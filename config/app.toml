@@ -1,0 +1,21 @@
+isDebug = false  # 是否是debug模式，如果是debug模式，使用debug-server配置，否则采用production-server
+accessLog = true  # 是否打开访问记录，文件地址在logger配置
+
+[debug-server]
+    name = "snowgo测试环境" # 服务名
+    version = "v1.1"
+    addr = "0.0.0.0"  # 服务地址
+    port = 8000  # 端口号
+    readTimeout = 4 # 单位s
+    writeTimeout = 4 # 单位s
+    maxHeaderMB = 2 # 单位M
+
+[production-server]
+    name = "snowgo正式环境" # 服务名
+    version = "v1.1"
+    addr = "0.0.0.0"  # 服务地址
+    port = 8000  # # 端口号
+    readTimeout = 2 # 单位s
+    writeTimeout = 2 # 单位s
+    maxHeaderMB = 2 # 单位M
+
