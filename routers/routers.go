@@ -1,6 +1,7 @@
 package routers
 
 import (
+	"snowgo/config"
 	"snowgo/middleware"
 	e "snowgo/utils/error"
 	"snowgo/utils/response"
@@ -9,6 +10,15 @@ import (
 )
 
 type option func(*gin.Engine)
+
+// 根据启动配置设置运行的mode
+func setMode() {
+	if config.ServerConf.IsDebug {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
+}
 
 // 中间件注册使用
 func loadMiddleWare(router *gin.Engine) {
@@ -37,6 +47,9 @@ func loadRouter(router *gin.Engine) {
 
 // InitRouter 初始化路由
 func InitRouter() *gin.Engine {
+	// 设置模式
+	setMode()
+	// 创建引擎
 	router := gin.New()
 	// 中间件注册
 	loadMiddleWare(router)

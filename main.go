@@ -8,11 +8,10 @@ import (
 	"os/signal"
 	"snowgo/config"
 	"snowgo/routers"
+	"snowgo/utils/cache/redis"
 	"snowgo/utils/logger"
 	"syscall"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 func init() {
@@ -24,12 +23,9 @@ func init() {
 
 func main() {
 
-	// 设置模式
-	if config.ServerConf.IsDebug {
-		gin.SetMode(gin.DebugMode)
-	} else {
-		gin.SetMode(gin.ReleaseMode)
-	}
+	// 初始化redis
+	redis.InitRedis()
+	defer redis.RDB.Close()
 
 	// 初始化路由
 	router := routers.InitRouter()
