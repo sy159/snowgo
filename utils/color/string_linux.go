@@ -5,6 +5,7 @@ package color
 import (
 	"fmt"
 	"math/rand"
+	"net/http"
 	"strconv"
 )
 

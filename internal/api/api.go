@@ -1,10 +1,11 @@
 package api
 
 import (
-	e "gin-api/utils/error"
-	"gin-api/utils/response"
-	"github.com/gin-gonic/gin"
+	e "snowgo/utils/error"
+	"snowgo/utils/response"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 // Index 首页

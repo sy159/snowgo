@@ -1,4 +1,4 @@
-module gin-api
+module snowgo
 
 go 1.14
 

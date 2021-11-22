@@ -1,9 +1,10 @@
 package response
 
 import (
-	e "gin-api/utils/error"
-	"github.com/gin-gonic/gin"
 	"net/http"
+	e "snowgo/utils/error"
+
+	"github.com/gin-gonic/gin"
 )
 
 // String 字符串返回

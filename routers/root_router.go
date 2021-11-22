@@ -1,7 +1,7 @@
 package routers
 
 import (
-	"gin-api/internal/api"
+	"snowgo/internal/api"
 
 	"github.com/gin-gonic/gin"
 )

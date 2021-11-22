@@ -5,6 +5,7 @@ package color
 import (
 	"fmt"
 	"math/rand"
+	"net/http"
 	"strconv"
 )
 
@@ -63,19 +64,6 @@ func WhiteFont(msg string) string {
 // WhiteBackground 白色背景
 func WhiteBackground(msg string) string {
 	return fmt.Sprintf("\x1b[47m%s\x1b[0m", msg)
-}
-
-func StatusCodeColor(status int) string {
-	switch {
-	case code >= http.StatusOK && code < http.StatusMultipleChoices:
-		return GreenBackground(status)
-	case code >= http.StatusMultipleChoices && code < http.StatusBadRequest:
-		return white
-	case code >= http.StatusBadRequest && code < http.StatusInternalServerError:
-		return yellow
-	default:
-		return red
-	}
 }
 
 // StatusCodeColor 根据状态码返回对应颜色

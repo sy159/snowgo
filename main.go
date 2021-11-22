@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-	"gin-api/config"
-	"gin-api/routers"
-	"gin-api/utils/logger"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"os"
 	"os/signal"
+	"snowgo/config"
+	"snowgo/routers"
+	"snowgo/utils/logger"
 	"syscall"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func init() {

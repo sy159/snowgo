@@ -2,25 +2,26 @@ package middleware
 
 import (
 	"fmt"
-	"gin-api/config"
-	"gin-api/utils"
-	"gin-api/utils/color"
-	e "gin-api/utils/error"
-	"gin-api/utils/logger"
-	"gin-api/utils/response"
-	"go.uber.org/zap"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"snowgo/config"
+	"snowgo/utils"
+	"snowgo/utils/color"
+	e "snowgo/utils/error"
+	"snowgo/utils/logger"
+	"snowgo/utils/response"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/gin-gonic/gin"
 )
 
 // AccessLogger 控制台输出访问日志，如果app配置了记录访问日志，会记录下访问日志
-func AccessLogger() gin.HandlerFunc  {
+func AccessLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		startTime := time.Now()

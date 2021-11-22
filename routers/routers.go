@@ -1,23 +1,24 @@
 package routers
 
 import (
-	"gin-api/middleware"
-	e "gin-api/utils/error"
-	"gin-api/utils/response"
+	"snowgo/middleware"
+	e "snowgo/utils/error"
+	"snowgo/utils/response"
+
 	"github.com/gin-gonic/gin"
 )
 
 type option func(*gin.Engine)
 
 // 中间件注册使用
-func loadMiddleWare(router *gin.Engine)  {
+func loadMiddleWare(router *gin.Engine) {
 	router.Use(middleware.AccessLogger(), middleware.Recovery())
 	router.Use(middleware.Cors())
 	gin.Logger()
 }
 
 // 注册所有路由
-func loadRouter(router *gin.Engine)  {
+func loadRouter(router *gin.Engine) {
 	// 统一处理404页面
 	router.NoRoute(func(c *gin.Context) {
 		response.FailByError(c, e.HttpNotFound)

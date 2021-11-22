@@ -1,7 +1,7 @@
 package config
 
 import (
-	"gin-api/utils/logger"
+	"snowgo/utils/logger"
 
 	"github.com/spf13/viper"
 )
@@ -13,7 +13,7 @@ var (
 // ServerConfig server配置
 type ServerConfig struct {
 	IsDebug      bool   `json:"isDebug" toml:"isDebug" yaml:"isDebug"`
-	AccessLog bool `json:"accessLog" toml:"accessLog" yaml:"accessLog"`
+	AccessLog    bool   `json:"accessLog" toml:"accessLog" yaml:"accessLog"`
 	Name         string `json:"name" toml:"name" yaml:"name"`
 	Version      string `json:"version" toml:"version" yaml:"version"`
 	Addr         string `json:"addr" toml:"addr" yaml:"addr"`
