@@ -1,24 +1,24 @@
 [debug-redis]
-addr = "127.0.01"  # 地址
-port = 6379  # 端口号
-password = ""  # 密码
-db = 0  # 数据库
-dialTimeout = 2  # 拨号超时(秒)
-readTimeout = 2  # 读取超时(秒)
-writeTimeout = 2  # 写入超时(秒)
-idleTimeout = 60  # 空闲超时(秒)
-minIdleConns = 8  # 最小空闲连接数
-poolSize = 20  # 连接池最大链接数
+    addr = "127.0.01"  # 地址
+    port = 6379  # 端口号
+    password = ""  # 密码
+    db = 0  # 数据库
+    dialTimeout = 2  # 拨号超时(秒)
+    readTimeout = 2  # 读取超时(秒)
+    writeTimeout = 2  # 写入超时(秒)
+    idleTimeout = 60  # 空闲超时(秒)
+    minIdleConns = 8  # 最小空闲连接数
+    poolSize = 20  # 连接池最大链接数
 
 
 [production-redis]
-addr = "127.0.01"  # 地址
-port = 6379  # 端口号
-password = ""  # 密码
-db = 0  # 数据库
-dialTimeout = 3  # 拨号超时(秒)
-readTimeout = 2  # 读取超时(秒)
-writeTimeout = 2  # 写入超时(秒)
-idleTimeout = 180  # 空闲超时(秒)
-minIdleConns = 20  # 最小空闲连接数
-poolSize = 100  # 连接池最大链接数
+    addr = "127.0.01"  # 地址
+    port = 6379  # 端口号
+    password = ""  # 密码
+    db = 0  # 数据库
+    dialTimeout = 3  # 拨号超时(秒)
+    readTimeout = 2  # 读取超时(秒)
+    writeTimeout = 2  # 写入超时(秒)
+    idleTimeout = 180  # 空闲超时(秒)
+    minIdleConns = 20  # 最小空闲连接数
+    poolSize = 100  # 连接池最大链接数

@@ -55,7 +55,7 @@ func InitConf() {
 // 初始化服务配置
 func loadServerConf() (err error) {
 	v := viper.New()
-	v.SetConfigName("app") // 设置文件名称
+	v.SetConfigName("application") // 设置文件名称
 	//v.SetConfigType("toml")
 	v.AddConfigPath("./config") // 设置文件所在路径
 
