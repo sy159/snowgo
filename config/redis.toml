@@ -1,6 +1,5 @@
 [debug-redis]
-    addr = "127.0.01"  # 地址
-    port = 6379  # 端口号
+    addr = "127.0.0.1:6379"  # 地址
     password = ""  # 密码
     db = 0  # 数据库
     dialTimeout = 2  # 拨号超时(秒)
@@ -12,8 +11,7 @@
 
 
 [production-redis]
-    addr = "127.0.01"  # 地址
-    port = 6379  # 端口号
+    addr = "127.0.0.1:6379"  # 地址
     password = ""  # 密码
     db = 0  # 数据库
     dialTimeout = 3  # 拨号超时(秒)

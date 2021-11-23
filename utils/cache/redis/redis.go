@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"fmt"
 	"snowgo/config"
 	"snowgo/utils/logger"
 	"time"
@@ -16,7 +15,7 @@ var RDB *redis.Client
 func InitRedis() {
 	dialTimeout := time.Duration(config.RedisConf.DialTimeout) * time.Second
 	RDB = redis.NewClient(&redis.Options{
-		Addr:         fmt.Sprintf("%s:%d", config.RedisConf.Addr, config.RedisConf.Port),
+		Addr:         config.RedisConf.Addr,
 		Password:     config.RedisConf.Password,
 		DB:           config.RedisConf.DB,
 		DialTimeout:  dialTimeout,

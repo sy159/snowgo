@@ -9,6 +9,7 @@ import (
 	"snowgo/config"
 	"snowgo/routers"
 	"snowgo/utils/cache/redis"
+	"snowgo/utils/database/mysql"
 	"snowgo/utils/logger"
 	"syscall"
 	"time"
@@ -23,6 +24,8 @@ func init() {
 
 func main() {
 
+	// 初始化mysql
+	mysql.InitMysql()
 	// 初始化redis
 	redis.InitRedis()
 	defer redis.RDB.Close()
