@@ -39,6 +39,7 @@ func connectMysql(config config.MysqlConfig) (db *gorm.DB, err error) {
 			TablePrefix:   config.TablePre, // 表前缀
 			SingularTable: true,            // 使用单数表名，启用该选项时，`User` 的表名应该是 `user`而不是users
 		},
+		SkipDefaultTransaction: true,
 	}
 
 	// 打印SQL设置
