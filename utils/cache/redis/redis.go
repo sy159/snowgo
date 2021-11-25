@@ -33,3 +33,8 @@ func InitRedis() {
 		logger.Panicf("redis init failed, err is %s", err.Error())
 	}
 }
+
+// CloseRedis 关闭redis连接
+func CloseRedis(rdb *redis.Client) (err error) {
+	return rdb.Close()
+}

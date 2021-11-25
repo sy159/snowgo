@@ -76,3 +76,12 @@ func connectMysql(config config.MysqlConfig) (db *gorm.DB, err error) {
 
 	return db, nil
 }
+
+// CloseMysql 关闭数据库连接
+func CloseMysql(db *gorm.DB) (err error) {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return
+	}
+	return sqlDB.Close()
+}

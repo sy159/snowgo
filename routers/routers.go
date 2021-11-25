@@ -2,7 +2,7 @@ package routers
 
 import (
 	"snowgo/config"
-	"snowgo/middleware"
+	"snowgo/routers/middleware"
 	e "snowgo/utils/error"
 	"snowgo/utils/response"
 

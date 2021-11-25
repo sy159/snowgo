@@ -13,9 +13,9 @@ import (
 
 const (
 	logTmFmtWithMS = "2006-01-02 15:04:05.000"
-	logTmFmtWithS = "2006-01-02 15:04:05"
-	logTmFmtWithM = "2006-01-02 15:04"
-	logTmFmtWithH = "2006-01-02 15"
+	logTmFmtWithS  = "2006-01-02 15:04:05"
+	logTmFmtWithM  = "2006-01-02 15:04"
+	logTmFmtWithH  = "2006-01-02 15"
 )
 
 //var Logger *zap.Logger // 也直接zap.L或者zap.S调用获取实例
@@ -90,7 +90,7 @@ func getNormalEncoder() zapcore.Encoder {
 		StacktraceKey: "stacktrace",
 		LineEnding:    zapcore.DefaultLineEnding,
 		//EncodeLevel: 带颜色输出 CapitalColorLevelEncoder
-		EncodeLevel:   func(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
+		EncodeLevel: func(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
 			enc.AppendString("[" + level.CapitalString() + "]")
 		},
 		// 时间格式 zapcore.ISO8601TimeEncoder
@@ -102,8 +102,8 @@ func getNormalEncoder() zapcore.Encoder {
 		EncodeDuration: func(d time.Duration, enc zapcore.PrimitiveArrayEncoder) {
 			enc.AppendInt64(int64(d) / int64(time.Millisecond))
 		},
-		EncodeCaller:   zapcore.ShortCallerEncoder, // 短路径编码器(相对路径+行号)
-		EncodeName:     zapcore.FullNameEncoder,
+		EncodeCaller: zapcore.ShortCallerEncoder, // 短路径编码器(相对路径+行号)
+		EncodeName:   zapcore.FullNameEncoder,
 	})
 }
 
@@ -118,7 +118,7 @@ func getJsonEncoder() zapcore.Encoder {
 		StacktraceKey: "stacktrace",
 		LineEnding:    zapcore.DefaultLineEnding,
 		//EncodeLevel: 带颜色输出 CapitalColorLevelEncoder
-		EncodeLevel:   func(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
+		EncodeLevel: func(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
 			enc.AppendString("[" + level.CapitalString() + "]")
 		},
 		// 时间格式 zapcore.ISO8601TimeEncoder
@@ -130,8 +130,8 @@ func getJsonEncoder() zapcore.Encoder {
 		EncodeDuration: func(d time.Duration, enc zapcore.PrimitiveArrayEncoder) {
 			enc.AppendInt64(int64(d) / int64(time.Millisecond))
 		},
-		EncodeCaller:   zapcore.ShortCallerEncoder, // 短路径编码器(相对路径+行号)
-		EncodeName:     zapcore.FullNameEncoder,
+		EncodeCaller: zapcore.ShortCallerEncoder, // 短路径编码器(相对路径+行号)
+		EncodeName:   zapcore.FullNameEncoder,
 	})
 }
 
@@ -152,8 +152,8 @@ func getAccessNormalEncoder() zapcore.Encoder {
 		EncodeDuration: func(d time.Duration, enc zapcore.PrimitiveArrayEncoder) {
 			enc.AppendInt64(int64(d) / int64(time.Millisecond))
 		},
-		EncodeCaller:   zapcore.ShortCallerEncoder, // 短路径编码器(相对路径+行号)
-		EncodeName:     zapcore.FullNameEncoder,
+		EncodeCaller: zapcore.ShortCallerEncoder, // 短路径编码器(相对路径+行号)
+		EncodeName:   zapcore.FullNameEncoder,
 	})
 }
 
@@ -174,8 +174,8 @@ func getAccessJsonEncoder() zapcore.Encoder {
 		EncodeDuration: func(d time.Duration, enc zapcore.PrimitiveArrayEncoder) {
 			enc.AppendInt64(int64(d) / int64(time.Millisecond))
 		},
-		EncodeCaller:   zapcore.ShortCallerEncoder, // 短路径编码器(相对路径+行号)
-		EncodeName:     zapcore.FullNameEncoder,
+		EncodeCaller: zapcore.ShortCallerEncoder, // 短路径编码器(相对路径+行号)
+		EncodeName:   zapcore.FullNameEncoder,
 	})
 }
 
@@ -196,9 +196,9 @@ func getAccessJsonEncoder() zapcore.Encoder {
 func getTimeWriter(filename string) zapcore.WriteSyncer {
 	hook, err := rotatelogs.New(
 		strings.Replace(filename, ".log", "", -1)+"-%Y-%m-%d.log", // 分割的新文件名(没有使用go的format格式, %Y%m%d%H%M%S）
-		rotatelogs.WithLinkName(filename),                               // 生成软链，指向最新日志文件
-		rotatelogs.WithMaxAge(90*24*time.Hour),                          // 文件最多保留时间
-		rotatelogs.WithRotationTime(24*time.Hour),                       // 文件分割间隔
+		rotatelogs.WithLinkName(filename),                         // 生成软链，指向最新日志文件
+		rotatelogs.WithMaxAge(90*24*time.Hour),                    // 文件最多保留时间
+		rotatelogs.WithRotationTime(24*time.Hour),                 // 文件分割间隔
 		rotatelogs.WithLocation(time.Local),
 	)
 
@@ -259,6 +259,6 @@ func Fatalf(template string, args ...interface{}) {
 }
 
 // Access 写入访问日志
-func Access(msg string, fields ...zap.Field)  {
+func Access(msg string, fields ...zap.Field) {
 	zap.L().Warn(msg, fields...)
 }
