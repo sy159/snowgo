@@ -24,7 +24,6 @@ func setMode() {
 func loadMiddleWare(router *gin.Engine) {
 	router.Use(middleware.AccessLogger(), middleware.Recovery())
 	router.Use(middleware.Cors())
-	gin.Logger()
 }
 
 // 注册所有路由

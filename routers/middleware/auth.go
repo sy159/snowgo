@@ -34,6 +34,21 @@ func JWTAuth() func(c *gin.Context) {
 			c.Abort()
 			return
 		}
+
+		// 检查token的type，refresh token不能使用
+		if !mc.CheckTypeByClaims() {
+			response.FailByError(c, e.TokenTypeError)
+			c.Abort()
+			return
+		}
+
+		// 检查token过期时间
+		if !mc.CheckTimeByClaims() {
+			response.FailByError(c, e.TokenExpired)
+			c.Abort()
+			return
+		}
+
 		// 将当前请求的username信息保存到请求的上下文c上
 		c.Set("userId", mc.UserId)
 		c.Set("username", mc.Username)

@@ -19,14 +19,22 @@ var (
 	HttpServiceUnavailable  = NewCode(503, "Service Unavailable")   // 服务器暂时处于超负载或正在进行停机维护，现在无法处理请求
 	HttpGatewayTimeout      = NewCode(504, "Gateway Timeout")       // 网关超时
 
-	// 后面的状态码为5位数，自己根据情况定制。。。
-	// 第一位 错误级别(1 开头表示系统相关；2 表示业务相关 等)
-	// 第二三位表示具体模块(比如：用户01 配送员02 商家03 订单04等)
-	// 第四五位表示模块下具体错误(比如：用户名不存在01 密码错误02 用户不存在03等)
-	// 认证为101开头
+)
+
+/*
+	后面的状态码为5位数，自己根据情况定制。。。
+	第一位 错误级别(1 开头表示系统相关；2 表示业务相关 等)
+	第二三位表示具体模块(比如：用户01 配送员02 商家03 订单04等)
+	第四五位表示模块下具体错误(比如：用户名不存在01 密码错误02 用户不存在03等)
+*/
+
+// auth相关  认证相关为101开头
+var (
 	TokenNotFound        = NewCode(10101, "token不能为空")
 	TokenIncorrectFormat = NewCode(10102, "token格式错误")
 	TokenInvalid         = NewCode(10103, "token无效")
+	TokenTypeError       = NewCode(10104, "token类型必须为access")
+	TokenExpired         = NewCode(10105, "token已过期")
 )
 
 type Code interface {

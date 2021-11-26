@@ -13,6 +13,9 @@ var RDB *redis.Client
 
 // InitRedis 初始化redis连接,设置全局Redis
 func InitRedis() {
+	if config.RedisConf == (config.RedisConfig{}) {
+		logger.Panic("Please initialize redis configuration first")
+	}
 	dialTimeout := time.Duration(config.RedisConf.DialTimeout) * time.Second
 	RDB = redis.NewClient(&redis.Options{
 		Addr:         config.RedisConf.Addr,

@@ -71,3 +71,19 @@ func ParseToken(token string) (*Claims, error) {
 
 	return nil, err
 }
+
+// CheckTypeByClaims 检查token的类型是不是访问token，而不是用刷新token来请求
+func (cm *Claims) CheckTypeByClaims() bool {
+	if cm.GrantType != accessType {
+		return false
+	}
+	return true
+}
+
+// CheckTimeByClaims 校验token是否过期
+func (cm *Claims) CheckTimeByClaims() bool {
+	if cm.StandardClaims.ExpiresAt < time.Now().Unix() {
+		return false
+	}
+	return true
+}

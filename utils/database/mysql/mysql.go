@@ -20,6 +20,9 @@ var DB *gorm.DB
 
 // InitMysql 初始化mysql连接,设置全局mysql db
 func InitMysql() {
+	if config.MysqlConf == (config.MysqlConfig{}) {
+		Panic("Please initialize mysql configuration first")
+	}
 	db, err := connectMysql(config.MysqlConf)
 	if err != nil {
 		Panicf("redis init failed, err is %s", err.Error())
