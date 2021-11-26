@@ -23,10 +23,14 @@ var (
 	// 第一位 错误级别(1 开头表示系统相关；2 表示业务相关 等)
 	// 第二三位表示具体模块(比如：用户01 配送员02 商家03 订单04等)
 	// 第四五位表示模块下具体错误(比如：用户名不存在01 密码错误02 用户不存在03等)
+	// 认证为101开头
+	TokenNotFound        = NewCode(10101, "token不能为空")
+	TokenIncorrectFormat = NewCode(10102, "token格式错误")
+	TokenInvalid         = NewCode(10103, "token无效")
 )
 
 type Code interface {
-	i()  // 避免被其他包实现
+	i() // 避免被其他包实现
 	GetErrCode() int
 	GetErrMsg() string
 	ToString() string

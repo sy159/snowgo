@@ -14,8 +14,13 @@ import (
 func init() {
 	// 初始化zap log全局配置
 	logger.InitLogger()
+
 	// 初始化配置文件
-	config.InitConf()
+	config.InitConf(
+		config.WithMysqlConf("mysql"), // 加载mysql配置
+		config.WithRedisConf("redis"), // 加载redis配置
+		config.WithJwtConf("jwt"),     // 加载jwt配置
+	)
 }
 
 func main() {
@@ -41,5 +46,5 @@ func main() {
 	<-quit
 
 	// 关闭服务
-	routers.StopHttpServer()
+	_ = routers.StopHttpServer()
 }

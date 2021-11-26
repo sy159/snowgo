@@ -7,9 +7,11 @@ import (
 )
 
 var (
+	configPath = "./config"
 	ServerConf ServerConfig // ServerConf 全局server配置
 	RedisConf  RedisConfig  // RedisConf 全局redis配置
 	MysqlConf  MysqlConfig  // MysqlConfig 全局mysql配置
+	JwtConf    JwtConfig    // JwtConf 全局jwt配置
 )
 
 // ServerConfig server启动配置
@@ -55,31 +57,39 @@ type MysqlConfig struct {
 	SlowSqlTime  int    `json:"slowSqlTime" toml:"slowSqlTime" yaml:"slowSqlTime"`    // 慢sql阈值 单位ms(在设置printSqlLog=true有用)
 }
 
+// JwtConfig jwt配置
+type JwtConfig struct {
+	Issuer                string `json:"issuer" toml:"issuer" yaml:"issuer"`                                              // 发布人
+	JwtSecret             string `json:"jwtSecret" toml:"jwtSecret" yaml:"jwtSecret"`                                     // jwt加密秘钥
+	AccessExpirationTime  int    `json:"accessExpirationTime" toml:"accessExpirationTime" yaml:"accessExpirationTime"`    // 访问token到期时间，单位min
+	RefreshExpirationTime int    `json:"refreshExpirationTime" toml:"refreshExpirationTime" yaml:"refreshExpirationTime"` // 刷新token到期时间，单位min
+
+}
+
+type Option func(option)
+
+type option struct{}
+
 // InitConf 加载所有需要配置文件
-func InitConf() {
+func InitConf(options ...Option) {
 	// 加载服务配置文件
-	if err := loadServerConf(); err != nil {
+	if err := loadServerConf("application"); err != nil {
 		logger.Panicf("server config failed to load, err is %s", err)
 	}
 
-	// 加载mysql配置文件
-	if err := loadMysqlConf(); err != nil {
-		logger.Panicf("mysql config failed to load, err is %s", err)
-	}
-
-	// 加载redis配置文件
-	if err := loadRedisConf(); err != nil {
-		logger.Panicf("redis config failed to load, err is %s", err)
+	// 加载需要注册的配置项目
+	for _, f := range options {
+		f(option{})
 	}
 
 }
 
 // 初始化服务配置
-func loadServerConf() (err error) {
+func loadServerConf(configName string) (err error) {
 	v := viper.New()
-	v.SetConfigName("application") // 设置文件名称
+	v.SetConfigName(configName) // 设置文件名称
 	//v.SetConfigType("toml")
-	v.AddConfigPath("./config") // 设置文件所在路径
+	v.AddConfigPath(configPath) // 设置文件所在路径
 
 	if err = v.ReadInConfig(); err != nil {
 		return
@@ -104,11 +114,11 @@ func loadServerConf() (err error) {
 }
 
 // 初始化mysql配置
-func loadMysqlConf() (err error) {
+func loadMysqlConf(configName string) (err error) {
 	v := viper.New()
-	v.SetConfigName("mysql") // 设置文件名称
+	v.SetConfigName(configName) // 设置文件名称
 	//v.SetConfigType("toml")
-	v.AddConfigPath("./config") // 设置文件所在路径
+	v.AddConfigPath(configPath) // 设置文件所在路径
 
 	if err = v.ReadInConfig(); err != nil {
 		return
@@ -129,11 +139,11 @@ func loadMysqlConf() (err error) {
 }
 
 // 初始化redis配置
-func loadRedisConf() (err error) {
+func loadRedisConf(configName string) (err error) {
 	v := viper.New()
-	v.SetConfigName("redis") // 设置文件名称
+	v.SetConfigName(configName) // 设置文件名称
 	//v.SetConfigType("toml")
-	v.AddConfigPath("./config") // 设置文件所在路径
+	v.AddConfigPath(configPath) // 设置文件所在路径
 
 	if err = v.ReadInConfig(); err != nil {
 		return
@@ -150,6 +160,60 @@ func loadRedisConf() (err error) {
 		return
 	}
 	return
+}
+
+// 初始化jwt配置
+func loadJwtConf(configName string) (err error) {
+	v := viper.New()
+	v.SetConfigName(configName) // 设置文件名称
+	//v.SetConfigType("toml")
+	v.AddConfigPath(configPath) // 设置文件所在路径
+
+	if err = v.ReadInConfig(); err != nil {
+		return
+	}
+
+	// 判断是正式环境还是测试环境,根据不同环境获取配置
+	subKey := "debug-jwt"
+	if !ServerConf.IsDebug {
+		subKey = "production-jwt"
+	}
+	serverSub := v.Sub(subKey)
+
+	if err = serverSub.Unmarshal(&JwtConf); err != nil {
+		return
+	}
+	return
+}
+
+// WithMysqlConf 加载mysql配置文件
+func WithMysqlConf(configName string) Option {
+	return func(o option) {
+		// 加载mysql配置文件
+		if err := loadMysqlConf(configName); err != nil {
+			logger.Panicf("mysql config failed to load, err is %s", err)
+		}
+	}
+}
+
+// WithRedisConf 加载redis配置文件
+func WithRedisConf(configName string) Option {
+	return func(o option) {
+		// 加载redis配置文件
+		if err := loadRedisConf(configName); err != nil {
+			logger.Panicf("redis config failed to load, err is %s", err)
+		}
+	}
+}
+
+// WithJwtConf 加载redis配置文件
+func WithJwtConf(configName string) Option {
+	return func(o option) {
+		// 加载redis配置文件
+		if err := loadJwtConf(configName); err != nil {
+			logger.Panicf("jwt config failed to load, err is %s", err)
+		}
+	}
 }
 
 //监控配置和重新获取配置

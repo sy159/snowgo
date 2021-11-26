@@ -17,6 +17,6 @@
     dialTimeout = 3  # 拨号超时(秒)
     readTimeout = 2  # 读取超时(秒)
     writeTimeout = 2  # 写入超时(秒)
-    idleTimeout = 180  # 空闲超时(秒)
+    idleTimeout = 300  # 空闲超时(秒)
     minIdleConns = 20  # 最小空闲连接数
-    poolSize = 100  # 连接池最大链接数
+    poolSize = 200  # 连接池最大链接数
