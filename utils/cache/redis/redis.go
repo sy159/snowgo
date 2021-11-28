@@ -38,6 +38,6 @@ func InitRedis() {
 }
 
 // CloseRedis 关闭redis连接
-func CloseRedis(rdb *redis.Client) (err error) {
-	return rdb.Close()
+func CloseRedis(rdb *redis.Client) {
+	_ = rdb.Close()
 }
