@@ -48,6 +48,8 @@ type Code interface {
 	GetErrCode() int
 	GetErrMsg() string
 	ToString() string
+	SetErrCode(int)
+	SetErrMsg(string)
 }
 
 type code struct {
@@ -73,6 +75,16 @@ func (c *code) GetErrCode() int {
 // GetErrMsg 获取错误信息
 func (c *code) GetErrMsg() string {
 	return c.ErrMsg
+}
+
+// SetErrCode 设置错误code
+func (c *code) SetErrCode(errCode int) {
+	c.ErrCode = errCode
+}
+
+// SetErrMsg 设置错误信息
+func (c *code) SetErrMsg(errMsg string) {
+	c.ErrMsg = errMsg
 }
 
 // ToString 返回 JSON 格式的错误详情
