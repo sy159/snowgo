@@ -1,37 +1,42 @@
-package main
+package cryption
 
 import (
 	"errors"
 	"math/rand"
-	"snowgo/utils"
+	str "snowgo/utils/str_tool"
 	"strings"
+	"time"
 )
 
-var (
-	chars   = "5dfucyar1j2txwgs8mvp4qhb3n6k7ez9" // 不重复的加密字符串
+const (
+	chars   = "5dfucyar1j2txwgs8mvp4qhb3n6k7ez9" // 不重复的加密字符串，可用utils.RandShuffleStr生成
 	charLen = uint(len(chars))
 	divider = "i" // 分割标识符
 )
 
-func id2Code(id uint, minLength int) (code string) {
+var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+// Id2Code id转code，可用于邀请码，短链接等生成
+func Id2Code(id uint, minLength int) (code string) {
 	for id/charLen > 0 {
 		code += string(chars[id%charLen])
 		id /= charLen
 	}
 	code += string(chars[id%charLen])
-	code = utils.ReverseStr(code)
+	code = str.ReverseStr(code)
 	fixLen := minLength - len(code)
 	if fixLen > 0 {
 		code += divider
 		for i := 0; i < fixLen-1; i++ {
 			//code += string(chars[i])
-			code += string(chars[rand.Intn(len(chars)-1)])
+			code += string(chars[seededRand.Intn(len(chars))])
 		}
 	}
 	return
 }
 
-func code2Id(code string) (id uint, err error) {
+// Code2Id code转id，用户解码
+func Code2Id(code string) (id uint, err error) {
 	for i := 0; i < len(code); i++ {
 		if string(code[i]) == divider {
 			break
