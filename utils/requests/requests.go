@@ -71,11 +71,12 @@ func Request(method, url, body string, opts ...Option) (res *response, err error
 
 	// 进行重试
 	for i := 0; i <= req.maxRetryNum; i++ {
-		resp, err := req.client.Do(req.request)
-		if err == nil {
+		resp, doErr := req.client.Do(req.request)
+		err = doErr
+		if doErr == nil {
 			return &response{req.request, resp}, nil
 		}
-		if i == req.maxRetryNum {
+		if i == req.maxRetryNum && req.maxRetryNum != 0 {
 			return nil, errors.New("Maximum number of retries reached ")
 		}
 	}
