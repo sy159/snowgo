@@ -25,7 +25,7 @@ func InitMysql() {
 	}
 	db, err := connectMysql(config.MysqlConf)
 	if err != nil {
-		Panicf("redis init failed, err is %s", err.Error())
+		Panicf("mysql init failed, err is %s", err.Error())
 	}
 	DB = db
 }
