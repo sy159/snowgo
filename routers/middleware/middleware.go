@@ -32,6 +32,12 @@ func AccessLogger() gin.HandlerFunc {
 		requestID := uuid.New().String()
 		// 将请求 ID 存储到 Gin 上下文中
 		c.Set("request_id", requestID)
+
+		// 处理ico请求，不记录日志
+		if c.Request.URL.Path == "/favicon.ico" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
 		c.Next()
 
 		cost := time.Since(startTime)

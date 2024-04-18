@@ -17,8 +17,8 @@
 [production-mysql]
     name = "生产数据库"
     addr = "127.0.0.1:3306"  # 地址
-    user = "test"  # 用户名
-    password = "test"  # 密码
+    user = "root"  # 用户名
+    password = "zx.123"  # 密码
     database = "test"  # 数据库名字
     charset = "utf8mb4"
     parseTime = true  # 是否支持把数据库datetime和date类型转换为golang的time.Time类型
