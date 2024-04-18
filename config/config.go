@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+	"snowgo/utils/env"
 	"snowgo/utils/logger"
 
 	"github.com/spf13/viper"
@@ -16,15 +18,15 @@ var (
 
 // ServerConfig server启动配置
 type ServerConfig struct {
-	IsDebug      bool   `json:"isDebug" toml:"isDebug" yaml:"isDebug"`
-	AccessLog    bool   `json:"accessLog" toml:"accessLog" yaml:"accessLog"`
-	Name         string `json:"name" toml:"name" yaml:"name"`
-	Version      string `json:"version" toml:"version" yaml:"version"`
-	Addr         string `json:"addr" toml:"addr" yaml:"addr"`
-	Port         uint32 `json:"port" toml:"port" yaml:"port"`
-	ReadTimeout  uint   `json:"readTimeout" toml:"readTimeout" yaml:"readTimeout" `
-	WriteTimeout uint   `json:"writeTimeout" toml:"writeTimeout" yaml:"writeTimeout"`
-	MaxHeaderMB  int    `json:"maxHeaderMB" toml:"maxHeaderMB" yaml:"maxHeaderMB"`
+	//IsDebug      bool   `json:"isDebug" toml:"isDebug" yaml:"isDebug"`
+	EnableAccessLog bool   `json:"enableAccessLog" toml:"enableAccessLog" yaml:"enableAccessLog"`
+	Name            string `json:"name" toml:"name" yaml:"name"`
+	Version         string `json:"version" toml:"version" yaml:"version"`
+	Addr            string `json:"addr" toml:"addr" yaml:"addr"`
+	Port            uint32 `json:"port" toml:"port" yaml:"port"`
+	ReadTimeout     uint   `json:"readTimeout" toml:"readTimeout" yaml:"readTimeout" `
+	WriteTimeout    uint   `json:"writeTimeout" toml:"writeTimeout" yaml:"writeTimeout"`
+	MaxHeaderMB     int    `json:"maxHeaderMB" toml:"maxHeaderMB" yaml:"maxHeaderMB"`
 }
 
 // RedisConfig redis连接配置
@@ -68,18 +70,31 @@ type JwtConfig struct {
 
 type Option func(option)
 
-type option struct{}
+type option struct {
+	configName string
+}
+
+var configFilePathMap = map[string]string{
+	env.ProdConstant: "config.prod",
+	env.UatConstant:  "config.uat",
+	env.DevConstant:  "config.dev",
+}
 
 // InitConf 加载所有需要配置文件
 func InitConf(options ...Option) {
+	configName, ok := configFilePathMap[env.Env()]
+	if !ok {
+		logger.Panicf("env config file not found, env is %s", env.Env())
+	}
+
 	// 加载服务配置文件
-	if err := loadServerConf("application"); err != nil {
+	if err := loadServerConf(configName); err != nil {
 		logger.Panicf("server config failed to load, err is %s", err)
 	}
 
 	// 加载需要注册的配置项目
 	for _, f := range options {
-		f(option{})
+		f(option{configName: configName})
 	}
 
 }
@@ -88,28 +103,23 @@ func InitConf(options ...Option) {
 func loadServerConf(configName string) (err error) {
 	v := viper.New()
 	v.SetConfigName(configName) // 设置文件名称
-	//v.SetConfigType("toml")
+	//v.SetConfigType("yaml")
 	v.AddConfigPath(configPath) // 设置文件所在路径
 
 	if err = v.ReadInConfig(); err != nil {
+		fmt.Println(err)
 		return
 	}
 
-	// 绑定配置文件
-	isDebug := v.GetBool("isDebug")
-
-	ServerConf.IsDebug = isDebug
-	ServerConf.AccessLog = v.GetBool("accessLog")
-	// 判断是正式环境还是测试环境,根据不同环境获取配置
-	subKey := "debug-server"
-	if !isDebug {
-		subKey = "production-server"
-	}
-	serverSub := v.Sub(subKey)
-
-	if err = serverSub.Unmarshal(&ServerConf); err != nil {
-		return
-	}
+	//ServerConf.IsDebug = isDebug
+	ServerConf.EnableAccessLog = v.GetBool("application.enable_access_log")
+	ServerConf.Name = v.GetString("application.server.name")
+	ServerConf.Version = v.GetString("application.server.version")
+	ServerConf.Addr = v.GetString("application.server.addr")
+	ServerConf.Port = v.GetUint32("application.server.port")
+	ServerConf.ReadTimeout = uint(v.GetInt("application.server.read_timeout"))
+	ServerConf.WriteTimeout = uint(v.GetInt("application.server.write_timeout"))
+	ServerConf.MaxHeaderMB = v.GetInt("application.server.max_header_mb")
 	return
 }
 
@@ -124,15 +134,7 @@ func loadMysqlConf(configName string) (err error) {
 		return
 	}
 
-	// 判断是正式环境还是测试环境,根据不同环境获取配置
-	subKey := "debug-mysql"
-	if !ServerConf.IsDebug {
-		subKey = "production-mysql"
-	}
-	// 读取的是基础数据库配置
-	serverSub := v.Sub(subKey)
-
-	if err = serverSub.Unmarshal(&MysqlConf); err != nil {
+	if err = v.UnmarshalKey("mysql", &MysqlConf); err != nil {
 		return
 	}
 	return
@@ -149,14 +151,7 @@ func loadRedisConf(configName string) (err error) {
 		return
 	}
 
-	// 判断是正式环境还是测试环境,根据不同环境获取配置
-	subKey := "debug-redis"
-	if !ServerConf.IsDebug {
-		subKey = "production-redis"
-	}
-	serverSub := v.Sub(subKey)
-
-	if err = serverSub.Unmarshal(&RedisConf); err != nil {
+	if err = v.UnmarshalKey("redis", &RedisConf); err != nil {
 		return
 	}
 	return
@@ -173,44 +168,37 @@ func loadJwtConf(configName string) (err error) {
 		return
 	}
 
-	// 判断是正式环境还是测试环境,根据不同环境获取配置
-	subKey := "debug-jwt"
-	if !ServerConf.IsDebug {
-		subKey = "production-jwt"
-	}
-	serverSub := v.Sub(subKey)
-
-	if err = serverSub.Unmarshal(&JwtConf); err != nil {
+	if err = v.UnmarshalKey("jwt", &JwtConf); err != nil {
 		return
 	}
 	return
 }
 
 // WithMysqlConf 加载mysql配置文件
-func WithMysqlConf(configName string) Option {
+func WithMysqlConf() Option {
 	return func(o option) {
 		// 加载mysql配置文件
-		if err := loadMysqlConf(configName); err != nil {
+		if err := loadMysqlConf(o.configName); err != nil {
 			logger.Panicf("mysql config failed to load, err is %s", err)
 		}
 	}
 }
 
 // WithRedisConf 加载redis配置文件
-func WithRedisConf(configName string) Option {
+func WithRedisConf() Option {
 	return func(o option) {
 		// 加载redis配置文件
-		if err := loadRedisConf(configName); err != nil {
+		if err := loadRedisConf(o.configName); err != nil {
 			logger.Panicf("redis config failed to load, err is %s", err)
 		}
 	}
 }
 
 // WithJwtConf 加载redis配置文件
-func WithJwtConf(configName string) Option {
+func WithJwtConf() Option {
 	return func(o option) {
 		// 加载redis配置文件
-		if err := loadJwtConf(configName); err != nil {
+		if err := loadJwtConf(o.configName); err != nil {
 			logger.Panicf("jwt config failed to load, err is %s", err)
 		}
 	}

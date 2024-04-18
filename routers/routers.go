@@ -1,8 +1,8 @@
 package routers
 
 import (
-	"snowgo/config"
 	"snowgo/routers/middleware"
+	"snowgo/utils/env"
 	e "snowgo/utils/error"
 	"snowgo/utils/response"
 
@@ -13,7 +13,7 @@ type option func(*gin.Engine)
 
 // 根据启动配置设置运行的mode
 func setMode() {
-	if config.ServerConf.IsDebug {
+	if env.Dev() {
 		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)

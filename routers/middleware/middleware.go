@@ -54,7 +54,7 @@ func AccessLogger() gin.HandlerFunc {
 		)
 
 		// 记录访问日志
-		if config.ServerConf.AccessLog {
+		if config.ServerConf.EnableAccessLog {
 			logger.Access(path,
 				zap.Int("status", c.Writer.Status()),
 				zap.String("method", method),

@@ -2,3 +2,4 @@
 *.log
 /logs/
 /.idea/
+/config/*.prod.yaml

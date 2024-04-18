@@ -1,0 +1,42 @@
+application:
+  enableAccessLog: true  # 是否打开访问记录，文件地址在logger配置
+  server:
+    name: snowgo测试环境" # 服务名
+    version: v1.1
+    addr: 0.0.0.0  # 服务地址
+    port: 8000  # 端口号
+    readTimeout: 30 # 单位s 当客户端发送请求后，服务器读取请求的时间超过该值，服务器将自动关闭连接。
+    writeTimeout: 30 # 单位s 当服务器处理请求后，写入响应的时间超过该值，服务器将自动关闭连接。
+    maxHeaderMB: 4 # 单位M
+
+mysql:
+  addr: 127.0.0.1:3306  # 地址
+  user: root  # 用户名
+  password: zx.123  # 密码
+  database: test  # 数据库名字
+  charset: utf8mb4
+  parseTime: true  # 是否支持把数据库datetime和date类型转换为golang的time.Time类型
+  loc: Local  # 使用系统本地时区
+  tablePre: ""  # 表前缀
+  maxIdleConns: 4  # 设置闲置的连接数，默认值为2；推荐 ((核心数 * 2) + 有效磁盘数)
+  maxOpenConns: 20  # 设置最大打开的连接数，默认值为0，表示不限制。
+  maxLifeTime: 180  # 设置了连接可复用的最大时间。单位min
+  printSqlLog: true  # 是否打印具体SQL
+  slowSqlTime: 3000 # 慢sql阈值 单位ms(在设置printSqlLog=true有用)
+
+redis:
+  addr: 127.0.0.1:6379  # 地址
+  password: ""  # 密码
+  db: 0  # 数据库
+  dialTimeout: 2  # 拨号超时(秒)
+  readTimeout: 2  # 读取超时(秒)
+  writeTimeout: 2  # 写入超时(秒)
+  idleTimeout: 60  # 空闲超时(秒)
+  minIdleConns: 8  # 最小空闲连接数
+  poolSize: 20  # 连接池最大链接数
+
+jwt:
+  issuer: snow  # 发布人
+  jwtSecret: kc&MhZCK$3Q6KMp5dANfZWFfDDSJF@nf  # jwt加密秘钥
+  accessExpirationTime: 15  # 访问token到期时间，单位min
+  refreshExpirationTime: 30  # 刷新token到期时间，单位min
