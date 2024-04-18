@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -28,6 +29,9 @@ func AccessLogger() gin.HandlerFunc {
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
 		method := c.Request.Method
+		requestID := uuid.New().String()
+		// 将请求 ID 存储到 Gin 上下文中
+		c.Set("request_id", requestID)
 		c.Next()
 
 		cost := time.Since(startTime)
@@ -51,9 +55,10 @@ func AccessLogger() gin.HandlerFunc {
 				zap.String("path", path),
 				zap.String("query", query),
 				zap.String("ip", c.ClientIP()),
+				zap.Duration("cost", cost),
+				zap.String("request_id", requestID),
 				zap.String("user-agent", c.Request.UserAgent()),
 				zap.String("errors", c.Errors.ByType(gin.ErrorTypePrivate).String()),
-				zap.Duration("cost", cost),
 			)
 		}
 	}
@@ -93,6 +98,7 @@ func Recovery() gin.HandlerFunc {
 					zap.String("path", c.Request.URL.Path),
 					zap.String("query", c.Request.URL.RawQuery),
 					zap.String("ip", c.ClientIP()),
+					zap.String("request_id", c.GetString("request_id")),
 					zap.String("user-agent", c.Request.UserAgent()),
 				)
 				//c.AbortWithStatus(http.StatusInternalServerError)  // 直接状态码为500

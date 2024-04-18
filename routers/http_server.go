@@ -26,6 +26,7 @@ func StartHttpServer() {
 	}
 
 	go func() {
+		fmt.Printf("%s:%s is running on %s\n", config.ServerConf.Name, config.ServerConf.Version, HttpServer.Addr)
 		if err := HttpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Fatalf("Server Listen: %s\n", err)
 		}
