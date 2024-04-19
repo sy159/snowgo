@@ -141,14 +141,14 @@ func loadServerConf(configName string) (err error) {
 	}
 
 	//ServerConf.IsDebug = isDebug
-	ServerConf.EnableAccessLog = v.GetBool("application.enable_access_log")
+	ServerConf.EnableAccessLog = v.GetBool("application.enableAccessLog")
 	ServerConf.Name = v.GetString("application.server.name")
 	ServerConf.Version = v.GetString("application.server.version")
 	ServerConf.Addr = v.GetString("application.server.addr")
 	ServerConf.Port = v.GetUint32("application.server.port")
-	ServerConf.ReadTimeout = uint(v.GetInt("application.server.read_timeout"))
-	ServerConf.WriteTimeout = uint(v.GetInt("application.server.write_timeout"))
-	ServerConf.MaxHeaderMB = v.GetInt("application.server.max_header_mb")
+	ServerConf.ReadTimeout = uint(v.GetInt("application.server.readTimeout"))
+	ServerConf.WriteTimeout = uint(v.GetInt("application.server.writeTimeout"))
+	ServerConf.MaxHeaderMB = v.GetInt("application.server.maxHeaderMB")
 	return
 }
 
