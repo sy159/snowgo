@@ -15,6 +15,8 @@ type option func(*gin.Engine)
 func setMode() {
 	if env.Dev() {
 		gin.SetMode(gin.DebugMode)
+	} else if env.Uat() {
+		gin.SetMode(gin.TestMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 	}

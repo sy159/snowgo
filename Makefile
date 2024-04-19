@@ -17,3 +17,10 @@ docker-stop:
 	echo "docker stop"
 	docker stop $(PROJECT_NAME) && docker rm $(PROJECT_NAME)
 
+
+# 生成model
+.PHONY: gen
+gen: do ?= init
+gen:
+	go run ./internal/dal/cmd/gen.go $(do)
+	# git add ./internal/dal/
