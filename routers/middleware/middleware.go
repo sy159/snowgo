@@ -1,8 +1,11 @@
 package middleware
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -15,11 +18,20 @@ import (
 	"snowgo/utils/response"
 	"strings"
 	"time"
-
-	"go.uber.org/zap"
-
-	"github.com/gin-gonic/gin"
 )
+
+// 自定义一个结构体，实现 gin.ResponseWriter interface
+type responseWriter struct {
+	gin.ResponseWriter
+	body *bytes.Buffer
+}
+
+// Write 复制一份出来
+func (w responseWriter) Write(b []byte) (int, error) {
+	//向一个bytes.buffer中写一份数据来为获取body使用
+	w.body.Write(b)
+	return w.ResponseWriter.Write(b)
+}
 
 // AccessLogger 控制台输出访问日志，如果app配置了记录访问日志，会记录下访问日志
 func AccessLogger() gin.HandlerFunc {
@@ -38,12 +50,29 @@ func AccessLogger() gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
+
+		// 处理resp，记录resp的
+		writer := &responseWriter{
+			c.Writer,
+			bytes.NewBuffer([]byte{}),
+		}
+		if config.ServerConf.EnableAccessLog {
+			writer = &responseWriter{
+				c.Writer,
+				bytes.NewBuffer([]byte{}),
+			}
+			c.Writer = writer
+		}
+
+		reqBody, _ := c.GetRawData()
+
 		c.Next()
 
 		cost := time.Since(startTime)
 		// 控制台输出访问日志
-		fmt.Printf("[%s] %25s | %4s | %14v | %5s  %#v | %12s\n%s",
+		fmt.Printf("[%s:%s] %25s | %4s | %14v | %5s  %#v | %12s\n%s",
 			config.ServerConf.Name,
+			config.ServerConf.Version,
 			time.Now().Format("2006-01-02 15:04:05.000"),
 			color.StatusCodeColor(c.Writer.Status()),
 			cost,
@@ -60,8 +89,10 @@ func AccessLogger() gin.HandlerFunc {
 				zap.String("method", method),
 				zap.String("path", path),
 				zap.String("query", query),
+				zap.String("req", string(reqBody)),
 				zap.String("ip", c.ClientIP()),
 				zap.Duration("cost", cost),
+				zap.String("res", writer.body.String()),
 				zap.String("request_id", requestID),
 				zap.String("user-agent", c.Request.UserAgent()),
 				zap.String("errors", c.Errors.ByType(gin.ErrorTypePrivate).String()),
