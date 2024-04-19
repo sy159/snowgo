@@ -10,19 +10,20 @@ application:
     maxHeaderMB: 4 # 单位M
 
 mysql:
-  addr: 127.0.0.1:3306  # 地址
-  user: root  # 用户名
-  password: zx.123  # 密码
-  database: test  # 数据库名字
-  charset: utf8mb4
-  parseTime: true  # 是否支持把数据库datetime和date类型转换为golang的time.Time类型
-  loc: Local  # 使用系统本地时区
+  separationRW: true  # 是否配置读写分离
+  dsn: root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
   tablePre: ""  # 表前缀
   maxIdleConns: 4  # 设置闲置的连接数，默认值为2；推荐 ((核心数 * 2) + 有效磁盘数)
   maxOpenConns: 20  # 设置最大打开的连接数，默认值为0，表示不限制。
-  maxLifeTime: 180  # 设置了连接可复用的最大时间。单位min
+  connMaxIdleTime: 30  # 连接空闲最大等待时间。单位min
+  connMaxLifeTime: 180  # 设置了连接可复用的最大时间。单位min
   printSqlLog: true  # 是否打印具体SQL
-  slowSqlTime: 3000 # 慢sql阈值 单位ms(在设置printSqlLog=true有用)
+  slowThresholdTime: 3000 # 慢sql阈值 单位ms(在设置printSqlLog=true有用)
+  mainsDSN:
+    - root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
+  slavesDSN:
+    - root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
+    - root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
 
 redis:
   addr: 127.0.0.1:6379  # 地址

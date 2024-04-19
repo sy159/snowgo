@@ -14,6 +14,7 @@ require (
 	golang.org/x/time v0.5.0
 	gorm.io/driver/mysql v1.5.6
 	gorm.io/gorm v1.25.9
+	gorm.io/plugin/dbresolver v1.5.1
 )
 
 require (

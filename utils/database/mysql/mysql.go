@@ -1,26 +1,24 @@
 package mysql
 
 import (
-	"fmt"
+	"errors"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+	"gorm.io/gorm/schema"
+	"gorm.io/plugin/dbresolver"
 	"log"
 	"os"
 	"snowgo/config"
 	. "snowgo/utils/logger"
 	"time"
-
-	"gorm.io/gorm/logger"
-
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm/schema"
-
-	"gorm.io/gorm"
 )
 
 var DB *gorm.DB
 
 // InitMysql 初始化mysql连接,设置全局mysql db
 func InitMysql() {
-	if config.MysqlConf == (config.MysqlConfig{}) {
+	if len(config.MysqlConf.DSN) == 0 && len(config.MysqlConf.MainsDSN) == 0 && len(config.MysqlConf.SlavesDSN) == 0 {
 		Panic("Please initialize mysql configuration first")
 	}
 	db, err := connectMysql(config.MysqlConf)
@@ -32,9 +30,9 @@ func InitMysql() {
 
 // 连接mysql
 func connectMysql(config config.MysqlConfig) (db *gorm.DB, err error) {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=%s&parseTime=%t&loc=%s",
-		config.User, config.Password, config.Addr, config.Database, config.Charset, config.ParseTime, config.Loc,
-	)
+	if config.DSN == "" {
+		return nil, errors.New("mysql init failed, dsn is empty")
+	}
 
 	// 连接额外配置信息
 	gormConfig := &gorm.Config{
@@ -48,34 +46,64 @@ func connectMysql(config config.MysqlConfig) (db *gorm.DB, err error) {
 	// 打印SQL设置
 	if config.PrintSqlLog {
 		loggerNew := logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
-			SlowThreshold: time.Duration(config.SlowSqlTime) * time.Millisecond, //慢SQL阈值 默认200ms
-			LogLevel:      logger.Info,                                          // info表示所有都打印，warn值打印慢sql
-			Colorful:      true,                                                 // 彩色打印开启
+			SlowThreshold:             time.Duration(config.SlowThresholdTime) * time.Millisecond, //慢SQL阈值
+			LogLevel:                  logger.Info,                                                // info表示所有都打印，warn值打印慢sql
+			Colorful:                  true,                                                       // 彩色打印开启
+			IgnoreRecordNotFoundError: true,
 		})
 		gormConfig.Logger = loggerNew
 	}
 
 	// 建立连接
-	db, err = gorm.Open(mysql.Open(dsn), gormConfig)
+	db, err = gorm.Open(mysql.Open(config.DSN), gormConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	// 设置连接池信息
 	sqlDB, err := db.DB()
-
 	if err != nil {
 		return nil, err
 	}
 	// 设置空闲连接池中连接的最大数量
-	sqlDB.SetMaxIdleConns(config.MaxIdleConns)
+	sqlDB.SetMaxIdleConns(config.GetMaxIdleConn())
 	// 设置打开数据库连接的最大数量 默认值为0表示不限制，可以避免并发太高导致连接mysql出现too many connections的错误。
-	sqlDB.SetMaxOpenConns(config.MaxOpenConns)
+	sqlDB.SetMaxOpenConns(config.GetMaxOpenConn())
 	// 设置了连接可复用的最大时间。单位min
-	sqlDB.SetConnMaxLifetime(time.Duration(config.MaxLifeTime) * time.Minute)
+	sqlDB.SetConnMaxLifetime(time.Duration(config.GetConnMaxLifeTime()) * time.Minute)
+	sqlDB.SetConnMaxIdleTime(time.Duration(config.GetConnMaxIdleTime()) * time.Minute)
 
+	// 未开启读写分离配置
+	if !config.SeparationRW {
+		return db, nil
+	}
+
+	// 读写分离配置
+	var sources []gorm.Dialector
+	var replicas []gorm.Dialector
+	if len(config.MainsDSN) > 0 {
+		for _, uri := range config.MainsDSN {
+			sources = append(sources, mysql.Open(uri))
+		}
+	}
+	if len(config.SlavesDSN) > 0 {
+		for _, uri := range config.SlavesDSN {
+			replicas = append(replicas, mysql.Open(uri))
+		}
+	}
 	// 使用插件
 	//err := db.Use(&TracePlugin{})
+	err = db.Use(dbresolver.Register(dbresolver.Config{
+		Sources:  sources,
+		Replicas: replicas,
+		Policy:   dbresolver.RandomPolicy{},
+	}).SetMaxOpenConns(config.GetMaxOpenConn()).
+		SetMaxIdleConns(config.GetMaxIdleConn()).
+		SetConnMaxIdleTime(time.Duration(config.GetConnMaxIdleTime()) * time.Minute).
+		SetConnMaxLifetime(time.Duration(config.GetConnMaxLifeTime()) * time.Minute))
+	if err != nil {
+		return nil, err
+	}
 
 	return db, nil
 }
