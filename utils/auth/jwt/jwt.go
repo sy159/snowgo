@@ -1,11 +1,10 @@
 package jwt
 
 import (
+	"github.com/golang-jwt/jwt"
 	"snowgo/config"
 	"snowgo/utils/logger"
 	"time"
-
-	"github.com/dgrijalva/jwt-go"
 )
 
 const (
