@@ -15,7 +15,6 @@ import (
 	"snowgo/internal/dal"
 	"sort"
 	"strings"
-	"time"
 )
 
 func init() {
@@ -99,6 +98,9 @@ func genModelByTables(db *gorm.DB, tablesStr string) {
 			}
 			return "byte"
 		},
+		"decimal": func(columnType gorm.ColumnType) (dataType string) {
+			return "decimal.Decimal"
+		},
 	}
 	g.WithDataTypeMap(dataMap)
 
@@ -122,8 +124,7 @@ func genModelByTables(db *gorm.DB, tablesStr string) {
 	g.Execute()
 	fmt.Println("生成model完成")
 
-	time.Sleep(1 * time.Second)
-	genQuery()
+	updateModelList(modelPkg)
 }
 
 func genModelByOldTables(db *gorm.DB) {
@@ -137,7 +138,6 @@ func genModelByOldTables(db *gorm.DB) {
 }
 
 func genQuery() {
-	updateModelList(modelPkg)
 
 	g := gen.NewGenerator(gen.Config{
 		OutPath:        "./internal/dal/query",

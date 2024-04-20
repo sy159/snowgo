@@ -15,6 +15,7 @@ import (
 )
 
 var DB *gorm.DB
+var DbMap = map[string]*gorm.DB{}
 
 // InitMysql 初始化mysql连接,设置全局mysql db
 func InitMysql() {

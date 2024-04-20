@@ -43,6 +43,12 @@ var (
 	TokenExpired         = NewCode(10205, "token已过期")
 )
 
+// account相关 103开头
+var (
+	UserNotFound    = NewCode(10301, "用户不存在")
+	UserCreateError = NewCode(10302, "用户创建失败")
+)
+
 type Code interface {
 	i() // 避免被其他包实现
 	GetErrCode() int

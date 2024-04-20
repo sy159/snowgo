@@ -22,5 +22,7 @@ docker-stop:
 .PHONY: gen
 gen: do ?= init
 gen:
-	go run ./internal/dal/cmd/gen.go $(do)
+	go run ./internal/dal/cmd/gen.go $(do) && make gen-query
 	# git add ./internal/dal/
+gen-query:
+	go run ./internal/dal/cmd/gen.go query

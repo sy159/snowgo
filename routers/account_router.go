@@ -10,7 +10,7 @@ import (
 func userRouters(r *gin.Engine) {
 	userGroup := r.Group("/account")
 	{
-		userGroup.POST("/login", Login)
+		userGroup.POST("/user", CreateUser)
 		userGroup.GET("/user/info", GetUserInfo)
 	}
 }
