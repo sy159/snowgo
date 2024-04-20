@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -65,6 +66,10 @@ func AccessLogger() gin.HandlerFunc {
 		}
 
 		reqBody, _ := c.GetRawData()
+		// 把读取的body内容重新写入
+		if len(reqBody) > 0 {
+			c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBody))
+		}
 
 		c.Next()
 
