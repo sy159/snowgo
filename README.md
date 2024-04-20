@@ -6,7 +6,7 @@
 2. zap日志管理
 3. viper配置文件解析
 4. response统一结构返回，以及error code自定义
-5. gorm数据库组件
+5. gorm数据库组件，以及使用gen生成model以及query
 6. go-redis缓存组件
 7. jwt鉴权
 8. rate限流
@@ -25,10 +25,15 @@ snowgo
 │   │   └── constants.go
 │   ├── dao    数据处理层
 │   │   └── dao.go
-│   ├── models  数据库model定义
-│   │   ├── account  账户相关model
-│   │   │   └── user.go
-│   │   └── dao.go
+│   ├── dal  数据库model query定义
+│   │   ├── cmd  使用gen生成model跟query
+│   │   │   └── gen.go
+│   │   ├── model  生成的model
+│   │   ├── query  model对应的query
+│   │   │   └── gen.go
+│   │   ├── repo  db的repo
+│   │   │   └── repo.go
+│   │   └── query_model.go  需要生成的model列表
 │   └── service 业务处理层
 ├── logs  日志
 ├── routers  web路由
@@ -56,6 +61,8 @@ snowgo
 │   ├── response 请求统一格式处理
 │   ├── str_tool 字符串相关操作
 │   └── common.go  常用工具
+├── Makefile
+├── Dockerfile
 ├── go.mod
 ├── go.sum
 └── main.go  项目启动入口
