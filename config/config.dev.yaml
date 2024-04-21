@@ -32,6 +32,23 @@ mysql:
     - root:zx.123@tcp(127.0.0.1:3306)/t1?charset=utf8mb4&parseTime=true&loc=Local
     - root:zx.123@tcp(127.0.0.1:3306)/t2?charset=utf8mb4&parseTime=true&loc=Local
 
+dbMap:
+  demo:
+    separationRW: false  # 是否配置读写分离
+    dsn: root:zx.123@tcp(127.0.0.1:3306)/demo?charset=utf8mb4&parseTime=true&loc=Local
+    tablePre: ""  # 表前缀
+    maxIdleConns: 4  # 设置闲置的连接数，默认值为2；推荐 ((核心数 * 2) + 有效磁盘数)
+    maxOpenConns: 20  # 设置最大打开的连接数，默认值为0，表示不限制。
+    connMaxIdleTime: 30  # 连接空闲最大等待时间。单位min
+    connMaxLifeTime: 180  # 设置了连接可复用的最大时间。单位min
+    printSqlLog: true  # 是否打印具体SQL
+    slowThresholdTime: 3000 # 慢sql阈值 单位ms(在设置printSqlLog=true有用)
+    mainsDSN:
+      - root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
+    slavesDSN:
+      - root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
+      - root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
+
 redis:
   addr: 127.0.0.1:6379  # 地址
   password: ""  # 密码

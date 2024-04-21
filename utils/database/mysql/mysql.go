@@ -27,6 +27,15 @@ func InitMysql() {
 		Panicf("mysql init failed, err is %s", err.Error())
 	}
 	DB = db
+
+	DbMap["default"] = db
+	for k, v := range config.OtherMapConf.DbMap {
+		otherDb, err := connectMysql(v)
+		if err != nil {
+			Panicf("mysql %s init failed, err is %s", k, err.Error())
+		}
+		DbMap[k] = otherDb
+	}
 }
 
 // 连接mysql

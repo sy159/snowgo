@@ -7,12 +7,13 @@ import (
 )
 
 var (
-	configPath = "./config"
-	ServerConf ServerConfig // ServerConf 全局server配置
-	LogConf    LogConfig    // LogConf 全局日志配置
-	RedisConf  RedisConfig  // RedisConf 全局redis配置
-	MysqlConf  MysqlConfig  // MysqlConfig 全局mysql配置
-	JwtConf    JwtConfig    // JwtConf 全局jwt配置
+	configPath   = "./config"
+	ServerConf   ServerConfig  // ServerConf 全局server配置
+	LogConf      LogConfig     // LogConf 全局日志配置
+	RedisConf    RedisConfig   // RedisConf 全局redis配置
+	MysqlConf    MysqlConfig   // MysqlConfig 全局mysql配置
+	OtherMapConf OtherDBConfig //OtherDBConfig 多数据库配置
+	JwtConf      JwtConfig     // JwtConf 全局jwt配置
 )
 
 // ServerConfig server启动配置
@@ -63,6 +64,10 @@ type MysqlConfig struct {
 	SlowThresholdTime int      `json:"slow_threshold_time" toml:"slowThresholdTime" yaml:"slowThresholdTime"` // 慢sql阈值 单位ms(在设置printSqlLog=true有用)
 	MainsDSN          []string `json:"mains_dsn" toml:"mainsDSN" yaml:"mainsDSN"`                             // 主库dsn separation_rw为t生效
 	SlavesDSN         []string `json:"slaves_dsn" toml:"slavesDSN" yaml:"slavesDSN"`                          // 从库dsn separation_rw为t生效
+}
+
+type OtherDBConfig struct {
+	DbMap map[string]MysqlConfig `json:"db_map" toml:"db_map" yaml:"db_map"`
 }
 
 // JwtConfig jwt配置
@@ -179,6 +184,10 @@ func loadMysqlConf(configName string) (err error) {
 	}
 
 	if err = v.UnmarshalKey("mysql", &MysqlConf); err != nil {
+		return
+	}
+
+	if err = v.Unmarshal(&OtherMapConf); err != nil {
 		return
 	}
 	return

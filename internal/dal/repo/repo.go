@@ -47,3 +47,14 @@ func (db *Repository) ReadQuery() *query.Query {
 func (db *Repository) DB() *gorm.DB {
 	return db.db.DB()
 }
+
+// ChangeDB 切换其他的db连接
+func (db *Repository) ChangeDB(dbName string) *Repository {
+	repository := db.db.GetBaseRepository(dbName)
+	return &Repository{
+		query:      query.Use(repository.DB()),
+		writeQuery: query.Use(repository.Use(dbresolver.Write).DB()),
+		readQuery:  query.Use(repository.Use(dbresolver.Read).DB()),
+		db:         repository,
+	}
+}
