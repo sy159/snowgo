@@ -6,11 +6,12 @@
 2. zap日志管理
 3. viper配置文件解析
 4. response统一结构返回，以及error code自定义
-5. gorm数据库组件，以及使用gen生成model以及query
+5. gorm数据库组件，以及使用gen生成model以及query(支持读写分离以及多数据库配置)
 6. go-redis缓存组件
 7. jwt鉴权
 8. rate限流
 9. 访问日志、跨域、全局异常处理等中间件
+
 ### 目录结构
 ```
 snowgo
@@ -69,3 +70,47 @@ snowgo
 
 ```
 
+### 安装部署
+安装运行需要的依赖
+```
+go mod download
+go mod tidy
+```
+修改配置文件
+```
+vim config$.{env}.yaml
+```
+根据需要注册mysql、redis等
+```
+// 初始化mysql
+mysql.InitMysql()
+defer mysql.CloseMysql(mysql.DB)
+// 初始化redis
+redis.InitRedis()
+defer redis.CloseRedis(redis.RDB)
+```
+启动项目
+```
+go run main.go
+```
+
+### 注意事项
+1. 根据数据库表生成model
+    ```
+    # 如果需要定制化某个db下model就修改db的地址配置(默认使用配置的数据库地址)
+    vim /internal/dal/cmd/gen.go
+   
+    # 初始化所有的表
+    make gen init
+   
+    # 新增某些表(根据表名)
+    make gen add
+   
+    # 更新以前生成的model
+    make gen update
+   
+    # 根据model生成所有的query
+    make gen query
+    ```
+2. 数据库orm语句
+    参考: [gen](https://gorm.io/zh_CN/gen/dao.html)、[gorm](https://gorm.io/zh_CN/docs/)
