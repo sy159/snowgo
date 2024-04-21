@@ -6,6 +6,7 @@ import (
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dao/account"
 	e "snowgo/utils/error"
+	"snowgo/utils/logger"
 	"snowgo/utils/response"
 	"strconv"
 )
@@ -42,6 +43,7 @@ func CreateUser(c *gin.Context) {
 		response.FailByError(c, e.HttpInternalServerError)
 		return
 	}
+	logger.Info("this is test info logo")
 	userDao := account.NewUserDao()
 	_, err := userDao.CreateUser(c, &model.User{
 		Username:     &user.Username,

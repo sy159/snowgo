@@ -12,15 +12,15 @@ import (
 )
 
 func init() {
-	// 初始化zap log全局配置
-	logger.InitLogger()
-
 	// 初始化配置文件
 	config.InitConf(
 		config.WithMysqlConf(), // 加载mysql配置
 		config.WithRedisConf(), // 加载redis配置
 		config.WithJwtConf(),   // 加载jwt配置
 	)
+
+	// 初始化zap log全局配置
+	logger.InitLogger()
 }
 
 func main() {

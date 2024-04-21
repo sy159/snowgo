@@ -1,13 +1,14 @@
 package logger
 
 import (
-	"os"
-	"strings"
-	"time"
-
+	"fmt"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"os"
+	"snowgo/config"
+	"strings"
+	"time"
 	//"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -22,10 +23,23 @@ const (
 
 // InitLogger 初始化Logger,设置zap全局logger
 func InitLogger() {
+	fmt.Println(config.LogConf)
+	logEncoder := config.LogConf.LogEncoder
+	accountEncoderConf := config.LogConf.AccountEncoder
+	logMaxAge := config.LogConf.LogFileMaxAgeDay
+	accountMaxAge := config.LogConf.AccountFileMaxAgeDay
+	writer := config.LogConf.Writer
 
 	// 设置日志输出格式
 	encoder := getNormalEncoder()
-	//encoder := getJsonEncoder()
+	if logEncoder == "json" {
+		encoder = getJsonEncoder()
+	}
+
+	accountEncoder := getAccessNormalEncoder()
+	if accountEncoderConf == "json" {
+		accountEncoder = getAccessJsonEncoder()
+	}
 
 	// 实现两个判断日志等级的interface
 	debugLevel := zap.LevelEnablerFunc(func(level zapcore.Level) bool {
@@ -43,25 +57,45 @@ func InitLogger() {
 	})
 
 	// 根据时间进行分割
-	debugWriter := getTimeWriter("./logs/debug/debug.log")
-	infoWriter := getTimeWriter("./logs/info/info.log")
-	accessWriter := getTimeWriter("./logs/access/access.log")
-	errorWriter := getTimeWriter("./logs/error/error.log")
+	debugWriter := zapcore.AddSync(os.Stdout)
+	infoWriter := zapcore.AddSync(os.Stdout)
+	accessWriter := zapcore.AddSync(os.Stdout)
+	errorWriter := zapcore.AddSync(os.Stdout)
+	// console控制台输出，file输出到文件 multi控制台跟日志文件同时输出
+	if writer == "file" {
+		debugWriter = getTimeWriter("./logs/debug/debug.log", logMaxAge)
+		infoWriter = getTimeWriter("./logs/info/info.log", logMaxAge)
+		accessWriter = getTimeWriter("./logs/access/access.log", accountMaxAge)
+		errorWriter = getTimeWriter("./logs/error/error.log", logMaxAge)
 
-	// 日志大小分割
-	//debugWriter := getSizeWriter("./logs/debug/debug.log")
-	//infoWriter := getSizeWriter("./logs/info/info.log")
-	//accessWriter := getSizeWriter("./logs/access/access.log")
-	//errorWriter := getSizeWriter("./logs/error/error.log")
+		// 日志大小分割
+		//debugWriter := getSizeWriter("./logs/debug/debug.log")
+		//infoWriter := getSizeWriter("./logs/info/info.log")
+		//accessWriter := getSizeWriter("./logs/access/access.log")
+		//errorWriter := getSizeWriter("./logs/error/error.log")
+	} else if writer == "multi" {
+		debugWriter = getTimeWriter("./logs/debug/debug.log", logMaxAge)
+		infoWriter = getTimeWriter("./logs/info/info.log", logMaxAge)
+		accessWriter = getTimeWriter("./logs/access/access.log", accountMaxAge)
+		errorWriter = getTimeWriter("./logs/error/error.log", logMaxAge)
+
+		// 日志大小分割
+		//debugWriter := getSizeWriter("./logs/debug/debug.log")
+		//infoWriter := getSizeWriter("./logs/info/info.log")
+		//accessWriter := getSizeWriter("./logs/access/access.log")
+		//errorWriter := getSizeWriter("./logs/error/error.log")
+		debugWriter = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), debugWriter)
+		infoWriter = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), infoWriter)
+		//accessWriter = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), accessWriter)  // account其他地方有些
+		errorWriter = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), errorWriter)
+	}
 
 	// 创建具体的Logger
 	core := zapcore.NewTee(
 		// zapcore.NewCore(encoder, zapcore.AddSync(os.Stdout), zap.NewAtomicLevelAt(zapcore.DebugLevel)),
-		zapcore.NewCore(encoder,
-			zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), debugWriter),
-			debugLevel),
+		zapcore.NewCore(encoder, debugWriter, debugLevel),
 		zapcore.NewCore(encoder, infoWriter, infoLevel),
-		zapcore.NewCore(getAccessNormalEncoder(), accessWriter, accessLevel),
+		zapcore.NewCore(accountEncoder, accessWriter, accessLevel),
 		zapcore.NewCore(encoder, errorWriter, errorLevel),
 	)
 
@@ -193,11 +227,11 @@ func getAccessJsonEncoder() zapcore.Encoder {
 //}
 
 // getTimeWriter 根据日志时间分割写入文件
-func getTimeWriter(filename string) zapcore.WriteSyncer {
+func getTimeWriter(filename string, maxAgeDay uint) zapcore.WriteSyncer {
 	hook, err := rotatelogs.New(
 		strings.Replace(filename, ".log", "", -1)+"-%Y-%m-%d.log", // 分割的新文件名(没有使用go的format格式, %Y%m%d%H%M%S）
 		rotatelogs.WithLinkName(filename),                         // 生成软链，指向最新日志文件
-		rotatelogs.WithMaxAge(90*24*time.Hour),                    // 文件最多保留时间
+		rotatelogs.WithMaxAge(time.Duration(maxAgeDay)*time.Hour), // 文件最多保留时间
 		rotatelogs.WithRotationTime(24*time.Hour),                 // 文件分割间隔
 		rotatelogs.WithLocation(time.Local),
 	)

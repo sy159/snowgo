@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	"snowgo/utils/env"
-	"snowgo/utils/logger"
 )
 
 var (
 	configPath = "./config"
 	ServerConf ServerConfig // ServerConf 全局server配置
+	LogConf    LogConfig    // LogConf 全局日志配置
 	RedisConf  RedisConfig  // RedisConf 全局redis配置
 	MysqlConf  MysqlConfig  // MysqlConfig 全局mysql配置
 	JwtConf    JwtConfig    // JwtConf 全局jwt配置
@@ -26,6 +26,15 @@ type ServerConfig struct {
 	ReadTimeout     uint   `json:"read_timeout" toml:"readTimeout" yaml:"readTimeout" `
 	WriteTimeout    uint   `json:"write_timeout" toml:"writeTimeout" yaml:"writeTimeout"`
 	MaxHeaderMB     int    `json:"max_header_mb" toml:"maxHeaderMB" yaml:"maxHeaderMB"`
+}
+
+// LogConfig log配置
+type LogConfig struct {
+	Writer               string `json:"writer" toml:"writer" yaml:"writer"`                                               // 日志输出的位置：console控制台输出，file输出到文件，multi控制台跟日志文件同时输出
+	AccountEncoder       string `json:"account_encoder" toml:"accountEncoder" yaml:"accountEncoder"`                      // 访问文件解析格式：normal正常格式输出；json输出为json
+	LogEncoder           string `json:"log_encoder" toml:"logEncoder" yaml:"logEncoder"`                                  // log文件解析格式：normal正常格式输出；json输出为json
+	AccountFileMaxAgeDay uint   `json:"account_file_max_age_day" toml:"accountFileMaxAgeDay" yaml:"accountFileMaxAgeDay"` // 访问文件最多保留多少天
+	LogFileMaxAgeDay     uint   `json:"log_file_max_age_day" toml:"logFileMaxAgeDay" yaml:"logFileMaxAgeDay"`             // 日志文件最多保留多少天
 }
 
 // RedisConfig redis连接配置
@@ -113,12 +122,12 @@ func (m *MysqlConfig) GetConnMaxLifeTime() int {
 func InitConf(options ...Option) {
 	configName, ok := configFilePathMap[env.Env()]
 	if !ok {
-		logger.Panicf("env config file not found, env is %s", env.Env())
+		panic(fmt.Sprintf("env config file not found, env is %s", env.Env()))
 	}
 
 	// 加载服务配置文件
 	if err := loadServerConf(configName); err != nil {
-		logger.Panicf("server config failed to load, err is %s", err)
+		panic(fmt.Sprintf("server config failed to load, err is %s", err))
 	}
 
 	// 加载需要注册的配置项目
@@ -149,6 +158,12 @@ func loadServerConf(configName string) (err error) {
 	ServerConf.ReadTimeout = uint(v.GetInt("application.server.readTimeout"))
 	ServerConf.WriteTimeout = uint(v.GetInt("application.server.writeTimeout"))
 	ServerConf.MaxHeaderMB = v.GetInt("application.server.maxHeaderMB")
+
+	// log
+	if err = v.UnmarshalKey("log", &LogConf); err != nil {
+		return
+	}
+
 	return
 }
 
@@ -208,7 +223,7 @@ func WithMysqlConf() Option {
 	return func(o option) {
 		// 加载mysql配置文件
 		if err := loadMysqlConf(o.configName); err != nil {
-			logger.Panicf("mysql config failed to load, err is %s", err)
+			panic(fmt.Sprintf("mysql config failed to load, err is %s", err))
 		}
 	}
 }
@@ -218,7 +233,7 @@ func WithRedisConf() Option {
 	return func(o option) {
 		// 加载redis配置文件
 		if err := loadRedisConf(o.configName); err != nil {
-			logger.Panicf("redis config failed to load, err is %s", err)
+			panic(fmt.Sprintf("redis config failed to load, err is %s", err))
 		}
 	}
 }
@@ -228,7 +243,7 @@ func WithJwtConf() Option {
 	return func(o option) {
 		// 加载redis配置文件
 		if err := loadJwtConf(o.configName); err != nil {
-			logger.Panicf("jwt config failed to load, err is %s", err)
+			panic(fmt.Sprintf("jwt config failed to load, err is %s", err))
 		}
 	}
 }

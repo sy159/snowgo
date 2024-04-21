@@ -9,6 +9,13 @@ application:
     writeTimeout: 30 # 单位s 当服务器处理请求后，写入响应的时间超过该值，服务器将自动关闭连接。
     maxHeaderMB: 4 # 单位M
 
+log:
+  writer: file  # 日志输出的位置：console控制台输出，file输出到文件，multi控制台跟日志文件同时输出
+  accountEncoder: json  # 访问文件解析格式：normal正常格式输出；json输出为json
+  logEncoder: normal  # log文件解析格式：normal正常格式输出；json输出为json
+  accountFileMaxAgeDay: 30 # 访问文件最多保留多少天
+  logFileMaxAgeDay: 30 # 日志文件最多保留多少天
+
 mysql:
   separationRW: true  # 是否配置读写分离
   dsn: root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
