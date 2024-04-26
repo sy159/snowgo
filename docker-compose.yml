@@ -3,6 +3,7 @@ version: '3'
 services:
   snow-nginx:
     image: nginx:1.12.1
+    container_name: snow-nginx
     ports:
       - ${NGINX_PORT:-80}:8080
     restart: always
@@ -21,6 +22,7 @@ services:
 
   snow-mysql:
     image: mysql:5.7
+    container_name: snow-mysql
     volumes:
       - /etc/localtime:/etc/localtime
       - ../data/mysql/data:/var/lib/mysql
@@ -37,6 +39,7 @@ services:
 
   snow-redis:
     image: redis:6.0
+    container_name: snow-redis
     restart: always
     ports:
       - ${REDIS_PORT:-6380}:6379
@@ -52,6 +55,7 @@ services:
 
   snow-service:
     image: ${SERVICE_IMAGE_NAME:-snow}:${SERVICE_IMAGE_VERSION:-v1.0}
+    container_name: snow-service
     restart: always
     logging:
       options:
