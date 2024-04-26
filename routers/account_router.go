@@ -7,7 +7,7 @@ import (
 )
 
 // 用户相关路由
-func userRouters(r *gin.Engine) {
+func userRouters(r *gin.RouterGroup) {
 	userGroup := r.Group("/account")
 	{
 		userGroup.POST("/user", CreateUser)

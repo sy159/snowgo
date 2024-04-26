@@ -2,7 +2,7 @@ application:
   enableAccessLog: true  # 是否打开访问记录，文件地址在logger配置
   server:
     name: snowgo正式环境 # 服务名
-    version: v1.1
+    version: v1
     addr: 0.0.0.0  # 服务地址
     port: 8000  # 端口号
     readTimeout: 30 # 单位s 当客户端发送请求后，服务器读取请求的时间超过该值，服务器将自动关闭连接。

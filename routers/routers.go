@@ -1,6 +1,8 @@
 package routers
 
 import (
+	"fmt"
+	"snowgo/config"
 	"snowgo/routers/middleware"
 	"snowgo/utils/env"
 	e "snowgo/utils/error"
@@ -9,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type option func(*gin.Engine)
+type option func(*gin.RouterGroup)
 
 // 根据启动配置设置运行的mode
 func setMode() {
@@ -35,14 +37,16 @@ func loadRouter(router *gin.Engine) {
 		response.FailByError(c, e.HttpNotFound)
 	})
 
-	rootRouters(router)  // 根目录下路由
-	options := []option{ // 根据不同分组注册路由
+	// 创建根路由组，并添加前缀
+	apiGroup := router.Group(fmt.Sprintf("/api/%s", config.ServerConf.Version))
+	rootRouters(apiGroup) // 根目录下路由
+	options := []option{  // 根据不同分组注册路由
 		userRouters, // 用户相关路由
 	}
 
 	// 注册其他分组下的路由
 	for _, opt := range options {
-		opt(router)
+		opt(apiGroup)
 	}
 }
 
