@@ -1,0 +1,76 @@
+version: '3'
+
+services:
+  snow-nginx:
+    image: nginx:1.12.1
+    ports:
+      - ${NGINX_PORT:-80}:8080
+    restart: always
+    logging:
+      options:
+        max-size: '10m'
+        max-file: '10'
+    networks:
+      - snow_network
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./config/nginx/conf.d:/etc/nginx/conf.d
+      - ../data/nginx/log:/var/log/nginx/
+      - ../dist:/usr/share/nginx/html/dist
+
+  snow-mysql:
+    image: mysql:5.7
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - ../data/mysql/data:/var/lib/mysql
+      - ./data/mysql/logs:/var/log/mysql
+      - ./config/mysql/my.cnf:/etc/mysql/my.cnf
+    restart: always
+    networks:
+      - snow_network
+    ports:
+      - ${MYSQL_PORT:-3307}:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: zx.123
+      MYSQL_DATABASE: snow
+
+  snow-redis:
+    image: redis:6.0
+    restart: always
+    ports:
+      - ${REDIS_PORT:-6380}:6379
+    networks:
+      - snow_network
+    privileged: true
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - ../data/redis/data:/data
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command:
+      redis-server /usr/local/etc/redis/redis.conf
+
+  snow-service:
+    image: ${SERVICE_IMAGE_NAME:-snow}:${SERVICE_IMAGE_VERSION:-v1.0}
+    restart: always
+    logging:
+      options:
+        max-size: '5m'
+        max-file: '10'
+    environment:
+      ENV: ${ENV:-dev}
+    networks:
+      - snow_network
+    privileged: true
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - ./config:/snow-service/config
+      - ./logs:/snow-service/logs
+
+networks:
+  snow_network:
+    ipam:
+      driver: default
+
+      config:
+        - subnet: ${SUBNET:-172.101.0.0/24}

@@ -1,7 +1,7 @@
 application:
   enableAccessLog: true  # 是否打开访问记录，文件地址在logger配置
   server:
-    name: snowgo测试环境" # 服务名
+    name: snowgo测试环境 # 服务名
     version: v1.1
     addr: 0.0.0.0  # 服务地址
     port: 8000  # 端口号
@@ -10,15 +10,15 @@ application:
     maxHeaderMB: 4 # 单位M
 
 log:
-  console: console  # 日志输出的位置：console控制台输出，file输出到文件，multi控制台跟日志文件同时输出
+  writer: console  # 日志输出的位置：console控制台输出，file输出到文件，multi控制台跟日志文件同时输出
   accountEncoder: json  # 访问文件解析格式：normal正常格式输出；json输出为json
   logEncoder: normal  # log文件解析格式：normal正常格式输出；json输出为json
   accountFileMaxAgeDay: 30 # 访问文件最多保留多少天
   logFileMaxAgeDay: 30 # 日志文件最多保留多少天
 
 mysql:
-  separationRW: true  # 是否配置读写分离
-  dsn: root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
+  separationRW: false  # 是否配置读写分离
+  dsn: root:zx.123@tcp(192.168.0.103:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
   tablePre: ""  # 表前缀
   maxIdleConns: 4  # 设置闲置的连接数，默认值为2；推荐 ((核心数 * 2) + 有效磁盘数)
   maxOpenConns: 20  # 设置最大打开的连接数，默认值为0，表示不限制。
@@ -32,25 +32,25 @@ mysql:
     - root:zx.123@tcp(127.0.0.1:3306)/t1?charset=utf8mb4&parseTime=true&loc=Local
     - root:zx.123@tcp(127.0.0.1:3306)/t2?charset=utf8mb4&parseTime=true&loc=Local
 
-dbMap:
-  demo:
-    separationRW: false  # 是否配置读写分离
-    dsn: root:zx.123@tcp(127.0.0.1:3306)/demo?charset=utf8mb4&parseTime=true&loc=Local
-    tablePre: ""  # 表前缀
-    maxIdleConns: 4  # 设置闲置的连接数，默认值为2；推荐 ((核心数 * 2) + 有效磁盘数)
-    maxOpenConns: 20  # 设置最大打开的连接数，默认值为0，表示不限制。
-    connMaxIdleTime: 30  # 连接空闲最大等待时间。单位min
-    connMaxLifeTime: 180  # 设置了连接可复用的最大时间。单位min
-    printSqlLog: true  # 是否打印具体SQL
-    slowThresholdTime: 3000 # 慢sql阈值 单位ms(在设置printSqlLog=true有用)
-    mainsDSN:
-      - root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
-    slavesDSN:
-      - root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
-      - root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
+#dbMap:
+#  demo:
+#    separationRW: false  # 是否配置读写分离
+#    dsn: root:zx.123@tcp(127.0.0.1:3306)/demo?charset=utf8mb4&parseTime=true&loc=Local
+#    tablePre: ""  # 表前缀
+#    maxIdleConns: 4  # 设置闲置的连接数，默认值为2；推荐 ((核心数 * 2) + 有效磁盘数)
+#    maxOpenConns: 20  # 设置最大打开的连接数，默认值为0，表示不限制。
+#    connMaxIdleTime: 30  # 连接空闲最大等待时间。单位min
+#    connMaxLifeTime: 180  # 设置了连接可复用的最大时间。单位min
+#    printSqlLog: true  # 是否打印具体SQL
+#    slowThresholdTime: 3000 # 慢sql阈值 单位ms(在设置printSqlLog=true有用)
+#    mainsDSN:
+#      - root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
+#    slavesDSN:
+#      - root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
+#      - root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local
 
 redis:
-  addr: 127.0.0.1:6379  # 地址
+  addr: snow-redis:6379  # 地址
   password: ""  # 密码
   db: 0  # 数据库
   dialTimeout: 2  # 拨号超时(秒)

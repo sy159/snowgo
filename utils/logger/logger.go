@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"fmt"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -23,7 +22,6 @@ const (
 
 // InitLogger 初始化Logger,设置zap全局logger
 func InitLogger() {
-	fmt.Println(config.LogConf)
 	logEncoder := config.LogConf.LogEncoder
 	accountEncoderConf := config.LogConf.AccountEncoder
 	logMaxAge := config.LogConf.LogFileMaxAgeDay

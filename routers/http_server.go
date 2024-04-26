@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"snowgo/config"
+	"snowgo/utils/color"
+	"snowgo/utils/env"
 	"snowgo/utils/logger"
 	"time"
 )
@@ -26,7 +28,11 @@ func StartHttpServer() {
 	}
 
 	go func() {
-		fmt.Printf("%s:%s is running on %s\n", config.ServerConf.Name, config.ServerConf.Version, HttpServer.Addr)
+		fmt.Printf("%s %s is running on %s... log wirter %s \n",
+			color.BlueFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
+			color.RedBackground(env.Env()),
+			HttpServer.Addr,
+			color.GreenFont(config.LogConf.Writer))
 		if err := HttpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Fatalf("Server Listen: %s\n", err)
 		}

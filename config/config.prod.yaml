@@ -1,7 +1,7 @@
 application:
   enableAccessLog: true  # 是否打开访问记录，文件地址在logger配置
   server:
-    name: snowgo正式环境" # 服务名
+    name: snowgo正式环境 # 服务名
     version: v1.1
     addr: 0.0.0.0  # 服务地址
     port: 8000  # 端口号
