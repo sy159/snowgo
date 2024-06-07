@@ -1,7 +1,7 @@
 FROM golang:1.21 AS builder
 
 # private repository
-RUN go env -w GOPRIVATE=github.com/infinitas-plus
+# RUN go env -w GOPRIVATE=github.com/sy159
 
 ENV GO111MODULE=on \
     GOPROXY=https://goproxy.cn,direct
@@ -9,9 +9,6 @@ ENV GO111MODULE=on \
 WORKDIR /go/src/app
 COPY go.mod go.sum ./
 COPY . .
-
-# private repository
-#RUN go env -w GOPRIVATE=github.com/xxx
 
 RUN go mod download && \
     CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /go/bin/app main.go
