@@ -1,7 +1,7 @@
 # snowgo <img src="https://img.shields.io/badge/golang-1.21-blue"/> <img src="https://img.shields.io/badge/gin-1.9.1-green"/> <img src="https://img.shields.io/badge/gorm-1.25.9-red"/>
 基于gin开发的脚手架工具，封装了常用功能，便于快速开发接口，开箱即用。可基于Docker，Docker Compose部署。
 
-### 集成组建:
+### 集成组件:
 1. gin轻量级Web框架
 2. zap日志管理
 3. viper配置文件解析
