@@ -1,8 +1,4 @@
-# snowgo
-<img src="https://img.shields.io/badge/golang-1.21-blue"/>
-<img src="https://img.shields.io/badge/gin-1.9.1-green"/>
-<img src="https://img.shields.io/badge/gorm-1.25.9-red"/>
-
+# snowgo <img src="https://img.shields.io/badge/golang-1.21-blue"/> <img src="https://img.shields.io/badge/gin-1.9.1-green"/> <img src="https://img.shields.io/badge/gorm-1.25.9-red"/>
 基于gin开发的脚手架工具，封装了常用功能，便于快速开发接口，开箱即用。可基于Docker，Docker Compose部署。
 
 ### 集成组建:
@@ -75,13 +71,14 @@ snowgo
 ```
 
 ### 安装部署
-#### 修改配置
+#### 1. 修改配置
 修改配置文件
 ```shell
 vim config$.{env}.yaml
 ```
 根据需要注册mysql、redis等
 ```
+# vim main.go
 // 初始化mysql
 mysql.InitMysql()
 defer mysql.CloseMysql(mysql.DB)
@@ -89,7 +86,8 @@ defer mysql.CloseMysql(mysql.DB)
 redis.InitRedis()
 defer redis.CloseRedis(redis.RDB)
 ```
-#### 命令运行项目
+#### 2. 运行项目
+##### 2.1 命令运行项目
 安装运行需要的依赖
 ```shell
 go mod download
@@ -100,7 +98,7 @@ go mod tidy
 go run main.go
 ```
 
-#### Docker运行项目
+##### 2.2 Docker运行项目
 生成项目服务docker镜像
 ```shell
 docker build -t snow:v1.0 .
@@ -110,7 +108,7 @@ docker build -t snow:v1.0 .
 docker run --name snow-service --restart always -d -p 8000:8000 -e ENV=dev -v ./config:/snow-service/config -v ./logs:/snow-service/logs snow:v1.0
 ```
 
-#### Docker Compose运行项目
+##### 2.3 Docker Compose运行项目
 生成项目服务docker镜像
 ```shell
 docker build -t snow:v1.0 .
