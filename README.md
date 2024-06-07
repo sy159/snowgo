@@ -1,5 +1,9 @@
 # snowgo
-基于gin开发的脚手架工具，封装了常用功能，便于快速开发接口，开箱即用。
+<img src="https://img.shields.io/badge/golang-1.21-blue"/>
+<img src="https://img.shields.io/badge/gin-1.9.1-green"/>
+<img src="https://img.shields.io/badge/gorm-1.25.9-red"/>
+
+基于gin开发的脚手架工具，封装了常用功能，便于快速开发接口，开箱即用。可基于Docker，Docker Compose部署。
 
 ### 集成组建:
 1. gin轻量级Web框架
@@ -71,13 +75,9 @@ snowgo
 ```
 
 ### 安装部署
-安装运行需要的依赖
-```
-go mod download
-go mod tidy
-```
+#### 修改配置
 修改配置文件
-```
+```shell
 vim config$.{env}.yaml
 ```
 根据需要注册mysql、redis等
@@ -89,9 +89,43 @@ defer mysql.CloseMysql(mysql.DB)
 redis.InitRedis()
 defer redis.CloseRedis(redis.RDB)
 ```
-启动项目
+#### 命令运行项目
+安装运行需要的依赖
+```shell
+go mod download
+go mod tidy
 ```
+启动项目
+```shell
 go run main.go
+```
+
+#### Docker运行项目
+生成项目服务docker镜像
+```shell
+docker build -t snow:v1.0 .
+```
+启动项目
+```shell
+docker run --name snow-service --restart always -d -p 8000:8000 -e ENV=dev -v ./config:/snow-service/config -v ./logs:/snow-service/logs snow:v1.0
+```
+
+#### Docker Compose运行项目
+生成项目服务docker镜像
+```shell
+docker build -t snow:v1.0 .
+```
+配置.env相关信息(服务端口、使用镜像等)
+```shell
+vim .env
+```
+修改配置文件(地址更换完docker compose服务名)
+```shell
+vim config$.{env}.yaml
+```
+启动项目
+```shell
+docker-compose up -d
 ```
 
 ### 注意事项
