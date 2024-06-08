@@ -1,4 +1,4 @@
-# snowgo <img src="https://img.shields.io/badge/golang-1.21-blue"/> <img src="https://img.shields.io/badge/gin-1.9.1-green"/> <img src="https://img.shields.io/badge/gorm-1.25.9-red"/>
+# snowgo <img src="https://img.shields.io/badge/golang-1.22-blue"/> <img src="https://img.shields.io/badge/gin-1.10.0-green"/> <img src="https://img.shields.io/badge/gorm-1.25.10-red"/>
 基于gin开发的脚手架工具，封装了常用功能，便于快速开发接口，开箱即用。可基于Docker，Docker Compose部署。
 
 ### 集成组件:
@@ -11,6 +11,7 @@
 7. jwt鉴权
 8. rate限流
 9. 访问日志、跨域、全局异常处理等中间件
+10. 基于redis等实现的分布式锁
 
 ### 目录结构
 ```
@@ -61,6 +62,7 @@ snowgo
 │   ├── requests http请求相关
 │   ├── response 请求统一格式处理
 │   ├── str_tool 字符串相关操作
+│   ├── xlock 分布式锁实现
 │   └── common.go  常用工具
 ├── Makefile
 ├── Dockerfile

@@ -1,4 +1,4 @@
-FROM golang:1.21 AS builder
+FROM golang:1.22.4 AS builder
 
 # private repository
 # RUN go env -w GOPRIVATE=github.com/sy159
