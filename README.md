@@ -51,6 +51,8 @@ snowgo
 │   ├── cache   缓存相关
 │   │   └── redis     redis
 │   │       └── redis.go
+│   │   └── cache.go    缓存定义
+│   │   └── redis_cache.go    基于redis的缓存使用
 │   ├── color   带颜色字符串
 │   ├── cryption   加解密，编码等操作
 │   ├── database   数据库相关
