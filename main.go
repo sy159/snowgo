@@ -5,8 +5,8 @@ import (
 	"os/signal"
 	"snowgo/config"
 	"snowgo/routers"
-	"snowgo/utils/cache/redis"
 	"snowgo/utils/database/mysql"
+	"snowgo/utils/database/redis"
 	"snowgo/utils/logger"
 	"syscall"
 )
