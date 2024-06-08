@@ -1,5 +1,6 @@
 application:
   enableAccessLog: true  # 是否打开访问记录，文件地址在logger配置
+  enablePprof: false  # 是否打开pprof
   server:
     name: snowgo正式环境 # 服务名
     version: v1

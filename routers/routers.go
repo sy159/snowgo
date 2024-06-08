@@ -2,6 +2,8 @@ package routers
 
 import (
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"snowgo/config"
 	"snowgo/routers/middleware"
 	"snowgo/utils/env"
@@ -36,6 +38,11 @@ func loadRouter(router *gin.Engine) {
 	router.NoRoute(func(c *gin.Context) {
 		response.FailByError(c, e.HttpNotFound)
 	})
+
+	// 注册pprof路由
+	if config.ServerConf.EnablePprof {
+		router.GET("/debug/pprof/*any", gin.WrapH(http.DefaultServeMux))
+	}
 
 	// 创建根路由组，并添加前缀
 	apiGroup := router.Group(fmt.Sprintf("/api/%s", config.ServerConf.Version))

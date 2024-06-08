@@ -20,6 +20,7 @@ var (
 type ServerConfig struct {
 	//IsDebug      bool   `json:"isDebug" toml:"isDebug" yaml:"isDebug"`
 	EnableAccessLog bool   `json:"enable_access_log" toml:"enableAccessLog" yaml:"enableAccessLog"`
+	EnablePprof     bool   `json:"enable_pprof" toml:"enablePprof" yaml:"enablePprof"`
 	Name            string `json:"name" toml:"name" yaml:"name"`
 	Version         string `json:"version" toml:"version" yaml:"version"`
 	Addr            string `json:"addr" toml:"addr" yaml:"addr"`
@@ -156,6 +157,7 @@ func loadServerConf(configName string) (err error) {
 
 	//ServerConf.IsDebug = isDebug
 	ServerConf.EnableAccessLog = v.GetBool("application.enableAccessLog")
+	ServerConf.EnablePprof = v.GetBool("application.enablePprof")
 	ServerConf.Name = v.GetString("application.server.name")
 	ServerConf.Version = v.GetString("application.server.version")
 	ServerConf.Addr = v.GetString("application.server.addr")
