@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"github.com/golang-jwt/jwt"
+	"github.com/pkg/errors"
 	"snowgo/config"
 	"snowgo/utils/logger"
 	"time"
@@ -10,6 +11,11 @@ import (
 const (
 	accessType  = "access"
 	refreshType = "refresh"
+)
+
+var (
+	ErrTokenExpired     = errors.New("token has expired")
+	ErrInvalidTokenType = errors.New("invalid token type")
 )
 
 type Claims struct {
@@ -59,6 +65,23 @@ func GenerateRefreshToken(userId uint, username string, role string) (string, er
 	return refreshToken, err
 }
 
+// GenerateTokens 生成访问令牌和刷新令牌
+func GenerateTokens(userId uint, username string, role string) (accessToken, refreshToken string, err error) {
+	// 生成访问令牌
+	accessToken, err = GenerateAccessToken(userId, username, role)
+	if err != nil {
+		return "", "", errors.Wrap(err, "Generate Access Token is err")
+	}
+
+	// 生成刷新令牌
+	refreshToken, err = GenerateRefreshToken(userId, username, role)
+	if err != nil {
+		return "", "", errors.Wrap(err, "Generate Refresh Token is err")
+	}
+
+	return accessToken, refreshToken, nil
+}
+
 // ParseToken 解析token
 func ParseToken(token string) (*Claims, error) {
 	tokenClaims, err := jwt.ParseWithClaims(token, &Claims{}, func(token *jwt.Token) (interface{}, error) {
@@ -74,10 +97,51 @@ func ParseToken(token string) (*Claims, error) {
 	return nil, err
 }
 
-// CheckTypeByClaims 检查token的类型是不是访问token，而不是用刷新token来请求
-func (cm *Claims) CheckTypeByClaims() bool {
+// RefreshTokens 根据刷新令牌生成新的刷新令牌和访问令牌
+func RefreshTokens(refreshToken string) (newRefreshToken, accessToken string, err error) {
+	// 解析刷新令牌
+	claims, err := ParseToken(refreshToken)
+	if err != nil {
+		return "", "", errors.Wrap(err, "Parse Refresh Token Error")
+	}
+
+	// 检查刷新令牌
+	if err := claims.Valid(); err != nil {
+		return "", "", errors.Wrap(err, "Claims Valid Error")
+	}
+
+	// 生成新的刷新令牌(这里如果重新生成，refresh token的过期时间又要重新算，如果沿用以前的，就是严格按照refresh token过期时间来)
+	newRefreshToken, err = GenerateRefreshToken(claims.UserId, claims.Username, claims.Role)
+	if err != nil {
+		return "", "", errors.Wrap(err, "Generate Refresh Token Error")
+	}
+
+	// 生成新的访问令牌
+	accessToken, err = GenerateAccessToken(claims.UserId, claims.Username, claims.Role)
+	if err != nil {
+		return "", "", errors.Wrap(err, "Generate Refresh Token Error")
+	}
+
+	return newRefreshToken, accessToken, nil
+}
+
+// IsAccessToken 检查token的类型是不是访问token，而不是用刷新token来请求
+func (cm *Claims) IsAccessToken() bool {
 	if cm.GrantType != accessType {
 		return false
 	}
 	return true
+}
+
+// ValidAccessToken 检查token的类型和有效期
+func (cm *Claims) ValidAccessToken() error {
+	// 检查到期时间 cm.Valid()默认的校验
+	if cm.ExpiresAt < time.Now().Unix() {
+		return ErrTokenExpired
+	}
+	// 检查令牌类型
+	if cm.GrantType != accessType {
+		return ErrInvalidTokenType
+	}
+	return nil
 }

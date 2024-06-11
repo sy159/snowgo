@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"github.com/pkg/errors"
 	"snowgo/utils/auth/jwt"
 	e "snowgo/utils/error"
 	"snowgo/utils/response"
@@ -35,9 +36,14 @@ func JWTAuth() func(c *gin.Context) {
 			return
 		}
 
-		// 检查token的type，refresh token不能使用
-		if !mc.CheckTypeByClaims() {
-			response.FailByError(c, e.TokenTypeError)
+		// 检查token的过期时间，以及type
+		if err := mc.ValidAccessToken(); err != nil {
+			if errors.Is(err, jwt.ErrInvalidTokenType) {
+				response.FailByError(c, e.TokenTypeError)
+				c.Abort()
+				return
+			}
+			response.FailByError(c, e.TokenExpired)
 			c.Abort()
 			return
 		}
