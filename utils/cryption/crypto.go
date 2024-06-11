@@ -40,7 +40,7 @@ func pkcs7UnPadding(origData []byte) []byte {
 	return origData[:(length - unPadding)]
 }
 
-// AesCBCEncrypt ase cbc模式加密,使用base64编码更直观 key长度(16，24，32)执行AES-128, AES-192, AES-256算法
+// AesCBCEncrypt aes cbc模式加密,使用base64编码更直观 key长度(16，24，32)执行AES-128, AES-192, AES-256算法
 func AesCBCEncrypt(plainText, key string) (string, error) {
 	plainByte, keyByte := []byte(plainText), []byte(key)
 	block, err := aes.NewCipher(keyByte)
@@ -55,7 +55,7 @@ func AesCBCEncrypt(plainText, key string) (string, error) {
 	return base64.StdEncoding.EncodeToString(cipherText), nil
 }
 
-// AesCBCDecrypt ase cbc解密
+// AesCBCDecrypt aes cbc解密
 func AesCBCDecrypt(cipherText, key string) (string, error) {
 	cipherByte, err := base64.StdEncoding.DecodeString(cipherText)
 	if err != nil {
