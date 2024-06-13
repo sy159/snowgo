@@ -70,6 +70,7 @@ func TestRedisCache(t *testing.T) {
 
 	t.Run("CacheIncrBy and CacheDecrBy", func(t *testing.T) {
 		incrKey := "test-incr-key"
+		_, _ = redisCache.Delete(ctx, incrKey)
 		_, err := redisCache.IncrBy(ctx, incrKey, 5)
 		if err != nil {
 			t.Fatalf("CacheIncrBy failed: %v", err)
