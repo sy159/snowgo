@@ -127,10 +127,7 @@ func RefreshTokens(refreshToken string) (newRefreshToken, accessToken string, er
 
 // IsAccessToken 检查token的类型是不是访问token，而不是用刷新token来请求
 func (cm *Claims) IsAccessToken() bool {
-	if cm.GrantType != accessType {
-		return false
-	}
-	return true
+	return cm.GrantType == accessType
 }
 
 // ValidAccessToken 检查token的类型和有效期

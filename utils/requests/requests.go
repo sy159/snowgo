@@ -1,13 +1,13 @@
 package requests
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -54,14 +54,17 @@ func Request(method, url, body string, opts ...Option) (res *response, err error
 		ctx:         context.Background(),
 		header:      defaultHeader,
 		maxRetryNum: defaultMaxRetryNum,
-	}
-	req.request, err = http.NewRequestWithContext(req.ctx, method, url, strings.NewReader(body))
-	if err != nil {
-		return nil, err
+		body:        body,
 	}
 
+	// 加载配置
 	for _, opt := range opts {
 		opt(req)
+	}
+
+	req.request, err = http.NewRequestWithContext(req.ctx, method, url, bytes.NewBufferString(req.body))
+	if err != nil {
+		return nil, err
 	}
 
 	// 处理header参数
@@ -71,13 +74,12 @@ func Request(method, url, body string, opts ...Option) (res *response, err error
 
 	// 进行重试
 	for i := 0; i <= req.maxRetryNum; i++ {
-		resp, doErr := req.client.Do(req.request)
-		err = doErr
-		if doErr == nil {
+		resp, err := req.client.Do(req.request)
+		if err == nil {
 			return &response{req.request, resp}, nil
 		}
 		if i == req.maxRetryNum && req.maxRetryNum != 0 {
-			return nil, errors.New("Maximum number of retries reached ")
+			return nil, errors.New("maximum number of retries reached")
 		}
 	}
 	return nil, err
@@ -93,9 +95,9 @@ func (res *response) Json(v interface{}) error {
 func (res *response) Map() (map[string]interface{}, error) {
 	defer res.Response.Body.Close()
 	var resMap map[string]interface{}
-	body, err := ioutil.ReadAll(res.Response.Body)
+	body, err := io.ReadAll(res.Response.Body)
 	if err != nil {
-		return resMap, err
+		return nil, err
 	}
 	err = json.Unmarshal(body, &resMap)
 	return resMap, err
@@ -104,62 +106,69 @@ func (res *response) Map() (map[string]interface{}, error) {
 // Text 返回body str内容，只能读取一次
 func (res *response) Text() (string, error) {
 	defer res.Response.Body.Close()
-	body, err := ioutil.ReadAll(res.Response.Body)
+	body, err := io.ReadAll(res.Response.Body)
 	if err != nil {
 		return "", err
 	}
 	return string(body), nil
 }
 
-// Get get请求
-func Get(url string, opts ...Option) (res *response, err error) {
+// Get 发起GET请求
+func Get(url string, opts ...Option) (*response, error) {
 	return Request("GET", url, "", opts...)
 }
 
-// Post post请求
-func Post(url, body string, opts ...Option) (res *response, err error) {
+// Post 发起POST请求
+func Post(url, body string, opts ...Option) (*response, error) {
 	return Request("POST", url, body, opts...)
 }
 
-// Delete delete请求
-func Delete(url, body string, opts ...Option) (res *response, err error) {
+// Delete 发起DELETE请求
+func Delete(url, body string, opts ...Option) (*response, error) {
 	return Request("DELETE", url, body, opts...)
 }
 
-// Put put请求
-func Put(url, body string, opts ...Option) (res *response, err error) {
+// Put 发起PUT请求
+func Put(url, body string, opts ...Option) (*response, error) {
 	return Request("PUT", url, body, opts...)
 }
 
-// WithClient 设置连接池，默认keepalive is false
+// WithClient 设置HTTP客户端
 func WithClient(client *http.Client) Option {
 	return func(r *request) {
 		r.client = client
 	}
 }
 
-// WithCtx 设置ctx
+// WithCtx 设置请求上下文
 func WithCtx(ctx context.Context) Option {
 	return func(r *request) {
 		r.ctx = ctx
 	}
 }
 
-// WithHeader 设置header
+// WithHeader 设置请求头
 func WithHeader(header map[string]string) Option {
 	return func(r *request) {
 		r.header = header
 	}
 }
 
-// WithMaxRetryNum 设置自大重试次数，默认为0
+// WithBody 设置请求体内容
+func WithBody(body string) Option {
+	return func(r *request) {
+		r.body = body
+	}
+}
+
+// WithMaxRetryNum 设置最大重试次数
 func WithMaxRetryNum(maxRetryNum int) Option {
 	return func(r *request) {
 		r.maxRetryNum = maxRetryNum
 	}
 }
 
-// WithRequest 设置请求参数，默认为NewRequestWithContext
+// WithRequest 设置自定义请求
 func WithRequest(req *http.Request) Option {
 	return func(r *request) {
 		r.request = req
