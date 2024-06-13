@@ -27,8 +27,7 @@ func TestCrypto(t *testing.T) {
 }
 
 func TestEncode(t *testing.T) {
-	var id uint
-	id = 11111
+	var id uint = 11111
 	t.Run("encode/decode", func(t *testing.T) {
 		code := cryption.Id2Code(id, 8)
 		fmt.Println(code)

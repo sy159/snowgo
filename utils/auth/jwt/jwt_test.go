@@ -9,8 +9,7 @@ import (
 )
 
 func TestJwt(t *testing.T) {
-	var userId uint
-	userId = 1
+	var userId uint = 1
 	username, role := "test", "admin"
 
 	t.Run("jwt token", func(t *testing.T) {
@@ -62,10 +61,8 @@ func TestJwt(t *testing.T) {
 		if err := mc.ValidAccessToken(); err != nil {
 			if errors.Is(err, jwt.ErrInvalidTokenType) {
 				fmt.Printf("invalid token type")
-				return
 			}
 			fmt.Printf("token has expired")
 		}
-		return
 	})
 }
