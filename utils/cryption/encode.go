@@ -32,7 +32,7 @@ func Id2Code(id uint, minLength int) (code string) {
 			code += string(chars[seededRand.Intn(len(chars))])
 		}
 	}
-	return
+	return code
 }
 
 // Code2Id code转id，用户解码
@@ -43,8 +43,7 @@ func Code2Id(code string) (id uint, err error) {
 		}
 		charIdx := strings.Index(chars, string(code[i]))
 		if charIdx == -1 {
-			err = errors.New("code decode failed")
-			return
+			return 0, errors.New("code decode failed")
 		}
 		charIndex := uint(charIdx)
 		if i > 0 {
@@ -53,5 +52,5 @@ func Code2Id(code string) (id uint, err error) {
 			id = charIndex
 		}
 	}
-	return
+	return id, nil
 }
