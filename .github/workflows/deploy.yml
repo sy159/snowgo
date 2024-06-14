@@ -1,0 +1,63 @@
+name: Build and push image, Deploy
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Build
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Load .env file
+        run: |
+          set -a
+          source .env
+          set +a
+          echo "SERVICE_IMAGE_NAME=${SERVICE_IMAGE_NAME:-snowgo}" >> $GITHUB_ENV
+          echo "SERVICE_IMAGE_VERSION=${SERVICE_IMAGE_VERSION:-v1.0}" >> $GITHUB_ENV
+          echo "PROJECT_NAME=${PROJECT_NAME:-snowgo-service}" >> $GITHUB_ENV
+
+      - name: Extract version tag
+        id: extract_tag
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          if [[ $TAG != v* ]]; then
+            TAG="v$TAG"
+          fi
+          echo "SERVICE_IMAGE_VERSION=$TAG" >> $GITHUB_ENV
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ env.SERVICE_IMAGE_NAME }}:${{ env.SERVICE_IMAGE_VERSION }}
+
+      - name: Set up SSH
+        uses: appleboy/ssh-action@v0.5.3
+        with:
+          host: ${{ secrets.SNOWGO_SERVER_IP }}
+          username: ${{ secrets.SNOWGO_SERVER_USER }}
+          key: ${{ secrets.SNOWGO_SERVER_SSH_KEY }}
+          script: |
+            cd /opt/${{ env.PROJECT_NAME }}
+
+            # 拉取最新的 Docker 镜像
+            docker-compose down
+            docker-compose pull ${{ env.SERVICE_IMAGE_NAME }}:${{ env.SERVICE_IMAGE_VERSION }}
+
+            # 使用新镜像启动容器
+            docker-compose up -d
