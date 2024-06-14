@@ -42,16 +42,15 @@ jobs:
           fi
           echo "SERVICE_IMAGE_VERSION=$TAG" >> $GITHUB_ENV
 
-      - name: Check Docker login status
-        run: docker info
-
+      - name: Check env info
+        run: env
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ env.SERVICE_IMAGE_NAME }}:${{ env.SERVICE_IMAGE_VERSION }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_IMAGE_NAME }}:${{ env.SERVICE_IMAGE_VERSION }}
           verbosity: 'debug'
 
 
