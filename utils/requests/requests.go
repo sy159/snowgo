@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -74,13 +75,15 @@ func Request(method, url, body string, opts ...Option) (res *response, err error
 
 	// 进行重试
 	for i := 0; i <= req.maxRetryNum; i++ {
-		resp, err := req.client.Do(req.request)
-		if err == nil {
+		resp, doErr := req.client.Do(req.request)
+		fmt.Println(doErr)
+		if doErr == nil {
 			return &response{req.request, resp}, nil
 		}
 		if i == req.maxRetryNum && req.maxRetryNum != 0 {
 			return nil, errors.New("maximum number of retries reached")
 		}
+		err = doErr
 	}
 	return nil, err
 }

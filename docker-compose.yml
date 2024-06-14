@@ -26,7 +26,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime
       - ../data/mysql/data:/var/lib/mysql
-      - ./data/mysql/logs:/var/log/mysql
+      - ../data/mysql/logs:/var/log/mysql
       - ./config/mysql/my.cnf:/etc/mysql/my.cnf
     restart: always
     networks:
