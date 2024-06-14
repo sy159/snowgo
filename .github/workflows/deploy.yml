@@ -42,7 +42,7 @@ jobs:
           fi
           echo "SERVICE_IMAGE_VERSION=$TAG" >> $GITHUB_ENV
 
-      - name: Check env info
+      - name: Print environment variables
         run: env
 
       - name: Build and push Docker image
@@ -51,7 +51,6 @@ jobs:
           context: .
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_IMAGE_NAME }}:${{ env.SERVICE_IMAGE_VERSION }}
-          verbosity: 'debug'
 
 
       - name: Set up SSH
