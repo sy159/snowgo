@@ -17,7 +17,7 @@ RUN go mod download && \
 FROM alpine:latest
 #FROM debian:stable-slim
 
-ENV PROJECT_NAME=snow-service
+ENV PROJECT_NAME=snowgo-service
 ENV PORT=8000
 
 WORKDIR /${PROJECT_NAME}

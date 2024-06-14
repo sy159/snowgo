@@ -105,11 +105,11 @@ go run main.go
 ##### 2.2 Docker运行项目
 生成项目服务docker镜像
 ```shell
-docker build -t snow:v1.0 .
+docker build -t snowgo:v1.0 .
 ```
 启动项目
 ```shell
-docker run --name snow-service --restart always -d -p 8000:8000 -e ENV=dev -v ./config:/snow-service/config -v ./logs:/snow-service/logs snow:v1.0
+docker run --name snowgo-service --restart always -d -p 8000:8000 -e ENV=dev -v ./config:/snowgo-service/config -v ./logs:/snowgo-service/logs snow:v1.0
 ```
 
 ##### 2.3 Docker Compose运行项目

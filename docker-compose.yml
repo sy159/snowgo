@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  snow-nginx:
+  snowgo-nginx:
     image: nginx:1.12.1
-    container_name: snow-nginx
+    container_name: snowgo-nginx
     ports:
       - ${NGINX_PORT:-80}:8080
     restart: always
@@ -12,7 +12,7 @@ services:
         max-size: '10m'
         max-file: '10'
     networks:
-      - snow_network
+      - snowgo_network
     volumes:
       - /etc/localtime:/etc/localtime
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf
@@ -20,9 +20,9 @@ services:
       - ../data/nginx/log:/var/log/nginx/
       - ../dist:/usr/share/nginx/html/dist
 
-  snow-mysql:
+  snowgo-mysql:
     image: mysql:5.7
-    container_name: snow-mysql
+    container_name: snowgo-mysql
     volumes:
       - /etc/localtime:/etc/localtime
       - ../data/mysql/data:/var/lib/mysql
@@ -30,21 +30,21 @@ services:
       - ./config/mysql/my.cnf:/etc/mysql/my.cnf
     restart: always
     networks:
-      - snow_network
+      - snowgo_network
     ports:
       - ${MYSQL_PORT:-3307}:3306
     environment:
       MYSQL_ROOT_PASSWORD: zx.123
-      MYSQL_DATABASE: snow
+      MYSQL_DATABASE: snowgo
 
-  snow-redis:
+  snowgo-redis:
     image: redis:6.0
-    container_name: snow-redis
+    container_name: snowgo-redis
     restart: always
     ports:
       - ${REDIS_PORT:-6380}:6379
     networks:
-      - snow_network
+      - snowgo_network
     privileged: true
     volumes:
       - /etc/localtime:/etc/localtime
@@ -53,9 +53,9 @@ services:
     command:
       redis-server /usr/local/etc/redis/redis.conf
 
-  snow-service:
-    image: ${SERVICE_IMAGE_NAME:-snow}:${SERVICE_IMAGE_VERSION:-v1.0}
-    container_name: snow-service
+  snowgo-service:
+    image: ${SERVICE_IMAGE_NAME:-snowgo}:${SERVICE_IMAGE_VERSION:-v1.0}
+    container_name: snowgo-service
     restart: always
     logging:
       options:
@@ -64,15 +64,15 @@ services:
     environment:
       ENV: ${ENV:-dev}
     networks:
-      - snow_network
+      - snowgo_network
     privileged: true
     volumes:
       - /etc/localtime:/etc/localtime
-      - ./config:/snow-service/config
-      - ./logs:/snow-service/logs
+      - ./config:/snowgo-service/config
+      - ./logs:/snowgo-service/logs
 
 networks:
-  snow_network:
+  snowgo_network:
     ipam:
       driver: default
 
