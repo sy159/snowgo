@@ -48,6 +48,8 @@ jobs:
           context: .
           push: true
           tags: ${{ env.SERVICE_IMAGE_NAME }}:${{ env.SERVICE_IMAGE_VERSION }}
+          verbosity: 'debug'
+
 
       - name: Set up SSH
         uses: appleboy/ssh-action@v1.0.3
