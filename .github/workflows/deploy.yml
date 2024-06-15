@@ -90,7 +90,8 @@ jobs:
             sed -i "s/^SERVICE_IMAGE_VERSION=.*/SERVICE_IMAGE_VERSION=${{ env.SERVICE_IMAGE_VERSION }}/" .env
   
             # 拉取最新的 Docker 镜像
+            docker-compose down
             docker-compose pull ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_IMAGE_NAME }}:${{ env.SERVICE_IMAGE_VERSION }}
 
             # 使用新镜像启动容器
-            docker-compose down && docker-compose up -d
+            docker-compose up -d
