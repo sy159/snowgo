@@ -7,9 +7,6 @@ on:
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
-    outputs:
-      SERVICE_IMAGE_NAME: ${{ steps.set_env.outputs.SERVICE_IMAGE_NAME }}
-      SERVICE_IMAGE_VERSION: ${{ steps.set_env.outputs.SERVICE_IMAGE_VERSION }}
 
     steps:
       - name: Checkout code
@@ -35,9 +32,6 @@ jobs:
           set +a
           echo "SERVICE_IMAGE_NAME=${SERVICE_IMAGE_NAME:-snowgo}" >> $GITHUB_ENV
           echo "SERVICE_IMAGE_VERSION=${SERVICE_IMAGE_VERSION:-v1.0}" >> $GITHUB_ENV
-          
-          echo "::set-output name=SERVICE_IMAGE_NAME::${SERVICE_IMAGE_NAME:-snowgo}"
-          echo "::set-output name=SERVICE_IMAGE_VERSION::${SERVICE_IMAGE_VERSION:-v1.0}"
 
       - name: Extract version tag
         id: extract_tag
@@ -47,7 +41,6 @@ jobs:
             TAG="v$TAG"
           fi
           echo "SERVICE_IMAGE_VERSION=$TAG" >> $GITHUB_ENV
-          echo "::set-output name=SERVICE_IMAGE_VERSION::$TAG"
 
       - name: Print environment variables
         run: env
@@ -59,6 +52,11 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_IMAGE_NAME }}:${{ env.SERVICE_IMAGE_VERSION }}
 
+      - name: Set output for next job
+        run: |
+          echo "SERVICE_IMAGE_NAME=${{ env.SERVICE_IMAGE_NAME }}" >> $GITHUB_OUTPUT
+          echo "SERVICE_IMAGE_VERSION=${{ env.SERVICE_IMAGE_VERSION }}" >> $GITHUB_OUTPUT
+
   deploy:
     runs-on: ubuntu-latest
     needs: build_and_push
@@ -67,6 +65,13 @@ jobs:
         run: |
           echo "SERVICE_IMAGE_NAME=${{ needs.build_and_push.outputs.SERVICE_IMAGE_NAME }}" >> $GITHUB_ENV
           echo "SERVICE_IMAGE_VERSION=${{ needs.build_and_push.outputs.SERVICE_IMAGE_VERSION }}" >> $GITHUB_ENV
+
+      # 私有仓库可能需要登录
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Set up SSH
         uses: appleboy/ssh-action@v1.0.3
