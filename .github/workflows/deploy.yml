@@ -7,7 +7,9 @@ on:
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
-
+    outputs:
+      SERVICE_IMAGE_NAME: ${{ steps.set_output.outputs.SERVICE_IMAGE_NAME }}
+      SERVICE_IMAGE_VERSION: ${{ steps.set_output.outputs.SERVICE_IMAGE_VERSION }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -53,6 +55,7 @@ jobs:
           tags: ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_IMAGE_NAME }}:${{ env.SERVICE_IMAGE_VERSION }}
 
       - name: Set output for next job
+        id: set_output
         run: |
           echo "SERVICE_IMAGE_NAME=${{ env.SERVICE_IMAGE_NAME }}" >> $GITHUB_OUTPUT
           echo "SERVICE_IMAGE_VERSION=${{ env.SERVICE_IMAGE_VERSION }}" >> $GITHUB_OUTPUT
@@ -88,7 +91,7 @@ jobs:
   
             # 拉取最新的 Docker 镜像
             docker-compose down
-            docker-compose pull ${{ env.SERVICE_IMAGE_NAME }}:${{ env.SERVICE_IMAGE_VERSION }}
+            docker-compose pull ${{ secrets.DOCKER_USERNAME }}/${{ env.SERVICE_IMAGE_NAME }}:${{ env.SERVICE_IMAGE_VERSION }}
 
             # 使用新镜像启动容器
             docker-compose up -d
