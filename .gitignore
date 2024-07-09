@@ -1,4 +1,4 @@
-!.getkeep
+!.gitkeep
 *.log
 /logs/
 /.idea/
