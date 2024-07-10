@@ -73,8 +73,7 @@ services:
 
 networks:
   snowgo_network:
+    driver: bridge
     ipam:
-      driver: default
-
       config:
         - subnet: ${SUBNET:-172.101.0.0/24}
