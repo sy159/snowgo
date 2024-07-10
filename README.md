@@ -115,7 +115,7 @@ docker run --name snowgo-service --restart always -d -p 8000:8000 -e ENV=dev -v 
 ##### 2.3 Docker Compose运行项目
 生成项目服务docker镜像
 ```shell
-docker build -t snow:v1.0 .
+docker build -t snowgo:v1.0 .
 ```
 配置.env相关信息(服务端口、使用镜像等)
 ```shell

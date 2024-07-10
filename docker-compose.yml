@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   snowgo-nginx:
-    image: nginx:1.12.1
+    image: nginx:1.26
     container_name: snowgo-nginx
     ports:
       - ${NGINX_PORT:-80}:8080
@@ -38,7 +38,7 @@ services:
       MYSQL_DATABASE: snowgo
 
   snowgo-redis:
-    image: redis:6.0
+    image: redis:6.2
     container_name: snowgo-redis
     restart: always
     ports:
