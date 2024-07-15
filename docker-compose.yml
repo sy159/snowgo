@@ -11,18 +11,23 @@ services:
       options:
         max-size: '10m'
         max-file: '10'
-    networks:
-      - snowgo_network
     volumes:
       - /etc/localtime:/etc/localtime
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./config/nginx/conf.d:/etc/nginx/conf.d
       - ../data/nginx/log:/var/log/nginx/
       - ../dist:/usr/share/nginx/html/dist
+    networks:
+      - snowgo_network
 
   snowgo-mysql:
     image: mysql:5.7
     container_name: snowgo-mysql
+    ports:
+      - ${MYSQL_PORT:-3307}:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: zx.123
+      MYSQL_DATABASE: snowgo
     volumes:
       - /etc/localtime:/etc/localtime
       - ../data/mysql/data:/var/lib/mysql
@@ -31,11 +36,6 @@ services:
     restart: always
     networks:
       - snowgo_network
-    ports:
-      - ${MYSQL_PORT:-3307}:3306
-    environment:
-      MYSQL_ROOT_PASSWORD: zx.123
-      MYSQL_DATABASE: snowgo
 
   snowgo-redis:
     image: redis:6.2
@@ -43,8 +43,6 @@ services:
     restart: always
     ports:
       - ${REDIS_PORT:-6380}:6379
-    networks:
-      - snowgo_network
     privileged: true
     volumes:
       - /etc/localtime:/etc/localtime
@@ -52,6 +50,8 @@ services:
       - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf
     command:
       redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - snowgo_network
 
   snowgo-service:
     image: ${SERVICE_IMAGE_NAME:-snowgo}:${SERVICE_IMAGE_VERSION:-v1.0}
@@ -63,13 +63,13 @@ services:
         max-file: '10'
     environment:
       ENV: ${ENV:-dev}
-    networks:
-      - snowgo_network
     privileged: true
     volumes:
       - /etc/localtime:/etc/localtime
       - ./config:/snowgo-service/config
       - ./logs:/snowgo-service/logs
+    networks:
+      - snowgo_network
 
 networks:
   snowgo_network:
