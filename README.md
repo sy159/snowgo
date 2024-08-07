@@ -12,6 +12,7 @@
 8. rate限流
 9. 访问日志、跨域、全局异常处理等中间件
 10. 基于redis等实现的分布式锁
+11. mq(pulsar)
 
 ### 目录结构
 ```
@@ -61,6 +62,7 @@ snowgo
 │   ├── error response自定义错误码  
 │   ├── limiter 限流相关  
 │   ├── logger 日志相关  
+│   ├── mq 消息队列(pulsar等)  
 │   ├── requests http请求相关
 │   ├── response 请求统一格式处理
 │   ├── str_tool 字符串相关操作
