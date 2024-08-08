@@ -12,7 +12,7 @@ import (
 
 // 测试默认队列
 func TestDefaultQueue(t *testing.T) {
-	p, err := NewPulsarProducer("pulsar://localhost:6650", "test-topic")
+	p, err := NewPulsarProducer("pulsar://localhost:6650", "persistent://snow/test/test-topic")
 	if err != nil {
 		t.Fatalf("Failed to create producer: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestDefaultQueue(t *testing.T) {
 func TestDelayedQueue(t *testing.T) {
 	p, err := NewPulsarProducer(
 		"pulsar://localhost:6650",
-		"delay-topic",
+		"persistent://snow/test/delay-topic",
 		WithDelayTime(5*time.Second),
 	)
 	if err != nil {
@@ -68,7 +68,7 @@ func TestDelayedQueue(t *testing.T) {
 func TestBatchingQueue(t *testing.T) {
 	p, err := NewPulsarProducer(
 		"pulsar://localhost:6650",
-		"batch-topic",
+		"persistent://snow/test/batch-topic",
 		WithMessageBatching(
 			false,
 			1*time.Second,

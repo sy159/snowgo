@@ -18,7 +18,7 @@ var defaultProducer = producerOptions{
 	batchingMaxSize:         2 * 1024 * 1024, // 合并发送时生效，单批次最大消息字节
 }
 
-type ProducerOptions func(producerOptions)
+type ProducerOptions func(*producerOptions)
 
 type producerOptions struct {
 	topic                   string
@@ -49,7 +49,7 @@ func NewPulsarProducer(url, topic string, opts ...ProducerOptions) (*PulsarProdu
 	producerOptions.topic = topic
 	// 加载配置
 	for _, opt := range opts {
-		opt(producerOptions)
+		opt(&producerOptions)
 	}
 
 	producer, err := client.CreateProducer(pulsar.ProducerOptions{
@@ -75,7 +75,7 @@ func NewPulsarProducer(url, topic string, opts ...ProducerOptions) (*PulsarProdu
 
 // WithDelayTime 设置消息延迟消费时间
 func WithDelayTime(delayTime time.Duration) ProducerOptions {
-	return func(options producerOptions) {
+	return func(options *producerOptions) {
 		if delayTime > 0 {
 			options.delay = delayTime
 		}
@@ -84,7 +84,7 @@ func WithDelayTime(delayTime time.Duration) ProducerOptions {
 
 // WithMessageBatching 设置消息批量发送
 func WithMessageBatching(disableBatching bool, maxPublishDelay time.Duration, maxMessages, maxSize uint) ProducerOptions {
-	return func(options producerOptions) {
+	return func(options *producerOptions) {
 		options.disableBatching = disableBatching
 		options.batchingMaxPublishDelay = maxPublishDelay
 		options.batchingMaxMessages = maxMessages
