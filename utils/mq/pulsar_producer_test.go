@@ -40,7 +40,7 @@ func TestDelayedQueue(t *testing.T) {
 	p, err := NewPulsarProducer(
 		"pulsar://localhost:6650",
 		"persistent://snow/test/delay-topic",
-		WithDelayTime(5*time.Second),
+		WithDeliverAfter(5*time.Second),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create producer: %v", err)

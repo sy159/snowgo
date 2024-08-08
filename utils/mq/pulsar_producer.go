@@ -22,7 +22,7 @@ type ProducerOptions func(*producerOptions)
 
 type producerOptions struct {
 	topic                   string
-	delay                   time.Duration // 消息延时时间
+	deliverAfter            time.Duration // 消息延时时间
 	disableBlockIfQueueFull bool          // 设置为false(默认值): 队列满了,会阻塞；true:队列满了,会立即返回错误
 	maxPendingMessages      int           // 待确定消息最大长度
 	disableBatching         bool          // true: 每一条消息单独发送；false: 合并发送
@@ -73,11 +73,11 @@ func NewPulsarProducer(url, topic string, opts ...ProducerOptions) (*PulsarProdu
 	}, nil
 }
 
-// WithDelayTime 设置消息延迟消费时间
-func WithDelayTime(delayTime time.Duration) ProducerOptions {
+// WithDeliverAfter 设置消息延迟消费时间
+func WithDeliverAfter(deliverAfter time.Duration) ProducerOptions {
 	return func(options *producerOptions) {
-		if delayTime > 0 {
-			options.delay = delayTime
+		if deliverAfter > 0 {
+			options.deliverAfter = deliverAfter
 		}
 	}
 }
@@ -99,8 +99,8 @@ func (p *PulsarProducer) SendMessage(ctx context.Context, message []byte, proper
 		Properties: properties,
 	}
 
-	if p.options.delay > 0 {
-		msg.DeliverAfter = p.options.delay
+	if p.options.deliverAfter > 0 {
+		msg.DeliverAfter = p.options.deliverAfter
 	}
 
 	_, err := p.producer.Send(ctx, msg)
@@ -117,8 +117,8 @@ func (p *PulsarProducer) SendAsyncMessage(ctx context.Context, message []byte, p
 		Properties: properties,
 	}
 
-	if p.options.delay > 0 {
-		msg.DeliverAfter = p.options.delay
+	if p.options.deliverAfter > 0 {
+		msg.DeliverAfter = p.options.deliverAfter
 	}
 
 	p.producer.SendAsync(ctx, msg, callback)

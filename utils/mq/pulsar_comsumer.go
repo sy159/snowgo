@@ -25,6 +25,7 @@ type consumerOptions struct {
 	subscriptionType pulsar.SubscriptionType // 订阅类型
 	handler          func(pulsar.Message)    // 消息处理方法
 	runNum           int                     // 启动的消费者数量
+	ackWithResponse  bool                    // 默认是false; 如果是false，不需要Broker确定(低延迟)；如果是true，Broker会发送ack确定然后删除消息(保证在队列故障不会被重复消费)
 }
 
 type ConsumerOptions func(*consumerOptions)
@@ -63,6 +64,7 @@ func NewPulsarConsumer(url, topic string, handler func(pulsar.Message), opts ...
 			SubscriptionName: consumerOptions.subscriptionName,
 			Type:             consumerOptions.subscriptionType,
 			Name:             consumerName,
+			AckWithResponse:  consumerOptions.ackWithResponse,
 		})
 		if err != nil {
 			client.Close()
@@ -87,7 +89,7 @@ func WithRunNum(runNum int) ConsumerOptions {
 	}
 }
 
-// WithSubscriptionType 设置消费订阅类型(相同订阅名下消息只能被其中一个消费者消费；不同订阅名信息会被多次消费)
+// WithSubscriptionType 默认为share
 func WithSubscriptionType(subscriptionType pulsar.SubscriptionType) ConsumerOptions {
 	return func(consumerOptions *consumerOptions) {
 		consumerOptions.subscriptionType = subscriptionType
@@ -98,6 +100,13 @@ func WithSubscriptionType(subscriptionType pulsar.SubscriptionType) ConsumerOpti
 func WithSubscriptionName(subscriptionName string) ConsumerOptions {
 	return func(consumerOptions *consumerOptions) {
 		consumerOptions.subscriptionName = subscriptionName
+	}
+}
+
+// WithAckWithResponse 设置是否需要broker确定(false低延迟，不过可能会丢数据；true数据不会有问题，相对延迟高一点)
+func WithAckWithResponse(ackWithResponse bool) ConsumerOptions {
+	return func(consumerOptions *consumerOptions) {
+		consumerOptions.ackWithResponse = ackWithResponse
 	}
 }
 
