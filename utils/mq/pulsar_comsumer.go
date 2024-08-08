@@ -14,18 +14,19 @@ import (
 var defaultConsumer = consumerOptions{
 	subscriptionName: "default-subscription",
 	subscriptionType: pulsar.Shared,
-	handler: func(message pulsar.Message) {
+	handler: func(ctx context.Context, message pulsar.Message) {
 		fmt.Printf("Received a message: %s; properties: %+v\n", string(message.Payload()), message.Properties())
 	},
-	runNum: 1,
+	runNum:          1,
+	ackWithResponse: true,
 }
 
 type consumerOptions struct {
-	subscriptionName string                  // 订阅名称
-	subscriptionType pulsar.SubscriptionType // 订阅类型
-	handler          func(pulsar.Message)    // 消息处理方法
-	runNum           int                     // 启动的消费者数量
-	ackWithResponse  bool                    // 默认是false; 如果是false，不需要Broker确定(低延迟)；如果是true，Broker会发送ack确定然后删除消息(保证在队列故障不会被重复消费)
+	subscriptionName string                                // 订阅名称
+	subscriptionType pulsar.SubscriptionType               // 订阅类型
+	handler          func(context.Context, pulsar.Message) // 消息处理方法
+	runNum           int                                   // 启动的消费者数量
+	ackWithResponse  bool                                  // 默认是false; 如果是false，不需要Broker确定(低延迟)；如果是true，Broker会发送ack确定然后删除消息(保证在队列故障不会被重复消费)
 }
 
 type ConsumerOptions func(*consumerOptions)
@@ -38,7 +39,7 @@ type PulsarConsumer struct {
 }
 
 // NewPulsarConsumer 创建一个新的Pulsar消费者
-func NewPulsarConsumer(url, topic string, handler func(pulsar.Message), opts ...ConsumerOptions) (*PulsarConsumer, error) {
+func NewPulsarConsumer(url, topic string, handler func(context.Context, pulsar.Message), opts ...ConsumerOptions) (*PulsarConsumer, error) {
 	client, err := pulsar.NewClient(pulsar.ClientOptions{
 		URL: url,
 	})
@@ -124,8 +125,7 @@ func (c *PulsarConsumer) Start(ctx context.Context) {
 			for {
 				select {
 				case msg := <-consumer.Chan():
-					c.options.handler(msg)
-					fmt.Println("消费成功", msg.ID(), consumerName)
+					c.options.handler(ctx, msg)
 					if err := consumer.Ack(msg); err != nil {
 						// TODO 增加其他的ack失败处理
 						logger.Error("Failed to acknowledge message",
