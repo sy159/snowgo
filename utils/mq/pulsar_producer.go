@@ -3,20 +3,26 @@ package mq
 import (
 	"context"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
+	"snowgo/utils/logger"
+
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 )
 
-var defaultProducer = producerOptions{
-	topic:                   "default-topic",
-	disableBlockIfQueueFull: false,           // 设置为false(默认值): 队列满了,会阻塞；true:队列满了,会立即返回错误
-	maxPendingMessages:      10000,           // 待确定消息最大长度
-	disableBatching:         true,            // true: 每一条消息单独发送；false: 合并发送
-	batchingMaxPublishDelay: 2 * time.Second, // 合并发送时生效，单批次最大等待时间
-	batchingMaxMessages:     5,               // 合并发送时生效，单批次最大消息数
-	batchingMaxSize:         2 * 1024 * 1024, // 合并发送时生效，单批次最大消息字节
-}
+var (
+	defaultProducer = producerOptions{
+		topic:                   "default-topic",
+		disableBlockIfQueueFull: false,           // 设置为false(默认值): 队列满了,会阻塞；true:队列满了,会立即返回错误
+		maxPendingMessages:      10000,           // 待确定消息最大长度
+		disableBatching:         true,            // true: 每一条消息单独发送；false: 合并发送
+		batchingMaxPublishDelay: 2 * time.Second, // 合并发送时生效，单批次最大等待时间
+		batchingMaxMessages:     5,               // 合并发送时生效，单批次最大消息数
+		batchingMaxSize:         2 * 1024 * 1024, // 合并发送时生效，单批次最大消息字节
+	}
+	producerLogger = logger.NewLogger("pulsar-producer", logger.WithFileMaxAgeDays(7))
+)
 
 type ProducerOptions func(*producerOptions)
 
@@ -92,6 +98,30 @@ func WithMessageBatching(disableBatching bool, maxPublishDelay time.Duration, ma
 	}
 }
 
+// LogMessage logs the message details.
+func (p *PulsarProducer) LogMessage(messageId pulsar.MessageID, message []byte, properties map[string]string, sendTime time.Time, err error) {
+	status := "success"
+	errMsg := ""
+	if err != nil {
+		status = "fail"
+		errMsg = err.Error()
+	}
+	messageIdStr := ""
+	if messageId != nil {
+		messageIdStr = messageId.String()
+	}
+	producerLogger.Log(
+		"pulsar producer",
+		zap.String("topic", p.producer.Topic()),
+		zap.String("message_id", messageIdStr),
+		zap.String("message", string(message)),
+		zap.Any("properties", properties),
+		zap.String("created_at", sendTime.Format("2006-01-02 15:04:05.000")),
+		zap.String("status", status),
+		zap.String("error_msg", errMsg),
+	)
+}
+
 // SendMessage 同步发送消息到mq
 func (p *PulsarProducer) SendMessage(ctx context.Context, message []byte, properties map[string]string) error {
 	msg := &pulsar.ProducerMessage{
@@ -103,7 +133,9 @@ func (p *PulsarProducer) SendMessage(ctx context.Context, message []byte, proper
 		msg.DeliverAfter = p.options.deliverAfter
 	}
 
-	_, err := p.producer.Send(ctx, msg)
+	sendTime := time.Now()
+	messageId, err := p.producer.Send(ctx, msg)
+	p.LogMessage(messageId, message, properties, sendTime, err)
 	if err != nil {
 		return errors.Wrap(err, "pulsar send message is err")
 	}

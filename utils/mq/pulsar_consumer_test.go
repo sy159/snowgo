@@ -73,7 +73,8 @@ func TestPulsarConsumer_DifferentSubscriptionNames_MultipleConsumers(t *testing.
 }
 
 // testHandler 处理测试消息
-func testHandler(ctx context.Context, msg pulsar.Message) {
+func testHandler(_ context.Context, msg pulsar.Message) error {
 	fmt.Printf("Received a message: %s; properties: %+v; msg id: %s\n", string(msg.Payload()), msg.Properties(), msg.ID())
 	time.Sleep(1 * time.Second)
+	return nil
 }

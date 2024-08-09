@@ -69,8 +69,8 @@ func NewLogger(name string, opts ...LogOptions) *MiddlewareLogger {
 
 	zapLogger := zap.New(
 		core,
-		zap.AddCaller(),
-		zap.AddCallerSkip(1),
+		//zap.AddCaller(),
+		//zap.AddCallerSkip(1),
 	)
 
 	return &MiddlewareLogger{logger: zapLogger}
@@ -79,9 +79,9 @@ func NewLogger(name string, opts ...LogOptions) *MiddlewareLogger {
 // json编码器配置
 func getMiddlewareJsonEncoder() zapcore.Encoder {
 	return zapcore.NewJSONEncoder(zapcore.EncoderConfig{
-		TimeKey:    "log_timestamp",
-		NameKey:    "logger",
-		CallerKey:  "log_caller",
+		TimeKey: "log_timestamp",
+		NameKey: "logger",
+		//CallerKey:  "log_caller",
 		MessageKey: "log_msg",
 		LineEnding: zapcore.DefaultLineEnding,
 		EncodeLevel: func(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
@@ -95,8 +95,8 @@ func getMiddlewareJsonEncoder() zapcore.Encoder {
 		EncodeDuration: func(d time.Duration, enc zapcore.PrimitiveArrayEncoder) {
 			enc.AppendInt64(int64(d) / int64(time.Millisecond))
 		},
-		EncodeCaller: zapcore.ShortCallerEncoder, // 短路径编码器(相对路径+行号)
-		EncodeName:   zapcore.FullNameEncoder,
+		//EncodeCaller: zapcore.ShortCallerEncoder, // 短路径编码器(相对路径+行号)
+		//EncodeName:   zapcore.FullNameEncoder,
 	})
 }
 
