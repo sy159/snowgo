@@ -3,6 +3,7 @@ package routers
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"net/http"
 	"snowgo/config"
 	"snowgo/utils/color"
@@ -33,7 +34,7 @@ func StartHttpServer() {
 			color.RedBackground(env.Env()),
 			HttpServer.Addr,
 			color.GreenFont(config.LogConf.Writer))
-		if err := HttpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatalf("Server Listen: %s\n", err)
 		}
 	}()
