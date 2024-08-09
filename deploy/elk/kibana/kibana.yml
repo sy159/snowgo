@@ -1,0 +1,19 @@
+#
+# ** THIS IS AN AUTO-GENERATED FILE **
+#
+# Default Kibana configuration for docker target
+server.name: kibana
+server.host: "0.0.0.0"
+server.shutdownTimeout: "10s"
+monitoring.ui.container.elasticsearch.enabled: true
+
+# This section was automatically generated during setup.
+elasticsearch.hosts: [ "http://elasticsearch:9200" ]
+elasticsearch.username: "kibana_system"  # 不能使用elastic
+elasticsearch.password: "zx.123"
+
+i18n.locale: zh-CN
+
+# xpack
+xpack.monitoring.collection.enabled: true  # 启用 Kibana 的监控数据收集
+xpack.reporting.enabled: true  # 启用 Kibana 的报告功能

@@ -38,9 +38,9 @@ services:
       - snowgo_network
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=zx.123" ]
-      interval: 3s
+      interval: 60s
       timeout: 1s
-      retries: 5
+      retries: 3
 
   snowgo-redis:
     image: redis:6.2
@@ -59,9 +59,9 @@ services:
       - snowgo_network
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
-      interval: 3s
+      interval: 60s
       timeout: 1s
-      retries: 5
+      retries: 3
 
   snowgo-service:
     image: ${SERVICE_IMAGE_NAME:-snowgo}:${SERVICE_IMAGE_VERSION:-v1.0}
@@ -81,10 +81,8 @@ services:
     networks:
       - snowgo_network
     depends_on:
-      snowgo-mysql:
-        condition: service_healthy
-      snowgo-redis:
-        condition: service_healthy
+      - snowgo-mysql
+      - snowgo-redis
 
 networks:
   snowgo_network:

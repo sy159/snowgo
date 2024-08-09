@@ -13,11 +13,14 @@
 9. 访问日志、跨域、全局异常处理等中间件
 10. 基于redis等实现的分布式锁
 11. mq(pulsar)
+12. elk收集日志在kibana展示
 
 ### 目录结构
 ```
 snowgo
+├── .github  github cicd
 ├── config  配置文件
+├── depoly  elk、监控等部署
 ├── docs  放置swagger，db.sql等文档
 ├── internal  应用程序
 │   ├── api    主要处理用户请求

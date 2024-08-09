@@ -1,0 +1,22 @@
+node.name: elasticsearch
+cluster.name: es-cluster
+network.host: 0.0.0.0
+
+# 锁定其使用的内存，以防止操作系统交换这部分内存，从而提高性能
+bootstrap.memory_lock: true
+
+# xpack相关
+# 启用X-Pack安全特性，包括用户认证和授权。
+xpack.security.enabled: true
+# trial: 30d有效使用许可证，可使用高级功能；basic：免费，基础的xpack功能；none：自己提供许可证
+xpack.license.self_generated.type: basic
+# 是否启用https，正式建议启用
+xpack.security.http.ssl.enabled: false
+# 是否启用节点间通信的SSL加密，正式建议启用
+xpack.security.transport.ssl.enabled: false
+# 启用Elasticsearch监控数据收集
+xpack.monitoring.collection.enabled: true
+
+# 跨域
+http.cors.enabled: true
+http.cors.allow-origin: "*"
