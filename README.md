@@ -14,13 +14,16 @@
 10. 基于redis等实现的分布式锁
 11. mq(pulsar)
 12. elk收集日志在kibana展示
+13. Prometheus+Grafana+alertmanager实现监控报警
 
 ### 目录结构
 ```
 snowgo
 ├── .github  github cicd
 ├── config  配置文件
-├── depoly  elk、监控等部署
+├── depoly
+│   ├── elk  elk部署
+│   └── monitor 监控部署
 ├── docs  放置swagger，db.sql等文档
 ├── internal  应用程序
 │   ├── api    主要处理用户请求
@@ -76,7 +79,6 @@ snowgo
 ├── go.mod
 ├── go.sum
 └── main.go  项目启动入口
-
 ```
 
 ### 安装部署
