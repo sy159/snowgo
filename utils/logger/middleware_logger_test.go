@@ -18,7 +18,7 @@ func TestLog(t *testing.T) {
 	})
 
 	t.Run("consumer log", func(t *testing.T) {
-		logger := NewLogger("consumer-producer")
+		logger := NewLogger("pulsar-consumer")
 		for i := 0; i < 10; i++ {
 			logger.Log(
 				" consumer test",
@@ -42,7 +42,7 @@ func TestConsoleLog(t *testing.T) {
 	})
 
 	t.Run("consumer log", func(t *testing.T) {
-		logger := NewLogger("consumer-producer", WithConsoleOutput(true), WithFileMaxAgeDays(3))
+		logger := NewLogger("pulsar-consumer", WithConsoleOutput(true), WithFileMaxAgeDays(3))
 		for i := 0; i < 10; i++ {
 			logger.Log(
 				" consumer test",

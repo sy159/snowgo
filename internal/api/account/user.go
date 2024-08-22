@@ -29,6 +29,7 @@ func GetUserInfo(c *gin.Context) {
 		return
 	}
 	userDao := account.NewUserDao()
+	logger.Info("get user info")
 	res, err := userDao.GetUserById(c, int32(userIdInt))
 	if err != nil {
 		response.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
