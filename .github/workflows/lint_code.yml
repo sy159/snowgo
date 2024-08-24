@@ -18,4 +18,4 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
-          args: --out-format=colored-line-number
+          args: --out-format=colored-line-number --timeout=5m
