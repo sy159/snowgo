@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: monitor-prometheus
+    ports:
+      - "19090:9090"
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./prometheus/data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4' # 最大cpu的40%
+          memory: 4G # 最大4g
+    networks:
+      - monitor
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: monitor-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./grafana/data:/var/lib/grafana
+    restart: always
+    networks:
+      - monitor
+
+  mysql_exporter:
+    image: prom/mysqld-exporter:latest
+    container_name: monitor-mysql-exporter
+    restart: always
+    command:
+      - "--mysqld.username=root:zx.123"
+      - "--mysqld.address=192.168.0.104:3306"
+    networks:
+      - monitor
+
+  elasticsearch_exporter:
+    image: justwatch/elasticsearch_exporter:latest
+    container_name: monitor-elasticsearch-exporter
+    environment:
+      - ES_URI=http://elastic:zx.123@192.168.0.104:9200
+    restart: always
+    networks:
+      - monitor
+
+networks:
+  monitor:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${SUBNET:-172.102.0.0/24}

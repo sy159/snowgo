@@ -14,7 +14,7 @@
 10. 基于redis等实现的分布式锁
 11. mq(pulsar)
 12. elk收集日志在kibana展示
-13. Prometheus+Grafana+alertmanager实现监控报警
+13. Prometheus+Grafana实现监控
 
 ### 目录结构
 ```
