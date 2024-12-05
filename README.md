@@ -34,6 +34,10 @@ snowgo
 │   │   └── constants.go
 │   ├── dao    数据处理层
 │   │   └── dao.go
+│   ├── routers  web路由
+│   │   ├── middleware   中间件
+│   │   ├── routers.go  路由初始化
+│   │   └── root_router.go 未分组的根路由
 │   ├── dal  数据库model query定义
 │   │   ├── cmd  使用gen生成model跟query
 │   │   │   └── gen.go
@@ -43,13 +47,10 @@ snowgo
 │   │   ├── repo  db的repo
 │   │   │   └── repo.go
 │   │   └── query_model.go  需要生成的model列表
+│   ├── server  服务相关
+│   │   └── http_server.go  http服务启动，关闭
 │   └── service 业务处理层
 ├── logs  日志
-├── routers  web路由
-│   ├── middleware   中间件
-│   ├── routers.go  路由初始化
-│   ├── http_server.go  服务启动，关闭
-│   └── rouut_router.go 未分组的根路由
 ├── test  测试用例
 ├── utils   公用工具包
 │   ├── auth   认证相关

@@ -4,7 +4,7 @@ import (
 	"os"
 	"os/signal"
 	"snowgo/config"
-	"snowgo/routers"
+	"snowgo/internal/server"
 	"snowgo/utils/database/mysql"
 	"snowgo/utils/database/redis"
 	"snowgo/utils/logger"
@@ -33,7 +33,7 @@ func main() {
 	defer redis.CloseRedis(redis.RDB)
 
 	// 启动服务
-	routers.StartHttpServer()
+	server.StartHttpServer()
 
 	// 等待中断信号来优雅地关闭服务器，为关闭服务器操作设置一个超时
 	// kill -2 发送 syscall.SIGINT 信号，用户发送INTR字符(Ctrl+C)触发
@@ -46,5 +46,5 @@ func main() {
 	<-quit
 
 	// 关闭服务
-	_ = routers.StopHttpServer()
+	_ = server.StopHttpServer()
 }

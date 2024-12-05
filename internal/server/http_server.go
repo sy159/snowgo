@@ -1,4 +1,4 @@
-package routers
+package server
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"net/http"
 	"snowgo/config"
+	"snowgo/internal/routers"
 	"snowgo/utils/color"
 	"snowgo/utils/env"
 	"snowgo/utils/logger"
@@ -19,7 +20,7 @@ var (
 // StartHttpServer 初始化路由，开启http服务
 func StartHttpServer() {
 	// 初始化路由
-	router := InitRouter()
+	router := routers.InitRouter()
 	HttpServer = &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", config.ServerConf.Addr, config.ServerConf.Port),
 		Handler:        router,

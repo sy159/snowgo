@@ -5,7 +5,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"snowgo/config"
-	"snowgo/routers/middleware"
+	"snowgo/internal/routers/middleware"
 	"snowgo/utils/env"
 	e "snowgo/utils/error"
 	"snowgo/utils/response"
