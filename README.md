@@ -63,7 +63,7 @@ snowgo
 │   ├── color   带颜色字符串
 │   ├── cryption   加解密，编码等操作
 │   ├── database   数据库相关
-│   │   └── msyql     mysql数据库
+│   │   └── mysql     mysql数据库
 │   │       └── mysql.go     
 │   ├── error response自定义错误码  
 │   ├── limiter 限流相关  

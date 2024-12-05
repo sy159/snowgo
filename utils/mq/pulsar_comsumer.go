@@ -170,6 +170,7 @@ func (c *PulsarConsumer) Start(ctx context.Context) {
 					ackErr := consumer.Ack(msg)
 					if ackErr != nil {
 						// TODO 增加其他的ack失败处理
+						logger.Errorf("ack err: %v", ackErr)
 					}
 					c.LogMessage(msg, consumerName, startTime, endTime, handlerErr, ackErr)
 				case <-ctx.Done():
