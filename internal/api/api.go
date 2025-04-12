@@ -1,9 +1,9 @@
 package api
 
 import (
-	"snowgo/utils/logger"
-	"snowgo/utils/response"
-	str "snowgo/utils/str_tool"
+	"snowgo/pkg/logger"
+	"snowgo/pkg/response"
+	str "snowgo/pkg/str_tool"
 	"time"
 
 	"github.com/gin-gonic/gin"

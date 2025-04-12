@@ -6,9 +6,9 @@ import (
 	_ "net/http/pprof"
 	"snowgo/config"
 	"snowgo/internal/routers/middleware"
-	"snowgo/utils/env"
-	e "snowgo/utils/error"
-	"snowgo/utils/response"
+	"snowgo/pkg/env"
+	e "snowgo/pkg/error"
+	"snowgo/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

@@ -10,7 +10,7 @@ import (
 	"log"
 	"os"
 	"snowgo/config"
-	. "snowgo/utils/logger"
+	. "snowgo/pkg/logger"
 	"time"
 )
 

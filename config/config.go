@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 	"github.com/spf13/viper"
-	"snowgo/utils/env"
+	"snowgo/pkg/env"
 )
 
 var (

@@ -3,7 +3,7 @@ package cryption
 import (
 	"errors"
 	"math/rand"
-	str "snowgo/utils/str_tool"
+	str "snowgo/pkg/str_tool"
 	"strings"
 	"time"
 )

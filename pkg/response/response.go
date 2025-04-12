@@ -2,7 +2,7 @@ package response
 
 import (
 	"net/http"
-	e "snowgo/utils/error"
+	e "snowgo/pkg/error"
 
 	"github.com/gin-gonic/gin"
 )

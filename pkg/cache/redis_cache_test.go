@@ -3,7 +3,7 @@ package cache_test
 import (
 	"context"
 	"fmt"
-	"snowgo/utils/cache"
+	"snowgo/pkg/cache"
 	"testing"
 	"time"
 

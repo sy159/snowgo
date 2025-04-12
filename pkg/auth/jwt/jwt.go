@@ -4,7 +4,7 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/pkg/errors"
 	"snowgo/config"
-	"snowgo/utils/logger"
+	"snowgo/pkg/logger"
 	"time"
 )
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
-	"snowgo/utils/xlock"
+	"snowgo/pkg/xlock"
 	"testing"
 	"time"
 )

@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"snowgo/config"
 	"snowgo/internal/routers"
-	"snowgo/utils/color"
-	"snowgo/utils/env"
-	"snowgo/utils/logger"
+	"snowgo/pkg/color"
+	"snowgo/pkg/env"
+	"snowgo/pkg/logger"
 	"time"
 )
 

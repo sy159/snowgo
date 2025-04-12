@@ -5,9 +5,9 @@ import (
 	"os/signal"
 	"snowgo/config"
 	"snowgo/internal/server"
-	"snowgo/utils/database/mysql"
-	"snowgo/utils/database/redis"
-	"snowgo/utils/logger"
+	"snowgo/pkg/database/mysql"
+	"snowgo/pkg/database/redis"
+	"snowgo/pkg/logger"
 	"syscall"
 )
 

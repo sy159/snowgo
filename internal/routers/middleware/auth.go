@@ -2,9 +2,9 @@ package middleware
 
 import (
 	"github.com/pkg/errors"
-	"snowgo/utils/auth/jwt"
-	e "snowgo/utils/error"
-	"snowgo/utils/response"
+	"snowgo/pkg/auth/jwt"
+	e "snowgo/pkg/error"
+	"snowgo/pkg/response"
 	"strings"
 
 	"github.com/gin-gonic/gin"

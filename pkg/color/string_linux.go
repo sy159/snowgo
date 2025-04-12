@@ -1,4 +1,5 @@
-// +build windows
+//go:build linux
+// +build linux
 
 package color
 
@@ -18,52 +19,52 @@ func RandomColor() string {
 
 // RedFont ...
 func RedFont(msg string) string {
-	return fmt.Sprintf("%s", msg)
+	return fmt.Sprintf("\x1b[31m%s\x1b[0m", msg)
 }
 
 // RedBackground ...
 func RedBackground(msg string) string {
-	return fmt.Sprintf("%s", msg)
+	return fmt.Sprintf("\x1b[41m%s\x1b[0m", msg)
 }
 
 // GreenFont ...
 func GreenFont(msg string) string {
-	return fmt.Sprintf("%s", msg)
+	return fmt.Sprintf("\x1b[32m%s\x1b[0m", msg)
 }
 
 // GreenBackground ...
 func GreenBackground(msg string) string {
-	return fmt.Sprintf("%s", msg)
+	return fmt.Sprintf("\x1b[42m%s\x1b[0m", msg)
 }
 
 // YellowFont 黄色字体
 func YellowFont(msg string) string {
-	return fmt.Sprintf("%s", msg)
+	return fmt.Sprintf("\x1b[33m%s\x1b[0m", msg)
 }
 
 // YellowBackground 黄色背景
 func YellowBackground(msg string) string {
-	return fmt.Sprintf("%s", msg)
+	return fmt.Sprintf("\x1b[43m%s\x1b[0m", msg)
 }
 
 // BlueFont 蓝色字体
 func BlueFont(msg string) string {
-	return fmt.Sprintf("%s", msg)
+	return fmt.Sprintf("\x1b[34m%s\x1b[0m", msg)
 }
 
 // BlueBackground 蓝色背景
 func BlueBackground(msg string) string {
-	return fmt.Sprintf("%s", msg)
+	return fmt.Sprintf("\x1b[44m%s\x1b[0m", msg)
 }
 
 // WhiteFont 白色字体
 func WhiteFont(msg string) string {
-	return fmt.Sprintf("%s", msg)
+	return fmt.Sprintf("\x1b[37m%s\x1b[0m", msg)
 }
 
 // WhiteBackground 白色背景
 func WhiteBackground(msg string) string {
-	return fmt.Sprintf("%s", msg)
+	return fmt.Sprintf("\x1b[47m%s\x1b[0m", msg)
 }
 
 // StatusCodeColor 根据状态码返回对应颜色

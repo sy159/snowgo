@@ -4,9 +4,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"snowgo/internal/di"
 	"snowgo/internal/service/account"
-	e "snowgo/utils/error"
-	"snowgo/utils/logger"
-	"snowgo/utils/response"
+	e "snowgo/pkg/error"
+	"snowgo/pkg/logger"
+	"snowgo/pkg/response"
 	"strconv"
 )
 

@@ -4,9 +4,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/plugin/dbresolver"
 	"snowgo/internal/dal/query"
-	"snowgo/utils/database"
-	"snowgo/utils/database/mysql"
-	"snowgo/utils/logger"
+	"snowgo/pkg/database"
+	"snowgo/pkg/database/mysql"
+	"snowgo/pkg/logger"
 )
 
 type Repository struct {

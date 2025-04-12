@@ -54,7 +54,7 @@ snowgo
 │   └── service 业务处理层
 ├── logs  日志
 ├── test  测试用例
-├── utils   公用工具包
+├── pkg   公用工具包
 │   ├── auth   认证相关
 │   │   └── jwt
 │   │       └── jwt.go

@@ -6,9 +6,9 @@ import (
 	"snowgo/internal/dal/repo"
 	accountDao "snowgo/internal/dao/account"
 	accountService "snowgo/internal/service/account"
-	"snowgo/utils/cache"
-	"snowgo/utils/database/redis"
-	"snowgo/utils/logger"
+	"snowgo/pkg/cache"
+	"snowgo/pkg/database/redis"
+	"snowgo/pkg/logger"
 )
 
 // Container 统一管理依赖

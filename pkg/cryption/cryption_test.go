@@ -2,7 +2,7 @@ package cryption_test
 
 import (
 	"fmt"
-	"snowgo/utils/cryption"
+	"snowgo/pkg/cryption"
 	"testing"
 )
 

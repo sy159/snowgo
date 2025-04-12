@@ -3,7 +3,7 @@ package jwt_test
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"snowgo/utils/auth/jwt"
+	"snowgo/pkg/auth/jwt"
 	"strings"
 	"testing"
 )

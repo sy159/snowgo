@@ -7,10 +7,10 @@ import (
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/repo"
 	"snowgo/internal/dao/account"
-	"snowgo/utils/cache"
-	"snowgo/utils/cryption"
-	e "snowgo/utils/error"
-	"snowgo/utils/logger"
+	"snowgo/pkg/cache"
+	"snowgo/pkg/cryption"
+	e "snowgo/pkg/error"
+	"snowgo/pkg/logger"
 	"time"
 )
 

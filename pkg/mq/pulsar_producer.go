@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"snowgo/utils/logger"
+	"snowgo/pkg/logger"
 
 	"time"
 

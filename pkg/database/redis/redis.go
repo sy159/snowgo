@@ -3,7 +3,7 @@ package redis
 import (
 	"context"
 	"snowgo/config"
-	"snowgo/utils/logger"
+	"snowgo/pkg/logger"
 	"time"
 
 	"github.com/go-redis/redis/v8"

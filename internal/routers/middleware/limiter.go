@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	e "snowgo/utils/error"
-	"snowgo/utils/limiter"
-	"snowgo/utils/response"
+	e "snowgo/pkg/error"
+	"snowgo/pkg/limiter"
+	"snowgo/pkg/response"
 	"time"
 )
 

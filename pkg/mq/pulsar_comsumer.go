@@ -6,7 +6,7 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"snowgo/utils/logger"
+	"snowgo/pkg/logger"
 	"sync"
 	"time"
 )

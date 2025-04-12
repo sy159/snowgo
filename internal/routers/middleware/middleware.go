@@ -14,11 +14,11 @@ import (
 	"snowgo/config"
 	"snowgo/internal/constants"
 	"snowgo/internal/di"
-	"snowgo/utils"
-	"snowgo/utils/color"
-	e "snowgo/utils/error"
-	"snowgo/utils/logger"
-	"snowgo/utils/response"
+	"snowgo/pkg"
+	"snowgo/pkg/color"
+	e "snowgo/pkg/error"
+	"snowgo/pkg/logger"
+	"snowgo/pkg/response"
 	"strings"
 	"time"
 )
@@ -137,7 +137,7 @@ func Recovery() gin.HandlerFunc {
 				}
 
 				logger.Error("[Recovery from panic]",
-					zap.String("error", utils.ErrorToString(err)),
+					zap.String("error", pkg.ErrorToString(err)),
 					zap.String("method", c.Request.Method),
 					zap.String("path", c.Request.URL.Path),
 					zap.String("query", c.Request.URL.RawQuery),
