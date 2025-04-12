@@ -12,6 +12,8 @@ import (
 	"net/http/httputil"
 	"os"
 	"snowgo/config"
+	"snowgo/internal/constants"
+	"snowgo/internal/di"
 	"snowgo/utils"
 	"snowgo/utils/color"
 	e "snowgo/utils/error"
@@ -176,6 +178,15 @@ func Cors() gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusNoContent)
 		}
 
+		c.Next()
+	}
+}
+
+// InjectContainerMiddleware 注入container
+func InjectContainerMiddleware() gin.HandlerFunc {
+	container := di.NewContainer()
+	return func(c *gin.Context) {
+		c.Set(constants.CONTAINER, container)
 		c.Next()
 	}
 }

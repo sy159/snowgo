@@ -34,6 +34,8 @@ snowgo
 │   │   └── constants.go
 │   ├── dao    数据处理层
 │   │   └── dao.go
+│   ├── di    依赖管理
+│   │   └── container.go
 │   ├── routers  web路由
 │   │   ├── middleware   中间件
 │   │   ├── routers.go  路由初始化

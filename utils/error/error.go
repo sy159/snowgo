@@ -30,8 +30,10 @@ var (
 
 // 系统相关 101开头
 var (
-	TooManyRequests    = NewCode(10101, "Too Many Requests")
-	KeyTooManyRequests = NewCode(10102, "因为访问频繁，你已经被限制访问，稍后重试")
+	TooManyRequests     = NewCode(10101, "Too Many Requests")
+	KeyTooManyRequests  = NewCode(10102, "因为访问频繁，你已经被限制访问，稍后重试")
+	OffsetErrorRequests = NewCode(10103, "offset必须大于等于0")
+	LimitErrorRequests  = NewCode(10104, "limit必须大于0")
 )
 
 // auth相关  认证相关为102开头
