@@ -10,7 +10,9 @@ import (
 func userRouters(r *gin.RouterGroup) {
 	userGroup := r.Group("/account")
 	{
+		userGroup.GET("/user", GetUserList)
 		userGroup.POST("/user", CreateUser)
-		userGroup.GET("/user/info", GetUserInfo)
+		userGroup.DELETE("/user", DeleteUserById)
+		userGroup.GET("/user/detail", GetUserInfo)
 	}
 }

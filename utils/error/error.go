@@ -47,8 +47,10 @@ var (
 
 // account相关 103开头
 var (
-	UserNotFound    = NewCode(10301, "用户不存在")
-	UserCreateError = NewCode(10302, "用户创建失败")
+	UserNotFound          = NewCode(10301, "用户不存在")
+	UserCreateError       = NewCode(10302, "用户创建失败")
+	UserNameTelEmptyError = NewCode(10303, "用户名或电话不能为空")
+	UserNameTelExistError = NewCode(10303, "用户名或电话已存在")
 )
 
 type Code interface {
