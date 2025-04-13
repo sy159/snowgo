@@ -4,23 +4,23 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/plugin/dbresolver"
 	"snowgo/internal/dal/query"
-	"snowgo/pkg/database"
-	"snowgo/pkg/database/mysql"
-	"snowgo/pkg/logger"
+	"snowgo/pkg/xdatabase"
+	"snowgo/pkg/xdatabase/mysql"
+	"snowgo/pkg/xlogger"
 )
 
 type Repository struct {
 	query      *query.Query
 	writeQuery *query.Query
 	readQuery  *query.Query
-	db         *database.BaseRepository
+	db         *xdatabase.BaseRepository
 }
 
 func NewRepository() *Repository {
 	if mysql.DB.Error != nil {
-		logger.Panic("Please initialize mysql first")
+		xlogger.Panic("Please initialize mysql first")
 	}
-	baseRepo := database.NewBaseRepository(mysql.DB, mysql.DbMap)
+	baseRepo := xdatabase.NewBaseRepository(mysql.DB, mysql.DbMap)
 	return &Repository{
 		query:      query.Use(baseRepo.DB()),
 		writeQuery: query.Use(baseRepo.Use(dbresolver.Write).DB()),

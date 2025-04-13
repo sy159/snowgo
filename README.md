@@ -55,26 +55,26 @@ snowgo
 ├── logs  日志
 ├── test  测试用例
 ├── pkg   公用工具包
-│   ├── auth   认证相关
+│   ├── xauth   认证相关
 │   │   └── jwt
 │   │       └── jwt.go
-│   ├── cache   缓存相关
+│   ├── xcache   缓存相关
 │   │   └── redis     redis
 │   │       └── redis.go
 │   │   └── cache.go    缓存定义
 │   │   └── redis_cache.go    基于redis的缓存使用
-│   ├── color   带颜色字符串
-│   ├── cryption   加解密，编码等操作
-│   ├── database   数据库相关
+│   ├── xcolor   带颜色字符串
+│   ├── xcryption   加解密，编码等操作
+│   ├── xdatabase   数据库相关
 │   │   └── mysql     mysql数据库
 │   │       └── mysql.go     
-│   ├── error response自定义错误码  
-│   ├── limiter 限流相关  
-│   ├── logger 日志相关  
-│   ├── mq 消息队列(pulsar等)  
-│   ├── requests http请求相关
-│   ├── response 请求统一格式处理
-│   ├── str_tool 字符串相关操作
+│   ├── xerror response自定义错误码  
+│   ├── xlimiter 限流相关  
+│   ├── xlogger 日志相关  
+│   ├── xmq 消息队列(pulsar等)  
+│   ├── xrequests http请求相关
+│   ├── xresponse 请求统一格式处理
+│   ├── xstr_tool 字符串相关操作
 │   ├── xlock 分布式锁实现
 │   └── common.go  常用工具
 ├── Makefile

@@ -5,9 +5,9 @@ import (
 	"os/signal"
 	"snowgo/config"
 	"snowgo/internal/server"
-	"snowgo/pkg/database/mysql"
-	"snowgo/pkg/database/redis"
-	"snowgo/pkg/logger"
+	"snowgo/pkg/xdatabase/mysql"
+	"snowgo/pkg/xdatabase/redis"
+	"snowgo/pkg/xlogger"
 	"syscall"
 )
 
@@ -20,7 +20,7 @@ func init() {
 	)
 
 	// 初始化zap log全局配置
-	logger.InitLogger()
+	xlogger.InitLogger()
 }
 
 func main() {

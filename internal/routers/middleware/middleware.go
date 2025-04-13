@@ -15,10 +15,10 @@ import (
 	"snowgo/internal/constants"
 	"snowgo/internal/di"
 	"snowgo/pkg"
-	"snowgo/pkg/color"
-	e "snowgo/pkg/error"
-	"snowgo/pkg/logger"
-	"snowgo/pkg/response"
+	"snowgo/pkg/xcolor"
+	e "snowgo/pkg/xerror"
+	"snowgo/pkg/xlogger"
+	"snowgo/pkg/xresponse"
 	"strings"
 	"time"
 )
@@ -81,9 +81,9 @@ func AccessLogger() gin.HandlerFunc {
 			config.ServerConf.Name,
 			config.ServerConf.Version,
 			time.Now().Format("2006-01-02 15:04:05.000"),
-			color.StatusCodeColor(c.Writer.Status()),
+			xcolor.StatusCodeColor(c.Writer.Status()),
 			cost,
-			color.MethodColor(method),
+			xcolor.MethodColor(method),
 			c.Request.URL.RequestURI(),
 			c.ClientIP(),
 			c.Errors.ByType(gin.ErrorTypePrivate).String(),
@@ -91,7 +91,7 @@ func AccessLogger() gin.HandlerFunc {
 
 		// 记录访问日志
 		if config.ServerConf.EnableAccessLog {
-			logger.Access(path,
+			xlogger.Access(path,
 				zap.Int("status", c.Writer.Status()),
 				zap.String("method", method),
 				zap.String("path", path),
@@ -126,7 +126,7 @@ func Recovery() gin.HandlerFunc {
 
 				if brokenPipe {
 					httpRequest, _ := httputil.DumpRequest(c.Request, false)
-					logger.Error(c.Request.URL.Path,
+					xlogger.Error(c.Request.URL.Path,
 						zap.Any("error", err),
 						zap.String("request", string(httpRequest)),
 					)
@@ -136,7 +136,7 @@ func Recovery() gin.HandlerFunc {
 					return
 				}
 
-				logger.Error("[Recovery from panic]",
+				xlogger.Error("[Recovery from panic]",
 					zap.String("error", pkg.ErrorToString(err)),
 					zap.String("method", c.Request.Method),
 					zap.String("path", c.Request.URL.Path),
@@ -146,7 +146,7 @@ func Recovery() gin.HandlerFunc {
 					zap.String("user-agent", c.Request.UserAgent()),
 				)
 				//c.AbortWithStatus(http.StatusInternalServerError)  // 直接状态码为500
-				response.FailByError(c, e.HttpInternalServerError)
+				xresponse.FailByError(c, e.HttpInternalServerError)
 				c.Abort()
 			}
 		}()

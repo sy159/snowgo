@@ -6,9 +6,9 @@ import (
 	_ "net/http/pprof"
 	"snowgo/config"
 	"snowgo/internal/routers/middleware"
-	"snowgo/pkg/env"
-	e "snowgo/pkg/error"
-	"snowgo/pkg/response"
+	"snowgo/pkg/xenv"
+	e "snowgo/pkg/xerror"
+	"snowgo/pkg/xresponse"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,9 +17,9 @@ type option func(*gin.RouterGroup)
 
 // 根据启动配置设置运行的mode
 func setMode() {
-	if env.Dev() {
+	if xenv.Dev() {
 		gin.SetMode(gin.DebugMode)
-	} else if env.Uat() {
+	} else if xenv.Uat() {
 		gin.SetMode(gin.TestMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
@@ -37,7 +37,7 @@ func loadMiddleWare(router *gin.Engine) {
 func loadRouter(router *gin.Engine) {
 	// 统一处理404页面
 	router.NoRoute(func(c *gin.Context) {
-		response.FailByError(c, e.HttpNotFound)
+		xresponse.FailByError(c, e.HttpNotFound)
 	})
 
 	// 注册pprof路由

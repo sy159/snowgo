@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 	"github.com/spf13/viper"
-	"snowgo/pkg/env"
+	"snowgo/pkg/xenv"
 )
 
 var (
@@ -87,9 +87,9 @@ type option struct {
 }
 
 var configFilePathMap = map[string]string{
-	env.ProdConstant: "config.prod",
-	env.UatConstant:  "config.uat",
-	env.DevConstant:  "config.dev",
+	xenv.ProdConstant: "config.prod",
+	xenv.UatConstant:  "config.uat",
+	xenv.DevConstant:  "config.dev",
 }
 
 // GetMaxOpenConn 最大打开连接数
@@ -126,9 +126,9 @@ func (m *MysqlConfig) GetConnMaxLifeTime() int {
 
 // InitConf 加载所有需要配置文件
 func InitConf(options ...Option) {
-	configName, ok := configFilePathMap[env.Env()]
+	configName, ok := configFilePathMap[xenv.Env()]
 	if !ok {
-		panic(fmt.Sprintf("env config file not found, env is %s", env.Env()))
+		panic(fmt.Sprintf("env config file not found, xenv is %s", xenv.Env()))
 	}
 
 	// 加载服务配置文件

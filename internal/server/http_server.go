@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"snowgo/config"
 	"snowgo/internal/routers"
-	"snowgo/pkg/color"
-	"snowgo/pkg/env"
-	"snowgo/pkg/logger"
+	"snowgo/pkg/xcolor"
+	"snowgo/pkg/xenv"
+	"snowgo/pkg/xlogger"
 	"time"
 )
 
@@ -31,12 +31,12 @@ func StartHttpServer() {
 
 	go func() {
 		fmt.Printf("%s %s is running on %s... log wirter %s \n",
-			color.BlueFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
-			color.RedBackground(env.Env()),
+			xcolor.BlueFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
+			xcolor.RedBackground(xenv.Env()),
 			HttpServer.Addr,
-			color.GreenFont(config.LogConf.Writer))
+			xcolor.GreenFont(config.LogConf.Writer))
 		if err := HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Fatalf("Server Listen: %s\n", err)
+			xlogger.Fatalf("Server Listen: %s\n", err)
 		}
 	}()
 }
@@ -47,7 +47,7 @@ func StopHttpServer() (err error) {
 	defer cancel()
 	// x秒内优雅关闭服务（将未处理完的请求处理完再关闭服务）
 	if err := HttpServer.Shutdown(ctx); err != nil {
-		logger.Fatalf("Server Shutdown: %s", err.Error())
+		xlogger.Fatalf("Server Shutdown: %s", err.Error())
 	}
 	return
 }

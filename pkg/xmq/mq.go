@@ -1,0 +1,5 @@
+package xmq
+
+func InitMq() {
+
+}

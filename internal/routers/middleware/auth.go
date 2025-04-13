@@ -2,9 +2,9 @@ package middleware
 
 import (
 	"github.com/pkg/errors"
-	"snowgo/pkg/auth/jwt"
-	e "snowgo/pkg/error"
-	"snowgo/pkg/response"
+	"snowgo/pkg/xauth/jwt"
+	e "snowgo/pkg/xerror"
+	"snowgo/pkg/xresponse"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -17,21 +17,21 @@ func JWTAuth() func(c *gin.Context) {
 		// 假设Token放在Header的Authorization中，并使用Bearer开头
 		authHeader := c.Request.Header.Get("Authorization")
 		if authHeader == "" {
-			response.FailByError(c, e.TokenNotFound)
+			xresponse.FailByError(c, e.TokenNotFound)
 			c.Abort()
 			return
 		}
 		// 按空格分割
 		parts := strings.SplitN(authHeader, " ", 2)
 		if !(len(parts) == 2 && parts[0] == "Bearer") {
-			response.FailByError(c, e.TokenIncorrectFormat)
+			xresponse.FailByError(c, e.TokenIncorrectFormat)
 			c.Abort()
 			return
 		}
 		// parts[1]是获取到的tokenString，我们使用之前定义好的解析JWT的函数来解析它
 		mc, err := jwt.ParseToken(parts[1])
 		if err != nil {
-			response.FailByError(c, e.TokenInvalid)
+			xresponse.FailByError(c, e.TokenInvalid)
 			c.Abort()
 			return
 		}
@@ -39,11 +39,11 @@ func JWTAuth() func(c *gin.Context) {
 		// 检查token的过期时间，以及type
 		if err := mc.ValidAccessToken(); err != nil {
 			if errors.Is(err, jwt.ErrInvalidTokenType) {
-				response.FailByError(c, e.TokenTypeError)
+				xresponse.FailByError(c, e.TokenTypeError)
 				c.Abort()
 				return
 			}
-			response.FailByError(c, e.TokenExpired)
+			xresponse.FailByError(c, e.TokenExpired)
 			c.Abort()
 			return
 		}

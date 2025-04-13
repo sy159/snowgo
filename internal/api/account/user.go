@@ -4,9 +4,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"snowgo/internal/di"
 	"snowgo/internal/service/account"
-	e "snowgo/pkg/error"
-	"snowgo/pkg/logger"
-	"snowgo/pkg/response"
+	e "snowgo/pkg/xerror"
+	"snowgo/pkg/xlogger"
+	"snowgo/pkg/xresponse"
 	"strconv"
 )
 
@@ -29,27 +29,27 @@ type UserList struct {
 func CreateUser(c *gin.Context) {
 	var user account.User
 	if err := c.ShouldBindJSON(&user); err != nil {
-		response.FailByError(c, e.HttpInternalServerError)
+		xresponse.FailByError(c, e.HttpInternalServerError)
 		return
 	}
-	logger.Infof("create user: %+v", user)
+	xlogger.Infof("create user: %+v", user)
 
 	if user.Username == "" || user.Tel == "" {
-		response.FailByError(c, e.UserNameTelEmptyError)
+		xresponse.FailByError(c, e.UserNameTelEmptyError)
 		return
 	}
 	container := di.GetContainer(c)
 	userId, err := container.UserService.CreateUser(c, &user)
 	if err != nil {
 		if err.Error() == e.UserNameTelExistError.GetErrMsg() {
-			response.FailByError(c, e.UserNameTelExistError)
+			xresponse.FailByError(c, e.UserNameTelExistError)
 			return
 		}
-		logger.Errorf("create user info is err: %+v", err)
-		response.FailByError(c, e.UserCreateError)
+		xlogger.Errorf("create user info is err: %+v", err)
+		xresponse.FailByError(c, e.UserCreateError)
 		return
 	}
-	response.Success(c, &gin.H{"id": userId})
+	xresponse.Success(c, &gin.H{"id": userId})
 }
 
 // GetUserInfo 用户信息
@@ -58,18 +58,18 @@ func GetUserInfo(c *gin.Context) {
 	userId, err := strconv.Atoi(userIdStr)
 	if err != nil {
 		// 转换失败，处理错误
-		response.FailByError(c, e.HttpInternalServerError)
+		xresponse.FailByError(c, e.HttpInternalServerError)
 		return
 	}
-	logger.Infof("get user info by id: %+v", userId)
+	xlogger.Infof("get user info by id: %+v", userId)
 	container := di.GetContainer(c)
 	user, err := container.UserService.GetUserById(c, int32(userId))
 	if err != nil {
-		logger.Errorf("get user info is err: %+v", err)
-		response.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
+		xlogger.Errorf("get user info is err: %+v", err)
+		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
 		return
 	}
-	response.Success(c, &UserInfo{
+	xresponse.Success(c, &UserInfo{
 		ID:           user.ID,
 		Username:     user.Username,
 		Tel:          user.Tel,
@@ -84,16 +84,16 @@ func GetUserInfo(c *gin.Context) {
 func GetUserList(c *gin.Context) {
 	var userListReq account.UserListCondition
 	if err := c.ShouldBindQuery(&userListReq); err != nil {
-		response.FailByError(c, e.HttpInternalServerError)
+		xresponse.FailByError(c, e.HttpInternalServerError)
 		return
 	}
-	logger.Infof("get user list: %+v", userListReq)
+	xlogger.Infof("get user list: %+v", userListReq)
 	if userListReq.Offset < 0 {
-		response.FailByError(c, e.OffsetErrorRequests)
+		xresponse.FailByError(c, e.OffsetErrorRequests)
 		return
 	}
 	if userListReq.Limit < 0 {
-		response.FailByError(c, e.LimitErrorRequests)
+		xresponse.FailByError(c, e.LimitErrorRequests)
 		return
 	} else if userListReq.Limit == 0 {
 		userListReq.Limit = 10 // 默认长度为10
@@ -102,8 +102,8 @@ func GetUserList(c *gin.Context) {
 	container := di.GetContainer(c)
 	res, err := container.UserService.GetUserList(c, &userListReq)
 	if err != nil {
-		logger.Errorf("get user list is err: %+v", err)
-		response.FailByError(c, e.HttpInternalServerError)
+		xlogger.Errorf("get user list is err: %+v", err)
+		xresponse.FailByError(c, e.HttpInternalServerError)
 		return
 	}
 	userList := make([]*UserInfo, 0, len(res.List))
@@ -118,7 +118,7 @@ func GetUserList(c *gin.Context) {
 			UpdatedAt:    user.UpdatedAt.Format("2006-01-02 15:04:05.000"),
 		})
 	}
-	response.Success(c, &UserList{
+	xresponse.Success(c, &UserList{
 		Total: res.Total,
 		List:  userList,
 	})
@@ -128,20 +128,20 @@ func GetUserList(c *gin.Context) {
 func DeleteUserById(c *gin.Context) {
 	var user UserInfo
 	if err := c.ShouldBindJSON(&user); err != nil {
-		response.FailByError(c, e.HttpInternalServerError)
+		xresponse.FailByError(c, e.HttpInternalServerError)
 		return
 	}
-	logger.Infof("delete user info by id: %+v", user.ID)
+	xlogger.Infof("delete user info by id: %+v", user.ID)
 	if user.ID < 1 {
-		response.FailByError(c, e.UserNotFound)
+		xresponse.FailByError(c, e.UserNotFound)
 		return
 	}
 	container := di.GetContainer(c)
 	err := container.UserService.DeleteById(c, user.ID)
 	if err != nil {
-		logger.Errorf("delete user is err: %+v", err)
-		response.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
+		xlogger.Errorf("delete user is err: %+v", err)
+		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
 		return
 	}
-	response.Success(c, &gin.H{"id": user.ID})
+	xresponse.Success(c, &gin.H{"id": user.ID})
 }

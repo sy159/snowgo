@@ -7,10 +7,10 @@ import (
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/repo"
 	"snowgo/internal/dao/account"
-	"snowgo/pkg/cache"
-	"snowgo/pkg/cryption"
-	e "snowgo/pkg/error"
-	"snowgo/pkg/logger"
+	"snowgo/pkg/xcache"
+	"snowgo/pkg/xcryption"
+	e "snowgo/pkg/xerror"
+	"snowgo/pkg/xlogger"
 	"time"
 )
 
@@ -26,10 +26,10 @@ type UserRepo interface {
 type UserService struct {
 	db      *repo.Repository
 	userDao UserRepo
-	cache   cache.Cache
+	cache   xcache.Cache
 }
 
-func NewUserService(db *repo.Repository, userDao UserRepo, cache cache.Cache) *UserService {
+func NewUserService(db *repo.Repository, userDao UserRepo, cache xcache.Cache) *UserService {
 	return &UserService{
 		db:      db,
 		cache:   cache,
@@ -71,7 +71,7 @@ type UserListCondition struct {
 
 // CreateUser 创建用户
 func (u *UserService) CreateUser(ctx context.Context, user *User) (int32, error) {
-	logger.Infof("创建用户: %+v", user)
+	xlogger.Infof("创建用户: %+v", user)
 	// 检查用户名，或者电话是否存在
 	isDuplicate, err := u.userDao.IsNameTelDuplicate(ctx, user.Username, user.Tel)
 	if err != nil {
@@ -84,14 +84,14 @@ func (u *UserService) CreateUser(ctx context.Context, user *User) (int32, error)
 	isDelete := false
 	userObj, err := u.userDao.CreateUser(ctx, &model.User{
 		Username:     user.Username,
-		Password:     cryption.Sha256("snowgo.pwd" + user.Password), // 密码加密(还可以加盐，增加密码难度)
+		Password:     xcryption.Sha256("snowgo.pwd" + user.Password), // 密码加密(还可以加盐，增加密码难度)
 		Tel:          user.Tel,
 		Sex:          &user.Sex,
 		WalletAmount: &user.WalletAmount,
 		IsDelete:     &isDelete,
 	})
 	if err != nil {
-		logger.Errorf("用户创建失败: %v", err)
+		xlogger.Errorf("用户创建失败: %v", err)
 		return 0, errors.WithMessage(err, "用户创建失败")
 	}
 	return userObj.ID, nil
@@ -99,13 +99,13 @@ func (u *UserService) CreateUser(ctx context.Context, user *User) (int32, error)
 
 // GetUserById 根据id获取用户信息
 func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo, error) {
-	logger.Infof("获取用户(%d)信息", userId)
+	xlogger.Infof("获取用户(%d)信息", userId)
 	if userId <= 0 {
 		return nil, errors.New(e.UserNotFound.GetErrMsg())
 	}
 	user, err := u.userDao.GetUserById(ctx, userId)
 	if err != nil {
-		logger.Infof("获取用户(%d)信息异常: %v", userId, err)
+		xlogger.Infof("获取用户(%d)信息异常: %v", userId, err)
 		return nil, errors.WithMessage(err, "用户信息查询失败")
 	}
 	return &UserInfo{
@@ -120,7 +120,7 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 
 // GetUserList 获取用户列表信息
 func (u *UserService) GetUserList(ctx context.Context, condition *UserListCondition) (*UserList, error) {
-	logger.Infof("获取用户列表: %+v", condition)
+	xlogger.Infof("获取用户列表: %+v", condition)
 	userList, total, err := u.userDao.GetUserList(ctx, &account.UserListCondition{
 		Ids:      condition.Ids,
 		Username: condition.Username,
@@ -130,7 +130,7 @@ func (u *UserService) GetUserList(ctx context.Context, condition *UserListCondit
 		Limit:    condition.Limit,
 	})
 	if err != nil {
-		logger.Infof("获取用户信息列表异常: %v", err)
+		xlogger.Infof("获取用户信息列表异常: %v", err)
 		return nil, errors.WithMessage(err, "用户信息列表查询失败")
 	}
 	userInfoList := make([]*UserInfo, 0, len(userList))
@@ -150,7 +150,7 @@ func (u *UserService) GetUserList(ctx context.Context, condition *UserListCondit
 
 // DeleteById 删除用户
 func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
-	logger.Infof("删除用户: %+v", userId)
+	xlogger.Infof("删除用户: %+v", userId)
 	if userId <= 0 {
 		return errors.New(e.UserNotFound.GetErrMsg())
 	}
