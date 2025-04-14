@@ -27,7 +27,7 @@ func main() {
 
 	// 初始化mysql
 	mysql.InitMysql()
-	defer mysql.CloseMysql(mysql.DB)
+	defer mysql.CloseAllMysql(mysql.DB, mysql.DbMap)
 	// 初始化redis
 	redis.InitRedis()
 	defer redis.CloseRedis(redis.RDB)

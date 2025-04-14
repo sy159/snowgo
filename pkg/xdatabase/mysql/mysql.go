@@ -126,3 +126,20 @@ func CloseMysql(db *gorm.DB) {
 	}
 	_ = sqlDB.Close()
 }
+
+// CloseAllMysql 关闭所有数据库连接
+func CloseAllMysql(db *gorm.DB, dbMap map[string]*gorm.DB) {
+	visited := make(map[*gorm.DB]bool, 4)
+
+	if _, ok := visited[db]; !ok {
+		CloseMysql(db)
+		visited[db] = true
+	}
+
+	for _, v := range dbMap {
+		if _, ok := visited[v]; !ok {
+			CloseMysql(v)
+			visited[v] = true
+		}
+	}
+}
