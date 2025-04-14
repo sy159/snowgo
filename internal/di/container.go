@@ -2,11 +2,14 @@ package di
 
 import (
 	"github.com/gin-gonic/gin"
+	v8 "github.com/go-redis/redis/v8"
+	"gorm.io/gorm"
 	"snowgo/internal/constants"
 	"snowgo/internal/dal/repo"
 	accountDao "snowgo/internal/dao/account"
 	accountService "snowgo/internal/service/account"
 	"snowgo/pkg/xcache"
+	"snowgo/pkg/xdatabase/mysql"
 	"snowgo/pkg/xdatabase/redis"
 	"snowgo/pkg/xlogger"
 )
@@ -21,23 +24,26 @@ type Container struct {
 }
 
 // BuildRepository 构建db操作
-func BuildRepository() *repo.Repository {
-	return repo.NewRepository()
+func BuildRepository(db *gorm.DB, dbMap map[string]*gorm.DB) *repo.Repository {
+	if db.Error != nil {
+		xlogger.Panic("Please initialize mysql first")
+	}
+	return repo.NewRepository(db, dbMap)
 }
 
 // BuildRedisCache 构建缓存操作
-func BuildRedisCache() xcache.Cache {
-	if redis.RDB == nil {
+func BuildRedisCache(rdb *v8.Client) xcache.Cache {
+	if rdb == nil {
 		xlogger.Panic("Please initialize redis first, redis cache is empty")
 	}
-	return xcache.NewRedisCache(redis.RDB)
+	return xcache.NewRedisCache(rdb)
 }
 
 // NewContainer 构造所有依赖，注意参数传递的顺序
 func NewContainer() *Container {
 	// 构造db、redis操作
-	repository := BuildRepository()
-	redisCache := BuildRedisCache()
+	repository := BuildRepository(mysql.DB, mysql.DbMap)
+	redisCache := BuildRedisCache(redis.RDB)
 
 	// 构造Dao
 	userDao := accountDao.NewUserDao(repository)
