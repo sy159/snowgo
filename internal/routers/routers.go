@@ -30,7 +30,6 @@ func setMode() {
 func loadMiddleWare(router *gin.Engine) {
 	router.Use(middleware.AccessLogger(), middleware.Recovery())
 	router.Use(middleware.Cors())
-	router.Use(middleware.InjectContainerMiddleware()) // 注册依赖
 }
 
 // 注册所有路由
@@ -47,6 +46,9 @@ func loadRouter(router *gin.Engine) {
 
 	// 创建根路由组，并添加前缀
 	apiGroup := router.Group(fmt.Sprintf("/api/%s", config.ServerConf.Version))
+	// api路由进行依赖注入
+	apiGroup.Use(middleware.InjectContainerMiddleware())
+
 	rootRouters(apiGroup) // 根目录下路由
 	options := []option{  // 根据不同分组注册路由
 		userRouters, // 用户相关路由
