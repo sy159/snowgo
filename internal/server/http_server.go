@@ -30,11 +30,23 @@ func StartHttpServer() {
 	}
 
 	go func() {
-		fmt.Printf("%s  %s is running on %s... log type %s \n",
+		banner := `
+     _______..__   __.   ______   ____    __    ____  _______   ______   
+    /       ||  \ |  |  /  __  \  \   \  /  \  /   / /  _____| /  __  \  
+   |   (----` + "`" + `|   \|  | |  |  |  |  \   \/    \/   / |  |  __  |  |  |  | 
+    \   \    |  . ` + "`" + `  | |  |  |  |   \            /  |  | |_ | |  |  |  | 
+.----)   |   |  |\   | |  ` + "`" + `--'  |    \    /\    /   |  |__| | |  ` + "`" + `--'  | 
+|_______/    |__| \__|  \______/      \__/  \__/     \______|  \______/  
+`
+		fmt.Printf("%s\n", xcolor.GreenFont(banner))
+		fmt.Printf("%s %s %s is running on %s %s log mode %s \n",
 			xcolor.GreenFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
-			xcolor.RedBackground(fmt.Sprintf("[%s]", xenv.Env())),
-			xcolor.RedFont(HttpServer.Addr),
+			xcolor.GreenFont("|"),
+			xcolor.YellowFont(fmt.Sprintf("http://%s", HttpServer.Addr)),
+			xcolor.RedBackground(fmt.Sprintf("%s", xenv.Env())),
+			xcolor.GreenFont("|"),
 			xcolor.BlueFont(config.LogConf.Writer))
+
 		if err := HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			xlogger.Fatalf("Server Listen: %s\n", err)
 		}
