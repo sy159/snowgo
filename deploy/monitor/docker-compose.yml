@@ -46,6 +46,11 @@ services:
       options:
         max-size: '10m'
         max-file: '3'
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9100" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   grafana:
     image: grafana/grafana:latest
@@ -69,9 +74,11 @@ services:
   mysql_exporter:
     image: prom/mysqld-exporter:latest
     container_name: monitor-mysql-exporter
+    ports:
+      - "19104:9104"
     command:
       - "--mysqld.username=root:zx.123"
-      - "--mysqld.address=127.0.0.1:3306"
+      - "--mysqld.address=192.168.0.106:3306"
     restart: always
     networks:
       - monitor
@@ -84,12 +91,19 @@ services:
         limits:
           cpus: '0.3'
           memory: 256M
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9104" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   redis_exporter:
     image: oliver006/redis_exporter:latest
     container_name: monitor-redis-exporter
+    ports:
+      - "19121:9121"
     environment:
-      - REDIS_ADDR=redis://127.0.0.1:6379
+      - REDIS_ADDR=redis://192.168.0.106:6379
     restart: always
     networks:
       - monitor
@@ -102,12 +116,20 @@ services:
         limits:
           cpus: '0.2'
           memory: 200M
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9121" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   elasticsearch_exporter:
-    image: justwatch/elasticsearch_exporter:latest
+    image: quay.io/prometheuscommunity/elasticsearch-exporter:latest
     container_name: monitor-elasticsearch-exporter
-    environment:
-      - ES_URI=http://elastic:zx.123@127.0.0.1:9200
+    ports:
+      - "19114:9114"
+    command:
+      - '--es.uri=http://elastic:zx.123@192.168.0.106:9200'
+      - '--es.all'
     restart: always
     networks:
       - monitor
@@ -120,6 +142,11 @@ services:
         limits:
           cpus: '0.3'
           memory: 512M
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9114" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
 networks:
   monitor:
