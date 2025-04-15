@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"errors"
+	"fmt"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -10,6 +11,7 @@ import (
 	"log"
 	"os"
 	"snowgo/config"
+	"snowgo/pkg/xcolor"
 	. "snowgo/pkg/xlogger"
 	"time"
 )
@@ -39,33 +41,42 @@ func InitMysql() {
 }
 
 // 连接mysql
-func connectMysql(config config.MysqlConfig) (db *gorm.DB, err error) {
-	if config.DSN == "" {
+func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
+	if mysqlConfig.DSN == "" {
 		return nil, errors.New("mysql init failed, dsn is empty")
 	}
 
 	// 连接额外配置信息
 	gormConfig := &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
-			TablePrefix:   config.TablePre, // 表前缀
-			SingularTable: true,            // 使用单数表名，启用该选项时，`User` 的表名应该是 `user`而不是users
+			TablePrefix:   mysqlConfig.TablePre, // 表前缀
+			SingularTable: true,                 // 使用单数表名，启用该选项时，`User` 的表名应该是 `user`而不是users
 		},
 		SkipDefaultTransaction: true,
 	}
 
 	// 打印SQL设置
-	if config.PrintSqlLog {
-		loggerNew := logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
-			SlowThreshold:             time.Duration(config.SlowThresholdTime) * time.Millisecond, //慢SQL阈值
-			LogLevel:                  logger.Info,                                                // info表示所有都打印，warn值打印慢sql
-			Colorful:                  true,                                                       // 彩色打印开启
-			IgnoreRecordNotFoundError: true,
-		})
+	if mysqlConfig.PrintSqlLog {
+		loggerNew := logger.New(
+			log.New(
+				os.Stdout,
+				fmt.Sprintf("\r\n%s %s",
+					xcolor.GreenFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
+					xcolor.YellowFont("[mysql] | "),
+				),
+				log.LstdFlags,
+			),
+			logger.Config{
+				SlowThreshold:             time.Duration(mysqlConfig.SlowThresholdTime) * time.Millisecond, //慢SQL阈值
+				LogLevel:                  logger.Info,                                                     // info表示所有都打印，warn值打印慢sql
+				Colorful:                  true,                                                            // 彩色打印开启
+				IgnoreRecordNotFoundError: true,
+			})
 		gormConfig.Logger = loggerNew
 	}
 
 	// 建立连接
-	db, err = gorm.Open(mysql.Open(config.DSN), gormConfig)
+	db, err = gorm.Open(mysql.Open(mysqlConfig.DSN), gormConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -76,28 +87,28 @@ func connectMysql(config config.MysqlConfig) (db *gorm.DB, err error) {
 		return nil, err
 	}
 	// 设置空闲连接池中连接的最大数量
-	sqlDB.SetMaxIdleConns(config.GetMaxIdleConn())
+	sqlDB.SetMaxIdleConns(mysqlConfig.GetMaxIdleConn())
 	// 设置打开数据库连接的最大数量 默认值为0表示不限制，可以避免并发太高导致连接mysql出现too many connections的错误。
-	sqlDB.SetMaxOpenConns(config.GetMaxOpenConn())
+	sqlDB.SetMaxOpenConns(mysqlConfig.GetMaxOpenConn())
 	// 设置了连接可复用的最大时间。单位min
-	sqlDB.SetConnMaxLifetime(time.Duration(config.GetConnMaxLifeTime()) * time.Minute)
-	sqlDB.SetConnMaxIdleTime(time.Duration(config.GetConnMaxIdleTime()) * time.Minute)
+	sqlDB.SetConnMaxLifetime(time.Duration(mysqlConfig.GetConnMaxLifeTime()) * time.Minute)
+	sqlDB.SetConnMaxIdleTime(time.Duration(mysqlConfig.GetConnMaxIdleTime()) * time.Minute)
 
 	// 未开启读写分离配置
-	if !config.SeparationRW {
+	if !mysqlConfig.SeparationRW {
 		return db, nil
 	}
 
 	// 读写分离配置
 	var sources []gorm.Dialector
 	var replicas []gorm.Dialector
-	if len(config.MainsDSN) > 0 {
-		for _, uri := range config.MainsDSN {
+	if len(mysqlConfig.MainsDSN) > 0 {
+		for _, uri := range mysqlConfig.MainsDSN {
 			sources = append(sources, mysql.Open(uri))
 		}
 	}
-	if len(config.SlavesDSN) > 0 {
-		for _, uri := range config.SlavesDSN {
+	if len(mysqlConfig.SlavesDSN) > 0 {
+		for _, uri := range mysqlConfig.SlavesDSN {
 			replicas = append(replicas, mysql.Open(uri))
 		}
 	}
@@ -107,10 +118,10 @@ func connectMysql(config config.MysqlConfig) (db *gorm.DB, err error) {
 		Sources:  sources,
 		Replicas: replicas,
 		Policy:   dbresolver.RandomPolicy{},
-	}).SetMaxOpenConns(config.GetMaxOpenConn()).
-		SetMaxIdleConns(config.GetMaxIdleConn()).
-		SetConnMaxIdleTime(time.Duration(config.GetConnMaxIdleTime()) * time.Minute).
-		SetConnMaxLifetime(time.Duration(config.GetConnMaxLifeTime()) * time.Minute))
+	}).SetMaxOpenConns(mysqlConfig.GetMaxOpenConn()).
+		SetMaxIdleConns(mysqlConfig.GetMaxIdleConn()).
+		SetConnMaxIdleTime(time.Duration(mysqlConfig.GetConnMaxIdleTime()) * time.Minute).
+		SetConnMaxLifetime(time.Duration(mysqlConfig.GetConnMaxLifeTime()) * time.Minute))
 	if err != nil {
 		return nil, err
 	}

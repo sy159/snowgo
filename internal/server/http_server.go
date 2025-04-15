@@ -30,11 +30,11 @@ func StartHttpServer() {
 	}
 
 	go func() {
-		fmt.Printf("%s %s is running on %s... log wirter %s \n",
-			xcolor.BlueFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
-			xcolor.RedBackground(xenv.Env()),
-			HttpServer.Addr,
-			xcolor.GreenFont(config.LogConf.Writer))
+		fmt.Printf("%s  %s is running on %s... log type %s \n",
+			xcolor.GreenFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
+			xcolor.RedBackground(fmt.Sprintf("[%s]", xenv.Env())),
+			xcolor.RedFont(HttpServer.Addr),
+			xcolor.BlueFont(config.LogConf.Writer))
 		if err := HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			xlogger.Fatalf("Server Listen: %s\n", err)
 		}

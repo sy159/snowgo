@@ -77,9 +77,9 @@ func AccessLogger() gin.HandlerFunc {
 
 		cost := time.Since(startTime)
 		// 控制台输出访问日志
-		fmt.Printf("[%s:%s] %25s | %4s | %14v | %5s  %#v | %12s\n%s",
-			config.ServerConf.Name,
-			config.ServerConf.Version,
+		fmt.Printf("%s %s %20s | %4s | %10v | %5s  %#v | %12s\n%s",
+			xcolor.GreenFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
+			xcolor.YellowFont("[access] |"),
 			time.Now().Format("2006-01-02 15:04:05.000"),
 			xcolor.StatusCodeColor(c.Writer.Status()),
 			cost,
@@ -91,12 +91,12 @@ func AccessLogger() gin.HandlerFunc {
 
 		// 记录访问日志
 		if config.ServerConf.EnableAccessLog {
-			xlogger.Access(path,
+			xlogger.Access("",
 				zap.Int("status", c.Writer.Status()),
 				zap.String("method", method),
 				zap.String("path", path),
 				zap.String("query", query),
-				zap.String("req", string(reqBody)),
+				zap.String("request_body", string(reqBody)),
 				zap.String("ip", c.ClientIP()),
 				zap.Duration("cost", cost),
 				zap.String("res", writer.body.String()),

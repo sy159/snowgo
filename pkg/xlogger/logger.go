@@ -1,11 +1,14 @@
 package xlogger
 
 import (
+	"fmt"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"io"
 	"os"
 	"snowgo/config"
+	"snowgo/pkg/xcolor"
 	"strings"
 	"time"
 	//"gopkg.in/natefinch/lumberjack.v2"
@@ -19,6 +22,21 @@ const (
 )
 
 //var Logger *zap.Logger // 也直接zap.L或者zap.S调用获取实例
+
+type prefixWriter struct {
+	w      io.Writer
+	prefix string
+}
+
+func (p *prefixWriter) Write(b []byte) (int, error) {
+	lines := strings.Split(string(b), "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = p.prefix + line
+		}
+	}
+	return p.w.Write([]byte(strings.Join(lines, "\n")))
+}
 
 // InitLogger 初始化Logger,设置zap全局logger
 func InitLogger() {
@@ -55,10 +73,16 @@ func InitLogger() {
 	})
 
 	// 根据时间进行分割
-	debugWriter := zapcore.AddSync(os.Stdout)
-	infoWriter := zapcore.AddSync(os.Stdout)
-	accessWriter := zapcore.AddSync(os.Stdout)
-	errorWriter := zapcore.AddSync(os.Stdout)
+	// 统一一个服务名前缀
+	stdoutWithPrefix := zapcore.AddSync(&prefixWriter{
+		w: os.Stdout,
+		prefix: xcolor.GreenFont(fmt.Sprintf("[%s:%s] ", config.ServerConf.Name, config.ServerConf.Version)) +
+			xcolor.YellowFont("[logger] | "),
+	})
+	debugWriter := stdoutWithPrefix
+	infoWriter := stdoutWithPrefix
+	accessWriter := stdoutWithPrefix
+	errorWriter := stdoutWithPrefix
 	// console控制台输出，file输出到文件 multi控制台跟日志文件同时输出
 	if writer == "file" {
 		debugWriter = getTimeWriter("./logs/debug/debug.log", logMaxAge)
@@ -82,10 +106,10 @@ func InitLogger() {
 		//infoWriter := getSizeWriter("./logs/info/info.log")
 		//accessWriter := getSizeWriter("./logs/access/access.log")
 		//errorWriter := getSizeWriter("./logs/xerror/xerror.log")
-		debugWriter = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), debugWriter)
-		infoWriter = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), infoWriter)
+		debugWriter = zapcore.NewMultiWriteSyncer(stdoutWithPrefix, debugWriter)
+		infoWriter = zapcore.NewMultiWriteSyncer(stdoutWithPrefix, infoWriter)
 		//accessWriter = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), accessWriter)  // account其他地方有些
-		errorWriter = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), errorWriter)
+		errorWriter = zapcore.NewMultiWriteSyncer(stdoutWithPrefix, errorWriter)
 	}
 
 	// 创建具体的Logger
@@ -116,7 +140,7 @@ func getNormalEncoder() zapcore.Encoder {
 	return zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
 		TimeKey:       "time",
 		LevelKey:      "level",
-		NameKey:       "xlogger",
+		NameKey:       "logger",
 		CallerKey:     "caller",
 		MessageKey:    "msg",
 		StacktraceKey: "stacktrace",
@@ -144,7 +168,7 @@ func getJsonEncoder() zapcore.Encoder {
 	return zapcore.NewJSONEncoder(zapcore.EncoderConfig{
 		TimeKey:       "time",
 		LevelKey:      "level",
-		NameKey:       "xlogger",
+		NameKey:       "logger",
 		CallerKey:     "caller",
 		MessageKey:    "msg",
 		StacktraceKey: "stacktrace",
@@ -171,7 +195,7 @@ func getJsonEncoder() zapcore.Encoder {
 func getAccessNormalEncoder() zapcore.Encoder {
 	return zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
 		TimeKey:       "time",
-		NameKey:       "xlogger",
+		NameKey:       "logger",
 		MessageKey:    "msg",
 		StacktraceKey: "stacktrace",
 		LineEnding:    zapcore.DefaultLineEnding,
@@ -193,7 +217,7 @@ func getAccessNormalEncoder() zapcore.Encoder {
 func getAccessJsonEncoder() zapcore.Encoder {
 	return zapcore.NewJSONEncoder(zapcore.EncoderConfig{
 		TimeKey:       "time",
-		NameKey:       "xlogger",
+		NameKey:       "logger",
 		MessageKey:    "msg",
 		StacktraceKey: "stacktrace",
 		LineEnding:    zapcore.DefaultLineEnding,
