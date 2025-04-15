@@ -15,10 +15,37 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.4' # 最大cpu的40%
-          memory: 4G # 最大4g
+          cpus: '0.8' # 最大cpu的40%
+          memory: 8G # 生产环境建议 8G+
     networks:
       - monitor
+    logging:
+      options:
+        max-size: '10m'
+        max-file: '5'
+    depends_on: # 添加依赖确保Exporter先启动
+      - node_exporter
+      - mysql_exporter
+      - redis_exporter
+      - elasticsearch_exporter
+
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: monitor-node-exporter
+    ports:
+      - "19100:9100"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 512M
+    networks:
+      - monitor
+    logging:
+      options:
+        max-size: '10m'
+        max-file: '3'
 
   grafana:
     image: grafana/grafana:latest
@@ -27,30 +54,72 @@ services:
       - "3000:3000"
     environment:
       - TZ=Asia/Shanghai
+      - GF_SECURITY_ADMIN_PASSWORD=zx123  # 设置默认密码
     volumes:
       - ./grafana/data:/var/lib/grafana
+      - ./grafana/plugins:/var/lib/grafana/plugins  # 持久化插件
     restart: always
     networks:
       - monitor
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   mysql_exporter:
     image: prom/mysqld-exporter:latest
     container_name: monitor-mysql-exporter
-    restart: always
     command:
       - "--mysqld.username=root:zx.123"
-      - "--mysqld.address=192.168.0.104:3306"
+      - "--mysqld.address=127.0.0.1:3306"
+    restart: always
     networks:
       - monitor
+    logging:
+      options:
+        max-size: '10m'
+        max-file: '5'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+
+  redis_exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: monitor-redis-exporter
+    environment:
+      - REDIS_ADDR=redis://127.0.0.1:6379
+    restart: always
+    networks:
+      - monitor
+    logging:
+      options:
+        max-size: '10m'
+        max-file: '3'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 200M
 
   elasticsearch_exporter:
     image: justwatch/elasticsearch_exporter:latest
     container_name: monitor-elasticsearch-exporter
     environment:
-      - ES_URI=http://elastic:zx.123@192.168.0.104:9200
+      - ES_URI=http://elastic:zx.123@127.0.0.1:9200
     restart: always
     networks:
       - monitor
+    logging:
+      options:
+        max-size: '10m'
+        max-file: '3'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 512M
 
 networks:
   monitor:

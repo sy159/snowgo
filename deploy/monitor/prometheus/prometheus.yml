@@ -1,25 +1,42 @@
 global:
   scrape_interval: 15s  # 全局抓取间隔，默认15秒
   evaluation_interval: 15s # 规则评估间隔
+  external_labels:
+    env: 'dev'    # 全局标签
 
 scrape_configs:
   # Prometheus 自身监控
   - job_name: 'prometheus'
     static_configs:
       - targets: [ 'localhost:9090' ]
+        labels:
+          service: prometheus
+
+  # 当前节点 监控配置
+  - job_name: 'node'
+    static_configs:
+      - targets: [ 'node_exporter:9100' ]
+        labels:
+          service: node
 
   # MySQL 监控配置
   - job_name: 'mysql'
     static_configs:
       - targets: [ 'mysql_exporter:9104' ]  # MySQL Exporter 默认端口
-    metrics_path: /metrics
-    scrape_interval: 15s
-    honor_labels: true
+        labels:
+          service: mysql
+    scrape_interval: 10s
+
+  # Redis 监控配置
+  - job_name: 'redis'
+    static_configs:
+      - targets: [ 'redis_exporter:9121' ]
+        labels:
+          service: redis
 
   # Elasticsearch 监控配置
   - job_name: 'elasticsearch'
     static_configs:
       - targets: [ 'elasticsearch_exporter:9114' ]  # Elasticsearch Exporter 默认端口
-    metrics_path: /metrics
-    scrape_interval: 15s
-    honor_labels: true
+        labels:
+          service: elasticsearch
