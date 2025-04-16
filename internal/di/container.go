@@ -13,6 +13,7 @@ import (
 	"snowgo/pkg/xcache"
 	xmysql "snowgo/pkg/xdatabase/mysql"
 	xredis "snowgo/pkg/xdatabase/redis"
+	"snowgo/pkg/xlock"
 	"snowgo/pkg/xlogger"
 )
 
@@ -21,6 +22,7 @@ type Container struct {
 	// 通用
 	Cache      xcache.Cache
 	JwtManager *jwt.Manager
+	Lock       xlock.Lock
 
 	// 这里只提供对api使用的service，不提供dao操作
 	UserService *accountService.UserService
@@ -59,9 +61,18 @@ func BuildRedisCache(rdb *redis.Client) xcache.Cache {
 	return xcache.NewRedisCache(rdb)
 }
 
+// BuildLock 构建锁
+func BuildLock(rdb *redis.Client) xlock.Lock {
+	if rdb == nil {
+		xlogger.Panic("Please initialize redis first, redis cache is empty")
+	}
+	return xlock.NewRedisLock(rdb)
+}
+
 // NewContainer 构造所有依赖，注意参数传递的顺序
 func NewContainer() *Container {
 	jwtManager := BuildJwtManager(config.JwtConf)
+	lock := BuildLock(xredis.RDB)
 
 	// 构造db、redis操作
 	repository := BuildRepository(xmysql.DB, xmysql.DbMap)
@@ -76,6 +87,7 @@ func NewContainer() *Container {
 	return &Container{
 		Cache:       redisCache,
 		JwtManager:  jwtManager,
+		Lock:        lock,
 		UserService: userService,
 	}
 }
