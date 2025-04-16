@@ -7,9 +7,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	BizCode = "biz_code"
+	BizMsg  = "biz_msg"
+)
+
 // String 字符串返回
 func String(c *gin.Context, res string) {
-	c.Set("biz_code", 0)
+	c.Set(BizCode, 0)
+	c.Set(BizMsg, "")
 	c.String(http.StatusOK, res)
 }
 
@@ -18,7 +24,8 @@ func Json(c *gin.Context, code int, msg string, data interface{}) {
 	if data == nil {
 		data = struct{}{}
 	}
-	c.Set("biz_code", code)
+	c.Set(BizCode, code)
+	c.Set(BizMsg, msg)
 	c.JSON(http.StatusOK, gin.H{
 		"code": code,
 		"msg":  msg,

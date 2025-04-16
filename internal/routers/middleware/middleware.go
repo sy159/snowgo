@@ -76,23 +76,15 @@ func AccessLogger() gin.HandlerFunc {
 		c.Next()
 
 		cost := time.Since(startTime)
-		// 控制台输出访问日志
-		fmt.Printf("%s %s %20s | %4s | %10v | %5s  %#v | %12s\n%s",
-			xcolor.GreenFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
-			xcolor.YellowFont("[access] |"),
-			time.Now().Format("2006-01-02 15:04:05.000"),
-			xcolor.StatusCodeColor(c.Writer.Status()),
-			cost,
-			xcolor.MethodColor(method),
-			c.Request.URL.RequestURI(),
-			c.ClientIP(),
-			c.Errors.ByType(gin.ErrorTypePrivate).String(),
-		)
+		bizCode := c.GetInt(xresponse.BizCode)  // 业务返回code
+		bizMsg := c.GetString(xresponse.BizMsg) // 业务返回msg
 
 		// 记录访问日志
 		if config.ServerConf.EnableAccessLog {
-			xlogger.Access("",
+			xlogger.Access(bizMsg,
 				zap.Int("status", c.Writer.Status()),
+				zap.Int("biz_code", bizCode),
+				//zap.String("biz_msg", bizMsg),
 				zap.String("method", method),
 				zap.String("path", path),
 				zap.String("query", query),
@@ -103,6 +95,21 @@ func AccessLogger() gin.HandlerFunc {
 				zap.String("request_id", requestID),
 				zap.String("user-agent", c.Request.UserAgent()),
 				zap.String("errors", c.Errors.ByType(gin.ErrorTypePrivate).String()),
+			)
+		} else {
+			// 控制台输出访问日志
+			fmt.Printf("%s %s %20s | status %3s | biz code %6s | %8v | %5s  %#v | %12s | %s\n",
+				xcolor.GreenFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
+				xcolor.YellowFont("[access] |"),
+				time.Now().Format("2006-01-02 15:04:05.000"),
+				xcolor.StatusCodeColor(c.Writer.Status()),
+				xcolor.BizCodeColor(bizCode),
+				cost,
+				xcolor.MethodColor(method),
+				c.Request.URL.RequestURI(),
+				c.ClientIP(),
+				//c.Errors.ByType(gin.ErrorTypePrivate).String(),
+				bizMsg,
 			)
 		}
 	}

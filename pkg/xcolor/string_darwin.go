@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	e "snowgo/pkg/xerror"
 	"strconv"
 )
 
@@ -57,6 +58,16 @@ func BlueBackground(msg string) string {
 	return fmt.Sprintf("\x1b[44m%s\x1b[0m", msg)
 }
 
+// PurpleFont 紫色字体
+func PurpleFont(msg string) string {
+	return fmt.Sprintf("\x1b[35m%s\x1b[0m", msg)
+}
+
+// PurpleBackground 紫色背景
+func PurpleBackground(msg string) string {
+	return fmt.Sprintf("\x1b[45m%s\x1b[0m", msg)
+}
+
 // WhiteFont 白色字体
 func WhiteFont(msg string) string {
 	return fmt.Sprintf("\x1b[37m%s\x1b[0m", msg)
@@ -74,8 +85,23 @@ func StatusCodeColor(statusCode int) string {
 	case statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices:
 		return GreenBackground(msg)
 	case statusCode >= http.StatusMultipleChoices && statusCode < http.StatusBadRequest:
-		return WhiteBackground(msg)
+		return PurpleBackground(msg)
 	case statusCode >= http.StatusBadRequest && statusCode < http.StatusInternalServerError:
+		return YellowBackground(msg)
+	default:
+		return RedBackground(msg)
+	}
+}
+
+// BizCodeColor 根据业务code返回对应颜色
+func BizCodeColor(bizCode int) string {
+	msg := strconv.Itoa(bizCode)
+	switch {
+	case bizCode == e.OK.GetErrCode() || (bizCode >= http.StatusOK && bizCode < http.StatusMultipleChoices):
+		return GreenBackground(msg)
+	case bizCode >= http.StatusMultipleChoices && bizCode < http.StatusBadRequest:
+		return PurpleBackground(msg)
+	case bizCode >= http.StatusBadRequest && bizCode < http.StatusInternalServerError:
 		return YellowBackground(msg)
 	default:
 		return RedBackground(msg)
