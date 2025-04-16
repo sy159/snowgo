@@ -77,7 +77,28 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime
       - ./config:/snowgo-service/config
-      - ./logs:/snowgo-service/logs
+      - ./logs/app1:/snowgo-service/logs
+    networks:
+      - snowgo_network
+    depends_on:
+      - snowgo-mysql
+      - snowgo-redis
+
+  snowgo-service2:
+    image: ${SERVICE_IMAGE_NAME:-snowgo}:${SERVICE_IMAGE_VERSION:-v1.0}
+    container_name: snowgo-service2
+    restart: always
+    logging:
+      options:
+        max-size: '5m'
+        max-file: '10'
+    environment:
+      ENV: ${ENV:-dev}
+    privileged: true
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - ./config:/snowgo-service/config
+      - ./logs/app2:/snowgo-service/logs
     networks:
       - snowgo_network
     depends_on:

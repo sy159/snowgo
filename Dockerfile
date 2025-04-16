@@ -1,4 +1,4 @@
-FROM golang:1.22.4 AS builder
+FROM golang:1.23.8 AS builder
 
 # private repository
 # RUN go env -w GOPRIVATE=github.com/sy159
@@ -16,6 +16,9 @@ RUN go mod download && \
 
 FROM alpine:latest
 #FROM debian:stable-slim
+
+# 安装根证书，防止部分请求失败
+RUN apk --no-cache add ca-certificates tzdata
 
 ENV PROJECT_NAME=snowgo-service
 ENV PORT=8000
