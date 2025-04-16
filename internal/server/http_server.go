@@ -43,7 +43,7 @@ func StartHttpServer() {
 			xcolor.GreenFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
 			xcolor.GreenFont("|"),
 			xcolor.PurpleFont(fmt.Sprintf("http://%s", HttpServer.Addr)),
-			xcolor.RedBackground(fmt.Sprintf("%s", xenv.Env())),
+			xcolor.RedBackground(xenv.Env()),
 			xcolor.GreenFont("|"),
 			xcolor.BlueFont(config.LogConf.Writer))
 
