@@ -5,8 +5,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
-	"snowgo/config"
-	"snowgo/pkg/xlogger"
 )
 
 const (
@@ -17,9 +15,25 @@ const (
 var (
 	ErrTokenExpired     = errors.New("token has expired")
 	ErrInvalidTokenType = errors.New("invalid token type")
+	ErrInvalidToken     = errors.New("invalid token")
 )
 
-// Claims 定义 JWT 的自定义 claims，内嵌 jwt.RegisteredClaims
+type Config struct {
+	JwtSecret             string
+	Issuer                string
+	AccessExpirationTime  int // 单位：分钟
+	RefreshExpirationTime int // 单位：分钟
+}
+
+type Manager struct {
+	jwtConf *Config
+}
+
+func NewJwtManager(conf *Config) *Manager {
+	return &Manager{jwtConf: conf}
+}
+
+// Claims 自定义声明
 type Claims struct {
 	GrantType string `json:"grant_type"` // 授权类型，区分 accessToken 与 refreshToken
 	UserId    uint   `json:"user_id"`
@@ -28,84 +42,74 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// GenerateAccessToken 生成访问 Token
-func GenerateAccessToken(userId uint, username, role string) (string, error) {
-	expiresAt := time.Now().Add(time.Duration(config.JwtConf.AccessExpirationTime) * time.Minute)
-
+// GenerateAccessToken 创建 access token
+func (m *Manager) GenerateAccessToken(userId uint, username, role string) (string, error) {
+	exp := time.Now().Add(time.Duration(m.jwtConf.AccessExpirationTime) * time.Minute)
+	exp = time.Unix(exp.Unix(), 0) // 去除纳秒
 	accessClaims := Claims{
 		GrantType: accessType,
 		UserId:    userId,
 		Username:  username,
 		Role:      role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expiresAt),
-			Issuer:    config.JwtConf.Issuer,
+			ExpiresAt: jwt.NewNumericDate(exp),
+			Issuer:    m.jwtConf.Issuer,
 		},
 	}
-	tokenClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
-	accessToken, err := tokenClaims.SignedString([]byte(config.JwtConf.JwtSecret))
-	if err != nil {
-		xlogger.Errorf("Generate Access Token error: %s", err)
-	}
-
-	return accessToken, err
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
+	return token.SignedString([]byte(m.jwtConf.JwtSecret))
 }
 
-// GenerateRefreshToken 生成刷新 Token
-func GenerateRefreshToken(userId uint, username, role string) (string, error) {
-	expiresAt := time.Now().Add(time.Duration(config.JwtConf.RefreshExpirationTime) * time.Minute)
-
+// GenerateRefreshToken 创建 refresh token
+func (m *Manager) GenerateRefreshToken(userId uint, username, role string) (string, error) {
+	exp := time.Now().Add(time.Duration(m.jwtConf.RefreshExpirationTime) * time.Minute)
+	exp = time.Unix(exp.Unix(), 0) // 去除纳秒
 	refreshClaims := Claims{
 		GrantType: refreshType,
 		UserId:    userId,
 		Username:  username,
 		Role:      role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expiresAt),
-			Issuer:    config.JwtConf.Issuer,
+			ExpiresAt: jwt.NewNumericDate(exp),
+			Issuer:    m.jwtConf.Issuer,
 		},
 	}
-	tokenClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	refreshToken, err := tokenClaims.SignedString([]byte(config.JwtConf.JwtSecret))
-
-	return refreshToken, err
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+	return token.SignedString([]byte(m.jwtConf.JwtSecret))
 }
 
-// GenerateTokens 同时生成访问令牌和刷新令牌
-func GenerateTokens(userId uint, username, role string) (accessToken, refreshToken string, err error) {
-	accessToken, err = GenerateAccessToken(userId, username, role)
+// GenerateTokens 创建一对 access + refresh token
+func (m *Manager) GenerateTokens(userId uint, username, role string) (accessToken, refreshToken string, err error) {
+	accessToken, err = m.GenerateAccessToken(userId, username, role)
 	if err != nil {
 		return "", "", errors.Wrap(err, "Generate Access Token error")
 	}
-
-	// 生成刷新令牌
-	refreshToken, err = GenerateRefreshToken(userId, username, role)
+	refreshToken, err = m.GenerateRefreshToken(userId, username, role)
 	if err != nil {
 		return "", "", errors.Wrap(err, "Generate Refresh Token error")
 	}
-
 	return accessToken, refreshToken, nil
 }
 
-// ParseToken 解析 token，并返回自定义的 Claims
-func ParseToken(tokenStr string) (*Claims, error) {
+// ParseToken 解析 JWT token
+func (m *Manager) ParseToken(tokenStr string) (*Claims, error) {
+	// 解析并校验token
 	tokenClaims, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(config.JwtConf.JwtSecret), nil
-	})
+		return []byte(m.jwtConf.JwtSecret), nil
+	}) // 自定义手动校验 jwt.WithoutClaimsValidation()这个是跳过所有的校验
 	if err != nil {
-		return nil, errors.Wrap(err, "Token parsing error")
+		return nil, err
 	}
 	claims, ok := tokenClaims.Claims.(*Claims)
-	if !ok || !tokenClaims.Valid {
-		return nil, errors.New("invalid token")
+	if !ok {
+		return nil, ErrInvalidToken
 	}
 	return claims, nil
 }
 
-// RefreshTokens 根据刷新令牌生成新的刷新令牌和访问令牌
-func RefreshTokens(refreshToken string) (newRefreshToken, accessToken string, err error) {
-	// 解析刷新令牌
-	claims, err := ParseToken(refreshToken)
+// RefreshTokens 用 refresh token 刷新令牌对
+func (m *Manager) RefreshTokens(refreshToken string) (newRefreshToken, accessToken string, err error) {
+	claims, err := m.ParseToken(refreshToken)
 	if err != nil {
 		return "", "", errors.Wrap(err, "Parse Refresh Token error")
 	}
@@ -115,36 +119,39 @@ func RefreshTokens(refreshToken string) (newRefreshToken, accessToken string, er
 		return "", "", ErrTokenExpired
 	}
 	// 检查令牌类型是否为 refresh
-	if claims.GrantType != refreshType {
+	if claims.IsRefreshToken() {
 		return "", "", ErrInvalidTokenType
 	}
 
 	// 生成新的刷新令牌(这里如果重新生成，refresh token的过期时间又要重新算，如果沿用以前的，就是严格按照refresh token过期时间来)
-	newRefreshToken, err = GenerateRefreshToken(claims.UserId, claims.Username, claims.Role)
+	newRefreshToken, err = m.GenerateRefreshToken(claims.UserId, claims.Username, claims.Role)
 	if err != nil {
 		return "", "", errors.Wrap(err, "Generate Refresh Token error")
 	}
-
 	// 生成新的访问令牌
-	accessToken, err = GenerateAccessToken(claims.UserId, claims.Username, claims.Role)
+	accessToken, err = m.GenerateAccessToken(claims.UserId, claims.Username, claims.Role)
 	if err != nil {
 		return "", "", errors.Wrap(err, "Generate Access Token error")
 	}
-
 	return newRefreshToken, accessToken, nil
 }
 
-// IsAccessToken 检查当前 Claims 是否为访问令牌
+// IsAccessToken 判断是否是 access token
 func (cm *Claims) IsAccessToken() bool {
 	return cm.GrantType == accessType
 }
 
-// ValidAccessToken 检查访问令牌的有效性（包括过期时间和令牌类型）
+// IsRefreshToken 判断是否是 access token
+func (cm *Claims) IsRefreshToken() bool {
+	return cm.GrantType == refreshType
+}
+
+// ValidAccessToken 校验 access token（类型 + 时间 + issuer）
 func (cm *Claims) ValidAccessToken() error {
-	// 检查到期时间 cm.Valid()默认的校验
-	if cm.ExpiresAt.Time.Before(time.Now()) {
-		return ErrTokenExpired
-	}
+	// 检查到期时间 解析的时候已经校验了
+	//if cm.ExpiresAt.Time.Before(time.Now()) {
+	//	return ErrTokenExpired
+	//}
 	// 检查令牌类型
 	if cm.GrantType != accessType {
 		return ErrInvalidTokenType

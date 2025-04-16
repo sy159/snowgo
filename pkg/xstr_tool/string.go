@@ -1,4 +1,4 @@
-package str
+package xstr_tool
 
 import (
 	"math/rand"

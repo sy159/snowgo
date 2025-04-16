@@ -4,10 +4,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"gorm.io/gorm"
+	"snowgo/config"
 	"snowgo/internal/constants"
 	"snowgo/internal/dal/repo"
 	accountDao "snowgo/internal/dao/account"
 	accountService "snowgo/internal/service/account"
+	"snowgo/pkg/xauth/jwt"
 	"snowgo/pkg/xcache"
 	xmysql "snowgo/pkg/xdatabase/mysql"
 	xredis "snowgo/pkg/xdatabase/redis"
@@ -17,10 +19,28 @@ import (
 // Container 统一管理依赖
 type Container struct {
 	// 通用
-	Cache xcache.Cache
+	Cache      xcache.Cache
+	JwtManager *jwt.Manager
 
 	// 这里只提供对api使用的service，不提供dao操作
 	UserService *accountService.UserService
+}
+
+// BuildJwtManager 构建jwt操作
+func BuildJwtManager(config config.JwtConfig) *jwt.Manager {
+	if len(config.JwtSecret) == 0 ||
+		len(config.Issuer) == 0 ||
+		config.AccessExpirationTime == 0 ||
+		config.RefreshExpirationTime == 0 {
+		xlogger.Panic("Please initialize jwt config first, jwt config is empty")
+	}
+	jwtManager := jwt.NewJwtManager(&jwt.Config{
+		JwtSecret:             config.JwtSecret,
+		Issuer:                config.Issuer,
+		AccessExpirationTime:  config.AccessExpirationTime,
+		RefreshExpirationTime: config.RefreshExpirationTime,
+	})
+	return jwtManager
 }
 
 // BuildRepository 构建db操作
@@ -41,6 +61,8 @@ func BuildRedisCache(rdb *redis.Client) xcache.Cache {
 
 // NewContainer 构造所有依赖，注意参数传递的顺序
 func NewContainer() *Container {
+	jwtManager := BuildJwtManager(config.JwtConf)
+
 	// 构造db、redis操作
 	repository := BuildRepository(xmysql.DB, xmysql.DbMap)
 	redisCache := BuildRedisCache(xredis.RDB)
@@ -53,6 +75,7 @@ func NewContainer() *Container {
 
 	return &Container{
 		Cache:       redisCache,
+		JwtManager:  jwtManager,
 		UserService: userService,
 	}
 }

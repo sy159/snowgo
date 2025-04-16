@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"github.com/pkg/errors"
+	"snowgo/config"
 	"snowgo/pkg/xauth/jwt"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xresponse"
@@ -12,6 +13,12 @@ import (
 
 // JWTAuth 基于JWT的认证中间件
 func JWTAuth() func(c *gin.Context) {
+	jwtManager := jwt.NewJwtManager(&jwt.Config{
+		JwtSecret:             config.JwtConf.JwtSecret,
+		Issuer:                config.JwtConf.Issuer,
+		AccessExpirationTime:  config.JwtConf.AccessExpirationTime,
+		RefreshExpirationTime: config.JwtConf.RefreshExpirationTime,
+	})
 	return func(c *gin.Context) {
 		// 客户端携带Token有三种方式 1.放在请求头 2.放在请求体 3.放在URI
 		// 假设Token放在Header的Authorization中，并使用Bearer开头
@@ -29,7 +36,7 @@ func JWTAuth() func(c *gin.Context) {
 			return
 		}
 		// parts[1]是获取到的tokenString，我们使用之前定义好的解析JWT的函数来解析它
-		mc, err := jwt.ParseToken(parts[1])
+		mc, err := jwtManager.ParseToken(parts[1])
 		if err != nil {
 			xresponse.FailByError(c, e.TokenInvalid)
 			c.Abort()
