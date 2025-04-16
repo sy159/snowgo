@@ -11,8 +11,6 @@ import (
 	accountService "snowgo/internal/service/account"
 	"snowgo/pkg/xauth/jwt"
 	"snowgo/pkg/xcache"
-	xmysql "snowgo/pkg/xdatabase/mysql"
-	xredis "snowgo/pkg/xdatabase/redis"
 	"snowgo/pkg/xlock"
 	"snowgo/pkg/xlogger"
 )
@@ -70,13 +68,13 @@ func BuildLock(rdb *redis.Client) xlock.Lock {
 }
 
 // NewContainer 构造所有依赖，注意参数传递的顺序
-func NewContainer() *Container {
-	jwtManager := BuildJwtManager(config.JwtConf)
-	lock := BuildLock(xredis.RDB)
+func NewContainer(jwtConfig config.JwtConfig, rdb *redis.Client, db *gorm.DB, dbMap map[string]*gorm.DB) *Container {
+	jwtManager := BuildJwtManager(jwtConfig)
+	lock := BuildLock(rdb)
 
 	// 构造db、redis操作
-	repository := BuildRepository(xmysql.DB, xmysql.DbMap)
-	redisCache := BuildRedisCache(xredis.RDB)
+	repository := BuildRepository(db, dbMap)
+	redisCache := BuildRedisCache(rdb)
 
 	// 构造Dao
 	userDao := accountDao.NewUserDao(repository)

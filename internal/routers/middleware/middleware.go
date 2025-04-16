@@ -16,6 +16,8 @@ import (
 	"snowgo/internal/di"
 	"snowgo/pkg"
 	"snowgo/pkg/xcolor"
+	"snowgo/pkg/xdatabase/mysql"
+	"snowgo/pkg/xdatabase/redis"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
@@ -191,7 +193,7 @@ func Cors() gin.HandlerFunc {
 
 // InjectContainerMiddleware 注入container
 func InjectContainerMiddleware() gin.HandlerFunc {
-	container := di.NewContainer()
+	container := di.NewContainer(config.JwtConf, redis.RDB, mysql.DB, mysql.DbMap)
 	return func(c *gin.Context) {
 		c.Set(constants.CONTAINER, container)
 		c.Next()
