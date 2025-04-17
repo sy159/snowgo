@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 22 * * 5'  # 每周五晚上10点定时安全检查
+    - cron: '0 22 * * 5'  # 每周五晚上 10 点定期检查一次
 
 jobs:
   codeql-analyze:
@@ -26,7 +26,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Go
+      - name: Set up Go (ensure correct version)
         uses: actions/setup-go@v3
         with:
           go-version: '1.23'
@@ -50,29 +50,31 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
-          output: results.sarif
+          output: results.sarif  # 输出为 SARIF 格式，便于后续分析
+          working-directory: .   # 确保在当前目录下生成 SARIF 文件
 
-      - name: Upload SARIF as Artifact
-        uses: actions/upload-artifact@v2
+      - name: Upload SARIF Results as Artifact
+        uses: actions/upload-artifact@v4  # 更新为 v4 版本
         with:
           name: codeql-sarif
-          path: results.sarif
+          path: results.sarif  # 上传 SARIF 文件作为工件
 
   codeql-upload:
     name: Upload SARIF Results to GitHub
     runs-on: ubuntu-latest
-    needs: codeql-analyze
+    needs: codeql-analyze  # 确保上传只在分析之后执行
     steps:
-      - name: Download SARIF Artifact
-        uses: actions/download-artifact@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download SARIF Results Artifact
+        uses: actions/download-artifact@v4  # 更新为 v4 版本
         with:
           name: codeql-sarif
-          path: sarif-download
+          path: .  # 将 SARIF 文件下载到当前目录
 
-      - name: Show Files (debug)
-        run: ls -R sarif-download
-
-      - name: Upload SARIF to GitHub
+      - name: Upload SARIF Results to GitHub
+        if: always()  # 确保无论分析是否成功，都上传结果
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: sarif-download/results.sarif  # 注意这个路径！
+          sarif_file: results.sarif  # 上传分析结果到 GitHub 安全警报系统
