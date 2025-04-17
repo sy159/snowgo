@@ -51,6 +51,7 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           output: results.sarif  # 输出为 SARIF 格式，便于后续分析
+          working-directory: .   # 确保在当前目录下生成 SARIF 文件
 
       - name: Upload SARIF Results as Artifact
         uses: actions/upload-artifact@v4  # 更新为 v4 版本
@@ -69,7 +70,8 @@ jobs:
       - name: Download SARIF Results Artifact
         uses: actions/download-artifact@v4  # 更新为 v4 版本
         with:
-          name: codeql-sarif  # 下载上传的 SARIF 文件
+          name: codeql-sarif
+          path: .  # 将 SARIF 文件下载到当前目录
 
       - name: Upload SARIF Results to GitHub
         if: always()  # 确保无论分析是否成功，都上传结果
