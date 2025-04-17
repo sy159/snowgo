@@ -9,7 +9,7 @@ on:
     - cron: '0 22 * * 5'  # 每周五晚上 10 点定期检查一次
 
 jobs:
-  codeql:
+  codeql-analyze:
     name: Analyze with CodeQL
     runs-on: ubuntu-latest
     permissions:
@@ -51,11 +51,28 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           output: results.sarif  # 输出为 SARIF 格式，便于后续分析
-          category: go-analysis-${{ github.run_id }}  # 为每次分析设置唯一的 category
+
+      - name: Upload SARIF Results as Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: codeql-sarif
+          path: results.sarif  # 上传 SARIF 文件作为工件
+
+  codeql-upload:
+    name: Upload SARIF Results to GitHub
+    runs-on: ubuntu-latest
+    needs: codeql-analyze  # 确保上传只在分析之后执行
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download SARIF Results Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: codeql-sarif  # 下载上传的 SARIF 文件
 
       - name: Upload SARIF Results to GitHub
         if: always()  # 确保无论分析是否成功，都上传结果
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: results.sarif  # 上传分析结果到 GitHub 安全警报系统
-          category: go-upload-${{ github.run_id }}  # 为每次上传设置唯一的 category
