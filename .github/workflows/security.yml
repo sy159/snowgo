@@ -6,11 +6,11 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 22 * * 5'  # 每周五晚上 10 点定期检查一次
+    - cron: '0 22 * * 5'  # 每周五晚上 10 点自动检查
 
 jobs:
-  codeql-analyze:
-    name: Analyze with CodeQL
+  codeql-analysis:
+    name: CodeQL Scan
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -26,18 +26,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Go (ensure correct version)
-        uses: actions/setup-go@v3
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          go-version: '1.23'
-
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/go-build
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.mod') }}
-          restore-keys: |
-            ${{ runner.os }}-go-mod-
+          go-version: '1.21'  # 请根据你项目实际版本修改
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -49,32 +41,56 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
-        with:
-          output: results.sarif  # 输出为 SARIF 格式，便于后续分析
-          working-directory: .   # 确保在当前目录下生成 SARIF 文件
 
-      - name: Upload SARIF Results as Artifact
-        uses: actions/upload-artifact@v4  # 更新为 v4 版本
-        with:
-          name: codeql-sarif
-          path: results.sarif  # 上传 SARIF 文件作为工件
-
-  codeql-upload:
-    name: Upload SARIF Results to GitHub
+  gosec-scan:
+    name: Gosec Scan
     runs-on: ubuntu-latest
-    needs: codeql-analyze  # 确保上传只在分析之后执行
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download SARIF Results Artifact
-        uses: actions/download-artifact@v4  # 更新为 v4 版本
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          name: codeql-sarif
-          path: .  # 将 SARIF 文件下载到当前目录
+          go-version: '1.23'
 
-      - name: Upload SARIF Results to GitHub
-        if: always()  # 确保无论分析是否成功，都上传结果
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Install Gosec
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+
+      - name: Run Gosec
+        run: gosec -fmt=json -out=gosec-report.json ./...
+
+      - name: Upload Gosec Report
+        uses: actions/upload-artifact@v4
         with:
-          sarif_file: results.sarif  # 上传分析结果到 GitHub 安全警报系统
+          name: gosec-report
+          path: gosec-report.json
+
+  osv-scanner:
+    name: Dependency Vulnerability Scan (OSV)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install OSV Scanner
+        run: |
+          curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner-linux-amd64 -o osv-scanner
+          chmod +x osv-scanner
+          sudo mv osv-scanner /usr/local/bin/
+
+      - name: Run OSV Scanner on go.mod
+        run: |
+          if [ -f go.mod ]; then
+            osv-scanner --lockfile=go.sum --format=json > osv-report.json || true
+          fi
+
+      - name: Upload OSV Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: osv-report
+          path: osv-report.json
