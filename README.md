@@ -1,21 +1,21 @@
 # snowgo <img src="https://img.shields.io/badge/golang-1.23-blue"/> <img src="https://img.shields.io/badge/gin-1.10.0-green"/> <img src="https://img.shields.io/badge/gorm-1.25.12-red"/>
 基于 Gin 开发的高可用、模块化 Go 脚手架，集成丰富的中间件与企业级基础设施，适用于中小型服务系统快速搭建，支持 Docker & Docker Compose 一键部署。
 
-### 📚 集成组件:
+### 🔌 集成组件:
 
-| 类别         | 组件                  | 描述                                         |
+| 🧩 模块        | 🔧 组件                 | 📝 描述                                        |
 |--------------|-----------------------|----------------------------------------------|
-| Web框架      | Gin                   | 高性能 HTTP 框架                            |
-| 配置管理     | Viper                 | 灵活的配置加载支持                          |
-| 日志系统     | Zap + ELK             | 支持多格式输出，可集成 ELK 进行日志分析     |
-| 数据访问     | GORM + Gen            | ORM 工具，支持读写分离、多数据库配置         |
-| 缓存组件     | go-redis              | 高性能 Redis 客户端封装                     |
-| 鉴权机制     | JWT                   | 支持 access_token / refresh_token 的鉴权方案 |
-| 权限控制     | 自定义 RBAC（菜单树） | 支持按钮/接口权限，基于菜单树结构            |
-| 限流中间件   | 自研 Rate Limiter     | 支持 IP / 路由维度的限流控制                |
-| 中间件       | 跨域、日志、异常处理  | 全面覆盖 Web 常用中间件                     |
-| 分布式能力   | Redis Lock、Pulsar MQ | 实现分布式锁、事件驱动架构                  |
-| 可观测性     | Prometheus + Grafana  | 实现服务监控指标管理等       |
+| 🌐 Web 框架      | Gin                   | 高性能 HTTP 框架                            |
+| ⚙️ 配置管理     | Viper                 | 灵活的配置加载支持                          |
+| 📜 日志系统     | Zap + ELK             | 支持多格式输出，可集成 ELK 进行日志分析     |
+| 🗃️ 数据访问     | GORM + Gen            | ORM 工具，支持读写分离、多数据库配置         |
+| 🚀 缓存系统     | go-redis              | 高性能 Redis 客户端封装                     |
+| 🔐 鉴权系统     | JWT                   | 支持 access_token / refresh_token 的鉴权方案 |
+| 🛂 权限系统     | 自定义 RBAC（菜单树） | 支持按钮/接口权限，基于菜单树结构            |
+| 🛡️ 限流中间件   | 自研 Rate Limiter     | 支持 IP / 路由维度的限流控制                |
+| 🔗 中间件       | 跨域、日志、异常处理  | 全面覆盖 Web 常用中间件                     |
+| 🧵 分布式能力   | Redis Lock、Pulsar MQ | 实现分布式锁、事件驱动架构                  |
+| 📈 可观测性     | Prometheus + Grafana  | 实现服务监控指标管理等       |
 
 [//]: # (1. gin轻量级Web框架)
 
@@ -128,7 +128,7 @@ redis.InitRedis()
 defer redis.CloseRedis(redis.RDB)
 ```
 #### 2. 运行项目
-##### 2.1 命令运行项目
+##### 2.1 💻 本地运行
 安装运行需要的依赖
 ```shell
 go mod download
@@ -167,7 +167,7 @@ vim config$.{env}.yaml
 docker-compose up -d
 ```
 
-### 注意事项
+### 📢 注意事项
 1. 🧱 数据模型管理
     ```
     # 如果需要定制化某个db下model就修改db的地址配置(默认使用配置的数据库地址)
@@ -185,5 +185,7 @@ docker-compose up -d
     # 根据model生成所有的query
     make gen query
     ```
-2. 📖 参考文档
-    参考: [gen](https://gorm.io/zh_CN/gen/dao.html)、[gorm](https://gorm.io/zh_CN/docs/)
+2. 📚 文档参考
+   - [Gin 官方文档](https://gin-gonic.com/)
+   - [GORM 文档](https://gorm.io/zh_CN/docs/)
+   - [Gen 工具](https://gorm.io/zh_CN/gen/dao.html)
