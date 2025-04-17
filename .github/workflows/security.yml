@@ -53,7 +53,7 @@ jobs:
           output: results.sarif  # 输出为 SARIF 格式，便于后续分析
 
       - name: Upload SARIF Results as Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v2  # 使用 v2 上传文件
         with:
           name: codeql-sarif
           path: results.sarif  # 上传 SARIF 文件作为工件
@@ -67,7 +67,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download SARIF Results Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v2  # 使用 v2 下载文件
         with:
           name: codeql-sarif  # 下载上传的 SARIF 文件
 
