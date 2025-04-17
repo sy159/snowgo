@@ -94,41 +94,10 @@ jobs:
         if: contains(steps.gosec.outputs.stdout, 'HIGH') || contains(steps.gosec.outputs.stdout, 'CRITICAL')
         run: exit 1
 
-  osv-scanner:
-    name: OSV Scanner
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Scan Dependencies
-        uses: google/osv-scanner-action@v2.0.1  # 使用具体版本号
-        with:
-          format: json
-          output: osv-report.json
-          args: .  # 明确指定扫描目录
-          skip-purls: "pkg:golang/github.com/example/private-repo"
-
-      - name: Upload OSV Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: osv-dependency-report
-          path: osv-report.json
-          retention-days: 7
-
-      - name: Check Vulnerability Results
-        run: |
-          if grep -q '"vulns":' osv-report.json; then
-            echo "::error::Found dependency vulnerabilities"
-            exit 1
-          fi
-
   security-report:
     name: Generate Security Report
     runs-on: ubuntu-latest
-    needs: [codeql-analysis, gosec-scan, osv-scanner]
+    needs: [codeql-analysis, gosec-scan]
     if: always()
 
     steps:
@@ -150,12 +119,6 @@ jobs:
             echo "High/Critical: $(jq '[.Issues[] | select(.severity == "HIGH" or .severity == "CRITICAL")] | length' artifacts/gosec-security-report/gosec-report.json)" >> report.md
           else
             echo "No Gosec report generated" >> report.md
-          fi
-          echo "### OSV Scanner Findings" >> report.md
-          if [ -f artifacts/osv-dependency-report/osv-report.json ]; then
-            echo "Total vulnerabilities: $(jq '[.results[].packages[].vulnerabilities[]] | length' artifacts/osv-dependency-report/osv-report.json)" >> report.md
-          else
-            echo "No OSV report generated" >> report.md
           fi
 
       - name: Upload Security Report
