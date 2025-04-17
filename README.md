@@ -1,22 +1,49 @@
-# snowgo <img src="https://img.shields.io/badge/golang-1.22-blue"/> <img src="https://img.shields.io/badge/gin-1.10.0-green"/> <img src="https://img.shields.io/badge/gorm-1.25.10-red"/>
-基于gin开发的脚手架工具，封装了常用功能，便于快速开发接口，开箱即用。可基于Docker，Docker Compose部署。
+# snowgo <img src="https://img.shields.io/badge/golang-1.23-blue"/> <img src="https://img.shields.io/badge/gin-1.10.0-green"/> <img src="https://img.shields.io/badge/gorm-1.25.12-red"/>
+基于 Gin 开发的高可用、模块化 Go 脚手架，集成丰富的中间件与企业级基础设施，适用于中小型服务系统快速搭建，支持 Docker & Docker Compose 一键部署。
 
-### 集成组件:
-1. gin轻量级Web框架
-2. zap日志管理
-3. viper配置文件解析
-4. response统一结构返回，以及error code自定义
-5. gorm数据库组件，以及使用gen生成model以及query(支持读写分离以及多数据库配置)
-6. go-redis缓存组件
-7. jwt鉴权
-8. rate限流
-9. 访问日志、跨域、全局异常处理等中间件
-10. 基于redis等实现的分布式锁
-11. mq(pulsar)
-12. elk收集日志在kibana展示
-13. Prometheus+Grafana实现监控
+### 📚 集成组件:
 
-### 目录结构
+| 类别         | 组件                  | 描述                                         |
+|--------------|-----------------------|----------------------------------------------|
+| Web框架      | Gin                   | 高性能 HTTP 框架                            |
+| 配置管理     | Viper                 | 灵活的配置加载支持                          |
+| 日志系统     | Zap + ELK             | 支持多格式输出，可集成 ELK 进行日志分析     |
+| 数据访问     | GORM + Gen            | ORM 工具，支持读写分离、多数据库配置         |
+| 缓存组件     | go-redis              | 高性能 Redis 客户端封装                     |
+| 鉴权机制     | JWT                   | 支持 access_token / refresh_token 的鉴权方案 |
+| 权限控制     | 自定义 RBAC（菜单树） | 支持按钮/接口权限，基于菜单树结构            |
+| 限流中间件   | 自研 Rate Limiter     | 支持 IP / 路由维度的限流控制                |
+| 中间件       | 跨域、日志、异常处理  | 全面覆盖 Web 常用中间件                     |
+| 分布式能力   | Redis Lock、Pulsar MQ | 实现分布式锁、事件驱动架构                  |
+| 可观测性     | Prometheus + Grafana  | 实现服务监控指标管理等       |
+
+[//]: # (1. gin轻量级Web框架)
+
+[//]: # (2. zap日志管理)
+
+[//]: # (3. viper配置文件解析)
+
+[//]: # (4. response统一结构返回，以及error code自定义)
+
+[//]: # (5. gorm数据库组件，以及使用gen生成model以及query&#40;支持读写分离以及多数据库配置&#41;)
+
+[//]: # (6. go-redis缓存组件)
+
+[//]: # (7. jwt鉴权)
+
+[//]: # (8. rate限流)
+
+[//]: # (9. 访问日志、跨域、全局异常处理等中间件)
+
+[//]: # (10. 基于redis等实现的分布式锁)
+
+[//]: # (11. mq&#40;pulsar&#41;)
+
+[//]: # (12. elk收集日志在kibana展示)
+
+[//]: # (13. Prometheus+Grafana实现监控)
+
+### 🧬 项目结构
 ```
 snowgo
 ├── .github  github cicd
@@ -84,7 +111,7 @@ snowgo
 └── main.go  项目启动入口
 ```
 
-### 安装部署
+### 🚀 快速开始
 #### 1. 修改配置
 修改配置文件
 ```shell
@@ -95,7 +122,7 @@ vim config$.{env}.yaml
 # vim main.go
 // 初始化mysql
 mysql.InitMysql()
-defer mysql.CloseMysql(mysql.DB)
+defer mysql.CloseAllMysql(mysql.DB, mysql.DbMap)
 // 初始化redis
 redis.InitRedis()
 defer redis.CloseRedis(redis.RDB)
@@ -112,7 +139,7 @@ go mod tidy
 go run main.go
 ```
 
-##### 2.2 Docker运行项目
+##### 2.2 🐳 Docker 运行
 生成项目服务docker镜像
 ```shell
 docker build -t snowgo:v1.0 .
@@ -122,7 +149,7 @@ docker build -t snowgo:v1.0 .
 docker run --name snowgo-service --restart always -d -p 8000:8000 -e ENV=dev -v ./config:/snowgo-service/config -v ./logs:/snowgo-service/logs snow:v1.0
 ```
 
-##### 2.3 Docker Compose运行项目
+##### 2.3 🛠 Docker Compose 部署
 生成项目服务docker镜像
 ```shell
 docker build -t snowgo:v1.0 .
@@ -141,7 +168,7 @@ docker-compose up -d
 ```
 
 ### 注意事项
-1. 根据数据库表生成model
+1. 🧱 数据模型管理
     ```
     # 如果需要定制化某个db下model就修改db的地址配置(默认使用配置的数据库地址)
     vim /internal/dal/cmd/gen.go
@@ -158,5 +185,5 @@ docker-compose up -d
     # 根据model生成所有的query
     make gen query
     ```
-2. 数据库orm语句
+2. 📖 参考文档
     参考: [gen](https://gorm.io/zh_CN/gen/dao.html)、[gorm](https://gorm.io/zh_CN/docs/)
