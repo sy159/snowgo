@@ -104,7 +104,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Scan Dependencies
-        uses: google/osv-scanner-action@v1.4.0  # 使用具体版本号
+        uses: google/osv-scanner-action@v2.0.1  # 使用具体版本号
         with:
           format: json
           output: osv-report.json
