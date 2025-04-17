@@ -1,12 +1,15 @@
 name: Security Scan
 
+#on:
+#  push:
+#    branches: [ main ]
+#  pull_request:
+#    branches: main
+#  schedule:
+#    - cron: "0 14 * * 5"  # UTC 时间每周五 14:00 (对应北京时间周五 22:00)
+
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: main
-  schedule:
-    - cron: "0 14 * * 5"  # UTC 时间每周五 14:00 (对应北京时间周五 22:00)
+  workflow_dispatch: # 只能手动触发，等于禁用
 
 permissions:
   contents: read
