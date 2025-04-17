@@ -51,9 +51,11 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           output: results.sarif  # 输出为 SARIF 格式，便于后续分析
+          category: go-analysis-${{ github.run_id }}  # 为每次分析设置唯一的 category
 
       - name: Upload SARIF Results to GitHub
         if: always()  # 确保无论分析是否成功，都上传结果
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: results.sarif  # 上传分析结果到 GitHub 安全警报系统
+          category: go-upload-${{ github.run_id }}  # 为每次上传设置唯一的 category
