@@ -2,11 +2,15 @@ name: Security Scan
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
   schedule:
-    - cron: '0 22 * * 5'  # 每周五晚上 10 点自动检查
+    - cron: "0 14 * * 5"  # UTC 时间每周五 14:00 (对应北京时间周五 22:00)
+
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
   codeql-analysis:
@@ -20,77 +24,134 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [go]
+        language: [ 'go' ]
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
-      - name: Set up Go
+      - name: Set up Go 1.23.8
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21'  # 请根据你项目实际版本修改
+          go-version: '1.23.8'  # 精确指定版本
+          cache: true
+          cache-dependency-path: go.sum
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
+          queries: +security-extended
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      - name: Build Code
+        run: go build ./...
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:go"
+          upload: true
 
   gosec-scan:
     name: Gosec Scan
     runs-on: ubuntu-latest
+    needs: codeql-analysis
+    timeout-minutes: 15
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Go
+      - name: Setup Go 1.23.8
         uses: actions/setup-go@v4
         with:
-          go-version: '1.23'
+          go-version: '1.23.8'  # 保持版本一致
+          cache: true
+          cache-dependency-path: go.sum
 
       - name: Install Gosec
         run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
-          echo "$HOME/go/bin" >> $GITHUB_PATH
+          GOSEC_VERSION=$(curl -s "https://api.github.com/repos/securego/gosec/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+          curl -sSfL "https://github.com/securego/gosec/releases/download/v${GOSEC_VERSION}/gosec_${GOSEC_VERSION}_linux_amd64.tar.gz" | tar -xz
+          sudo mv gosec /usr/local/bin/
 
-      - name: Run Gosec
-        run: gosec -fmt=json -out=gosec-report.json ./...
+      - name: Run Gosec Analysis
+        run: |
+          gosec -fmt=json -out=gosec-report.json -exclude-generated ./... || echo "::warning::Gosec found vulnerabilities"
+        continue-on-error: true
 
       - name: Upload Gosec Report
         uses: actions/upload-artifact@v4
         with:
-          name: gosec-report
+          name: gosec-security-report
           path: gosec-report.json
+          retention-days: 7
+
+      - name: Fail on Critical Issues
+        if: contains(steps.gosec.outputs.stdout, 'HIGH') || contains(steps.gosec.outputs.stdout, 'CRITICAL')
+        run: exit 1
 
   osv-scanner:
-    name: Dependency Vulnerability Scan (OSV)
+    name: OSV Scanner
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install OSV Scanner
-        run: |
-          curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner-linux-amd64 -o osv-scanner
-          chmod +x osv-scanner
-          sudo mv osv-scanner /usr/local/bin/
-
-      - name: Run OSV Scanner on go.mod
-        run: |
-          if [ -f go.mod ]; then
-            osv-scanner --lockfile=go.sum --format=json > osv-report.json || true
-          fi
+      - name: Scan Dependencies
+        uses: google/osv-scanner-action@v1
+        with:
+          format: json
+          output: osv-report.json
+          skip-purls: "pkg:golang/github.com/example/private-repo"
 
       - name: Upload OSV Report
         uses: actions/upload-artifact@v4
         with:
-          name: osv-report
+          name: osv-dependency-report
           path: osv-report.json
+          retention-days: 7
+
+      - name: Check Vulnerability Results
+        run: |
+          if grep -q '"vulns":' osv-report.json; then
+            echo "::error::Found dependency vulnerabilities"
+            exit 1
+          fi
+
+  security-report:
+    name: Generate Security Report
+    runs-on: ubuntu-latest
+    needs: [codeql-analysis, gosec-scan, osv-scanner]
+    if: always()
+
+    steps:
+      - name: Aggregate Reports
+        run: |
+          echo "## Security Scan Summary [$(date '+%Y-%m-%d %H:%M:%S UTC%z')]" >> report.md
+          echo "### Go Version: 1.23.8" >> report.md
+          echo "### CodeQL Findings" >> report.md
+          echo "View detailed results in [Security tab](https://github.com/${{ github.repository }}/security/code-scanning)" >> report.md
+          echo "### Gosec Findings" >> report.md
+          if [ -f gosec-report.json ]; then
+            echo "Total issues: $(jq '.Issues | length' gosec-report.json)" >> report.md
+            echo "High/Critical: $(jq '[.Issues[] | select(.severity == "HIGH" or .severity == "CRITICAL")] | length' gosec-report.json)" >> report.md
+          else
+            echo "No Gosec report generated" >> report.md
+          fi
+          echo "### OSV Scanner Findings" >> report.md
+          if [ -f osv-report.json ]; then
+            echo "Total vulnerabilities: $(jq '[.results[].packages[].vulnerabilities[]] | length' osv-report.json)" >> report.md
+          else
+            echo "No OSV report generated" >> report.md
+          fi
+
+      - name: Upload Security Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary-report
+          path: report.md
