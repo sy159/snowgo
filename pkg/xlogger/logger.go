@@ -250,11 +250,15 @@ func getAccessJsonEncoder() zapcore.Encoder {
 
 // getTimeWriter 根据日志时间分割写入文件
 func getTimeWriter(filename string, maxAgeDay uint) zapcore.WriteSyncer {
+	// 文件最多保留30年
+	if maxAgeDay >= 365*30 {
+		maxAgeDay = 365 * 30
+	}
 	hook, err := rotatelogs.New(
-		strings.Replace(filename, ".log", "", -1)+"-%Y-%m-%d.log", // 分割的新文件名(没有使用go的format格式, %Y%m%d%H%M%S）
-		rotatelogs.WithLinkName(filename),                         // 生成软链，指向最新日志文件
-		rotatelogs.WithMaxAge(time.Duration(maxAgeDay)*time.Hour), // 文件最多保留时间
-		rotatelogs.WithRotationTime(24*time.Hour),                 // 文件分割间隔
+		strings.Replace(filename, ".log", "", -1)+"-%Y-%m-%d.log",    // 分割的新文件名(没有使用go的format格式, %Y%m%d%H%M%S）
+		rotatelogs.WithLinkName(filename),                            // 生成软链，指向最新日志文件
+		rotatelogs.WithMaxAge(24*time.Duration(maxAgeDay)*time.Hour), // 文件最多保留时间
+		rotatelogs.WithRotationTime(24*time.Hour),                    // 文件分割间隔
 		rotatelogs.WithLocation(time.Local),
 	)
 

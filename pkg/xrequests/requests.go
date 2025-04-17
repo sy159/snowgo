@@ -21,7 +21,7 @@ var (
 			MaxConnsPerHost:     0,
 			IdleConnTimeout:     120 * time.Second,
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: false, // 校验https
 			},
 		},
 		Timeout: 5 * time.Second,

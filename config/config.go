@@ -162,8 +162,8 @@ func loadServerConf(configName string) (err error) {
 	ServerConf.Version = v.GetString("application.server.version")
 	ServerConf.Addr = v.GetString("application.server.addr")
 	ServerConf.Port = v.GetUint32("application.server.port")
-	ServerConf.ReadTimeout = uint(v.GetInt("application.server.readTimeout"))
-	ServerConf.WriteTimeout = uint(v.GetInt("application.server.writeTimeout"))
+	ServerConf.ReadTimeout = v.GetUint("application.server.readTimeout")
+	ServerConf.WriteTimeout = v.GetUint("application.server.writeTimeout")
 	ServerConf.MaxHeaderMB = v.GetInt("application.server.maxHeaderMB")
 
 	// log

@@ -37,13 +37,15 @@ jobs:
         with:
           go-version: '1.23.8'
           cache: true
-          cache-dependency-path: go.sum
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           queries: +security-extended
+
+      - name: Download Dependencies
+        run: go mod download
 
       - name: Build Code
         run: go build ./...
@@ -77,6 +79,9 @@ jobs:
           curl -sSfL "https://github.com/securego/gosec/releases/download/v${GOSEC_VERSION}/gosec_${GOSEC_VERSION}_linux_amd64.tar.gz" | tar -xz
           sudo mv gosec /usr/local/bin/
 
+      - name: Download Dependencies
+        run: go mod download
+
       - name: Run Gosec Analysis
         id: gosec
         run: |
@@ -91,8 +96,14 @@ jobs:
           retention-days: 7
 
       - name: Fail on Critical Issues
-        if: contains(steps.gosec.outputs.stdout, 'HIGH') || contains(steps.gosec.outputs.stdout, 'CRITICAL')
-        run: exit 1
+        run: |
+          critical_count=$(jq '[.Issues[] | select(.severity == "HIGH" or .severity == "CRITICAL")] | length' gosec-report.json)
+          if [ "$critical_count" -gt 0 ]; then
+            echo "❌ Found $critical_count HIGH/CRITICAL issues"
+            exit 1
+          else
+            echo "✅ No high/critical severity issues found"
+          fi
 
   security-report:
     name: Generate Security Report
