@@ -1,8 +1,8 @@
 # snowgo <img src="https://img.shields.io/badge/golang-1.23-blue"/> <img src="https://img.shields.io/badge/gin-1.10.0-green"/> <img src="https://img.shields.io/badge/gorm-1.25.12-red"/>
 基于 Gin 开发的高可用、模块化 Go 脚手架，集成丰富的中间件与企业级基础设施，适用于中小型服务系统快速搭建，支持 Docker & Docker Compose 一键部署。
 
+------------
 ### 🔌 集成组件:
-
 | 🧩 模块        | 🔧 组件                 | 📝 描述                                        |
 |--------------|-----------------------|----------------------------------------------|
 | 🌐 Web 框架      | Gin                   | 高性能 HTTP 框架                            |
@@ -43,10 +43,12 @@
 
 [//]: # (13. Prometheus+Grafana实现监控)
 
+------------
 ### 🧬 项目结构
 ```
 snowgo
 ├── .github  github cicd
+├── assets  静态文件
 ├── config  配置文件
 ├── depoly
 │   ├── elk  elk部署
@@ -111,6 +113,7 @@ snowgo
 └── main.go  项目启动入口
 ```
 
+------------
 ### 🚀 快速开始
 #### 1. 修改配置
 修改配置文件
@@ -127,7 +130,10 @@ defer mysql.CloseAllMysql(mysql.DB, mysql.DbMap)
 redis.InitRedis()
 defer redis.CloseRedis(redis.RDB)
 ```
+
+------------
 #### 2. 运行项目
+![](/assets/images/run.png)
 ##### 2.1 💻 本地运行
 安装运行需要的依赖
 ```shell
@@ -139,6 +145,7 @@ go mod tidy
 go run main.go
 ```
 
+------------
 ##### 2.2 🐳 Docker 运行
 生成项目服务docker镜像
 ```shell
@@ -149,6 +156,7 @@ docker build -t snowgo:v1.0 .
 docker run --name snowgo-service --restart always -d -p 8000:8000 -e ENV=dev -v ./config:/snowgo-service/config -v ./logs:/snowgo-service/logs snow:v1.0
 ```
 
+------------
 ##### 2.3 🛠 Docker Compose 部署
 生成项目服务docker镜像
 ```shell
@@ -167,6 +175,7 @@ vim config$.{env}.yaml
 docker-compose up -d
 ```
 
+------------
 ### 📢 注意事项
 1. 🧱 数据模型管理
     ```
@@ -185,6 +194,8 @@ docker-compose up -d
     # 根据model生成所有的query
     make gen query
     ```
+
+------------
 2. 📚 文档参考
    - [Gin 官方文档](https://gin-gonic.com/)
    - [GORM 文档](https://gorm.io/zh_CN/docs/)
