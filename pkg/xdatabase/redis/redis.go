@@ -16,25 +16,31 @@ func InitRedis() {
 	if config.RedisConf == (config.RedisConfig{}) {
 		xlogger.Panic("Please initialize redis configuration first")
 	}
-	dialTimeout := time.Duration(config.RedisConf.DialTimeout) * time.Second
-	RDB = redis.NewClient(&redis.Options{
-		Addr:         config.RedisConf.Addr,
-		Password:     config.RedisConf.Password,
-		DB:           config.RedisConf.DB,
+	RDB = NewRedis(config.RedisConf)
+}
+
+// NewRedis 创建一个新的 redis 实例（不影响全局 RDB）
+func NewRedis(cfg config.RedisConfig) *redis.Client {
+	dialTimeout := time.Duration(cfg.DialTimeout) * time.Second
+	rdb := redis.NewClient(&redis.Options{
+		Addr:         cfg.Addr,
+		Password:     cfg.Password,
+		DB:           cfg.DB,
 		DialTimeout:  dialTimeout,
-		ReadTimeout:  time.Duration(config.RedisConf.ReadTimeout) * time.Second,
-		WriteTimeout: time.Duration(config.RedisConf.WriteTimeout) * time.Second,
-		PoolSize:     config.RedisConf.PoolSize,
-		MinIdleConns: config.RedisConf.MinIdleConns,
-		IdleTimeout:  time.Duration(config.RedisConf.IdleTimeout) * time.Second,
+		ReadTimeout:  time.Duration(cfg.ReadTimeout) * time.Second,
+		WriteTimeout: time.Duration(cfg.WriteTimeout) * time.Second,
+		PoolSize:     cfg.PoolSize,
+		MinIdleConns: cfg.MinIdleConns,
+		IdleTimeout:  time.Duration(cfg.IdleTimeout) * time.Second,
 	})
-	// 使用超时上下文，验证redis
+
+	// 使用超时上下文验证连接
 	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
 	defer cancel()
-	_, err := RDB.Ping(ctx).Result()
-	if err != nil {
-		xlogger.Panicf("redis init failed, err is %s", err.Error())
+	if _, err := rdb.Ping(ctx).Result(); err != nil {
+		xlogger.Panicf("NewRedis instance init failed, err: %s", err.Error())
 	}
+	return rdb
 }
 
 // CloseRedis 关闭redis连接

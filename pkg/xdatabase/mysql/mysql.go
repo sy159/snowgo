@@ -40,6 +40,11 @@ func InitMysql() {
 	}
 }
 
+// NewMysql 创建一个新的gorm.DB实例
+func NewMysql(cfg config.MysqlConfig) (*gorm.DB, error) {
+	return connectMysql(cfg)
+}
+
 // 连接mysql
 func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 	if mysqlConfig.DSN == "" {
