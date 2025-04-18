@@ -2,210 +2,166 @@ package xrequests_test
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"snowgo/pkg/xrequests"
+	"strings"
 	"testing"
 	"time"
+
+	"snowgo/pkg/xrequests"
 )
 
-func TestGet(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"message": "hello world"}`))
+// TestBasicResponse 验证基本 GET 请求和 Response 方法
+func TestBasicResponse(t *testing.T) {
+	payload := `{"foo":"bar"}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(payload))
 	}))
-	defer server.Close()
+	defer srv.Close()
 
-	resp, err := xrequests.Get(server.URL)
+	res, err := xrequests.Get(srv.URL)
 	if err != nil {
-		t.Fatalf("Expected no xerror, got %v", err)
+		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	if resp.Response.StatusCode != http.StatusOK {
-		t.Errorf("Expected status code %v, got %v", http.StatusOK, resp.Response.StatusCode)
+	// StatusCode
+	if res.StatusCode != http.StatusTeapot {
+		t.Errorf("Expected status %d, got %d", http.StatusTeapot, res.StatusCode)
 	}
 
-	var result map[string]string
-	err = resp.Json(&result)
+	// Text
+	text, err := res.Text()
 	if err != nil {
-		t.Fatalf("Expected no xerror, got %v", err)
+		t.Fatalf("Text() error: %v", err)
 	}
-	fmt.Println(result)
-	if result["message"] != "hello world" {
-		t.Errorf("Expected message 'hello world', got %v", result["message"])
+	if text != payload {
+		t.Errorf("Expected Text() '%s', got '%s'", payload, text)
+	}
+
+	// Json into struct
+	var obj struct {
+		Foo string `json:"foo"`
+	}
+	if err := res.Json(&obj); err != nil {
+		t.Fatalf("Json() error: %v", err)
+	}
+	if obj.Foo != "bar" {
+		t.Errorf("Expected Json.Foo 'bar', got '%s'", obj.Foo)
+	}
+
+	// Map
+	m, err := res.Map()
+	if err != nil {
+		t.Fatalf("Map() error: %v", err)
+	}
+	if m["foo"] != "bar" {
+		t.Errorf("Expected Map[foo]='bar', got '%v'", m["foo"])
 	}
 }
 
-func TestPost(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(body)
-	}))
-	defer server.Close()
-
-	body := `{"name": "test"}`
-	resp, err := xrequests.Post(server.URL, body)
-	if err != nil {
-		t.Fatalf("Expected no xerror, got %v", err)
-	}
-
-	if resp.Response.StatusCode != http.StatusOK {
-		t.Errorf("Expected status code %v, got %v", http.StatusOK, resp.Response.StatusCode)
-	}
-
-	var result map[string]string
-	err = resp.Json(&result)
-	if err != nil {
-		t.Fatalf("Expected no xerror, got %v", err)
-	}
-
-	fmt.Println(result)
-	if result["name"] != "test" {
-		t.Errorf("Expected name 'test', got %v", result["name"])
-	}
-}
-
-func TestWithHeader(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Custom-Header") != "value" {
-			t.Errorf("Expected header 'Custom-Header' to be 'value', got %v", r.Header.Get("Custom-Header"))
+// TestOptions 分别测试各种 Option 行为
+func TestOptions(t *testing.T) {
+	// WithHeader
+	srvHdr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Test-Hdr") != "val" {
+			t.Errorf("WithHeader failed, got '%s'", r.Header.Get("X-Test-Hdr"))
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer server.Close()
-
-	_, err := xrequests.Get(server.URL, xrequests.WithHeader(map[string]string{"Custom-Header": "value"}))
+	defer srvHdr.Close()
+	_, err := xrequests.Get(srvHdr.URL, xrequests.WithHeader(map[string]string{"X-Test-Hdr": "val"}))
 	if err != nil {
-		t.Fatalf("Expected no xerror, got %v", err)
+		t.Fatalf("WithHeader error: %v", err)
 	}
-}
 
-func TestWithCtx(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(1 * time.Millisecond)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"message": "hello world"}`))
+	// WithBody + WithQuery + POST wrapper
+	srvBody := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("q") != "1" {
+			t.Errorf("WithQuery failed, got '%s'", r.URL.RawQuery)
+		}
+		b, _ := io.ReadAll(r.Body)
+		if string(b) != "hello" {
+			t.Errorf("WithBody failed, got '%s'", string(b))
+		}
+		w.WriteHeader(http.StatusCreated)
 	}))
-	defer server.Close()
+	defer srvBody.Close()
+	resp, err := xrequests.Post(srvBody.URL, "", xrequests.WithBody("hello"), xrequests.WithQuery(map[string]string{"q": "1"}))
+	if err != nil {
+		t.Fatalf("WithBody/WithQuery error: %v", err)
+	}
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201, got %d", resp.StatusCode)
+	}
 
+	// WithCtx 超时
+	srvCtx := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(5 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srvCtx.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 	defer cancel()
-
-	_, err := xrequests.Get(server.URL, xrequests.WithCtx(ctx))
+	_, err = xrequests.Get(srvCtx.URL, xrequests.WithCtx(ctx))
 	if err == nil {
-		t.Fatalf("Expected xerror due to context timeout, got no xerror")
+		t.Error("Expected timeout error, got nil")
 	}
-}
 
-func TestWithMaxRetryNum(t *testing.T) {
-	retryCount := 0
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		retryCount++
-		fmt.Println(retryCount)
-		if retryCount < 3 {
-			time.Sleep(1 * time.Second)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(`{"xerror": "server xerror"}`))
-			return
+	// WithMaxRetries 网络错误重试
+	count := 0
+	rt := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		count++
+		if count <= 2 {
+			return nil, errors.New("neterr")
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"message": "success"}`))
-	}))
-	defer server.Close()
-
-	defaultClient := &http.Client{
-		Timeout: 1 * time.Second,
-	}
-
-	resp, err := xrequests.Get(server.URL, xrequests.WithMaxRetryNum(2), xrequests.WithClient(defaultClient))
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"ok":true}`))}, nil
+	})
+	client := &http.Client{Transport: rt}
+	res, err := xrequests.Get("http://test", xrequests.WithClient(client), xrequests.WithMaxRetries(2))
 	if err != nil {
-		t.Fatalf("预期无错误，但得到的是 %v", err)
+		t.Fatalf("WithMaxRetries error: %v", err)
 	}
-
-	if retryCount != 3 { // 初次尝试 + 2次重试
-		t.Errorf("预期3次请求，得到的是 %v", retryCount)
+	if count != 3 {
+		t.Errorf("Expected 3 attempts, got %d", count)
 	}
-
-	if resp.Response.StatusCode != http.StatusOK {
-		t.Errorf("预期状态码 %v，得到的是 %v", http.StatusOK, resp.Response.StatusCode)
-	}
-
-	var result map[string]string
-	err = resp.Json(&result)
-	if err != nil {
-		t.Fatalf("预期无错误，但得到的是 %v", err)
-	}
-
-	if result["message"] != "success" {
-		t.Errorf("预期消息 'success'，但得到的是 %v", result["message"])
+	var m map[string]interface{}
+	if err := res.Json(&m); err != nil {
+		t.Fatalf("Json after retry error: %v", err)
 	}
 }
 
-func TestWithClient(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(1 * time.Millisecond)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"message": "hello world"}`))
-	}))
-	defer server.Close()
-	customClient := &http.Client{Timeout: 1 * time.Millisecond}
-	res, err := xrequests.Get(server.URL, xrequests.WithClient(customClient))
-	fmt.Println(res, err)
-	if err == nil {
-		t.Fatalf("Expected xerror due to client timeout, got no xerror")
+// TestWrappers 测试 Post/Delete/Put 封装
+func TestWrappers(t *testing.T) {
+	handler := func(code int) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(code) }
+	}
+	// POST
+	srvP := httptest.NewServer(handler(http.StatusAccepted))
+	defer srvP.Close()
+	if res, err := xrequests.Post(srvP.URL, `{"x":1}`); err != nil || res.StatusCode != http.StatusAccepted {
+		t.Errorf("Post wrapper failed: %v, %d", err, res.StatusCode)
+	}
+	// DELETE
+	srvD := httptest.NewServer(handler(http.StatusNoContent))
+	defer srvD.Close()
+	if res, err := xrequests.Delete(srvD.URL, ``); err != nil || res.StatusCode != http.StatusNoContent {
+		t.Errorf("Delete wrapper failed: %v, %d", err, res.StatusCode)
+	}
+	// PUT
+	srvU := httptest.NewServer(handler(http.StatusResetContent))
+	defer srvU.Close()
+	if res, err := xrequests.Put(srvU.URL, ``); err != nil || res.StatusCode != http.StatusResetContent {
+		t.Errorf("Put wrapper failed: %v, %d", err, res.StatusCode)
 	}
 }
 
-func TestWithBody(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		if string(body) != `{"name": "test"}` {
-			t.Errorf("Expected body '{\"name\": \"test\"}', got %v", string(body))
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
+// roundTripperFunc 用于模拟 Transport
+type roundTripperFunc func(req *http.Request) (*http.Response, error)
 
-	_, err := xrequests.Post(server.URL, "", xrequests.WithBody(`{"name": "test"}`))
-	if err != nil {
-		t.Fatalf("Expected no xerror, got %v", err)
-	}
-}
-
-func TestDelete(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	resp, err := xrequests.Delete(server.URL, "")
-	if err != nil {
-		t.Fatalf("Expected no xerror, got %v", err)
-	}
-
-	if resp.Response.StatusCode != http.StatusOK {
-		t.Errorf("Expected status code %v, got %v", http.StatusOK, resp.Response.StatusCode)
-	}
-}
-
-func TestPut(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	resp, err := xrequests.Put(server.URL, "")
-	if err != nil {
-		t.Fatalf("Expected no xerror, got %v", err)
-	}
-
-	if resp.Response.StatusCode != http.StatusOK {
-		t.Errorf("Expected status code %v, got %v", http.StatusOK, resp.Response.StatusCode)
-	}
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }

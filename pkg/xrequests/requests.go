@@ -29,35 +29,34 @@ var (
 		"user-agent":   "snowgo Request",
 		"Content-Type": "application/json; charset=UTF-8",
 	}
-	defaultMaxRetryNum = 1
+	defaultMaxRetries = 0
 )
 
 type Option func(*request)
 
 type request struct {
-	client      *http.Client
-	ctx         context.Context
-	body        string
-	header      map[string]string
-	maxRetryNum int
-	hook        func(*http.Request)
-	request     *http.Request
-	query       map[string]string
+	client     *http.Client
+	ctx        context.Context
+	body       string
+	header     map[string]string
+	maxRetries int
+	request    *http.Request
+	query      map[string]string
 }
 
 type Response struct {
-	Request  *http.Request
-	Response *http.Response
-	body     []byte
+	response   *http.Response
+	Body       []byte
+	StatusCode int
 }
 
 func Request(method, rawURL, body string, opts ...Option) (*Response, error) {
 	req := &request{
-		client:      defaultClient,
-		ctx:         context.Background(),
-		header:      cloneHeader(defaultHeader),
-		maxRetryNum: defaultMaxRetryNum,
-		body:        body,
+		client:     defaultClient,
+		ctx:        context.Background(),
+		header:     cloneHeader(defaultHeader),
+		maxRetries: defaultMaxRetries,
+		body:       body,
 	}
 
 	// 加载配置
@@ -79,7 +78,7 @@ func Request(method, rawURL, body string, opts ...Option) (*Response, error) {
 	}
 
 	var lastErr error
-	for i := 0; i <= req.maxRetryNum; i++ {
+	for i := 0; i <= req.maxRetries; i++ {
 		var bodyReader io.Reader
 		if req.body != "" {
 			bodyReader = bytes.NewBufferString(req.body)
@@ -96,74 +95,59 @@ func Request(method, rawURL, body string, opts ...Option) (*Response, error) {
 			}
 		}
 
-		if req.hook != nil {
-			req.hook(httpReq)
-		}
-
 		resp, err := req.client.Do(httpReq)
 		if err == nil {
-			return &Response{Request: httpReq, Response: resp}, nil
+			// 将原始的Body保存
+			response := &Response{
+				response:   resp,
+				StatusCode: resp.StatusCode,
+			}
+			// 第一次读取响应体，复制一份到body字段
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, err
+			}
+			// 将响应体内容写入到body字段，缓存起来
+			response.Body = body
+			// 将原始的Body重新赋值，供外部使用
+			_ = resp.Body.Close()
+			resp.Body = io.NopCloser(bytes.NewReader(body))
+
+			return response, nil
 		}
 		lastErr = err
 	}
 	return nil, lastErr
 }
 
-func cloneHeader(src map[string]string) map[string]string {
-	cp := make(map[string]string, len(src))
-	for k, v := range src {
-		cp[k] = v
+// cloneHeader 复制header，防止header被修改
+func cloneHeader(header map[string]string) map[string]string {
+	cpHeader := make(map[string]string, len(header))
+	for k, v := range header {
+		cpHeader[k] = v
 	}
-	return cp
-}
-
-func (res *Response) readBody() ([]byte, error) {
-	if res.body != nil {
-		return res.body, nil
-	}
-	body, err := io.ReadAll(res.Response.Body)
-	res.Response.Body.Close()
-	if err != nil {
-		return nil, err
-	}
-	res.body = body
-	return body, nil
+	return cpHeader
 }
 
 // Json 返回body json内容
 func (res *Response) Json(v interface{}) error {
-	body, err := res.readBody()
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(body, v)
+	return json.Unmarshal(res.Body, v)
 }
 
 // Map 返回body map内容
 func (res *Response) Map() (map[string]interface{}, error) {
-	body, err := res.readBody()
-	if err != nil {
-		return nil, err
-	}
 	var m map[string]interface{}
-	err = json.Unmarshal(body, &m)
+	err := json.Unmarshal(res.Body, &m)
 	return m, err
 }
 
 // Text 返回body str内容
 func (res *Response) Text() (string, error) {
-	body, err := res.readBody()
-	if err != nil {
-		return "", err
-	}
-	return string(body), nil
+	return string(res.Body), nil
 }
 
-func (res *Response) StatusCode() int {
-	if res.Response != nil {
-		return res.Response.StatusCode
-	}
-	return 0
+func (res *Response) RawResponse() *http.Response {
+	return res.response
 }
 
 // Get 发起GET请求
@@ -214,10 +198,10 @@ func WithBody(body string) Option {
 	}
 }
 
-// WithMaxRetryNum 设置最大重试次数
-func WithMaxRetryNum(maxRetryNum int) Option {
+// WithMaxRetries 设置最大重试次数
+func WithMaxRetries(maxRetries int) Option {
 	return func(r *request) {
-		r.maxRetryNum = maxRetryNum
+		r.maxRetries = maxRetries
 	}
 }
 
@@ -225,13 +209,6 @@ func WithMaxRetryNum(maxRetryNum int) Option {
 func WithRequest(req *http.Request) Option {
 	return func(r *request) {
 		r.request = req
-	}
-}
-
-// WithHook 设置自定义操作
-func WithHook(hook func(*http.Request)) Option {
-	return func(r *request) {
-		r.hook = hook
 	}
 }
 
