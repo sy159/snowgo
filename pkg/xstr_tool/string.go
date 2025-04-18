@@ -43,6 +43,12 @@ func RandStr(n int, flag int) string {
 	if flag&PunctuationFlag != 0 {
 		chars += punctuation
 	}
+
+	// 检查是否有有效字符集
+	if len(chars) == 0 {
+		return ""
+	}
+
 	charsLen := len(chars)
 	b := make([]byte, n)
 	for i := range b {
@@ -66,6 +72,12 @@ func RandShuffleStr(n int, flag int) string {
 	if flag&PunctuationFlag != 0 {
 		chars += punctuation
 	}
+
+	// 检查是否有有效字符集
+	if len(chars) == 0 {
+		return ""
+	}
+
 	charByte := []byte(chars)
 	for i := len(charByte) - 1; i > 0; i-- {
 		// 随机交换位置，实现打乱效果
