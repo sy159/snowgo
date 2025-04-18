@@ -2,8 +2,7 @@ package routers
 
 import (
 	"fmt"
-	"net/http"
-	_ "net/http/pprof"
+	"github.com/gin-contrib/pprof"
 	"snowgo/config"
 	"snowgo/internal/routers/middleware"
 	"snowgo/pkg/xenv"
@@ -39,9 +38,12 @@ func loadRouter(router *gin.Engine) {
 		xresponse.FailByError(c, e.HttpNotFound)
 	})
 
-	// 注册pprof路由
+	// 注册pprof路由(白名单访问)
 	if config.ServerConf.EnablePprof {
-		router.GET("/debug/pprof/*any", gin.WrapH(http.DefaultServeMux))
+		// 只允许内网或指定网段访问
+		iPWhitelist := []string{"127.0.0.1/32", "192.168.0.0/16"}
+		pprofGroup := router.Group("", middleware.IPWhiteList(iPWhitelist))
+		pprof.Register(pprofGroup)
 	}
 
 	// 创建根路由组，并添加前缀
