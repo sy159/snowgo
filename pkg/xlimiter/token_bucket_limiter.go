@@ -2,69 +2,121 @@ package xlimiter
 
 import (
 	"context"
-	"golang.org/x/time/rate"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 var (
-	prefixKey  = "token_bucket:"
-	limiterMap sync.Map
+	// prefixKey 区分不同限流器的前缀
+	prefixKey = "token_bucket:"
+	// limiterMap 缓存所有限流器实例，线程安全
+	limiterMap sync.Map // map[string]*BucketLimiter
+
+	// cleanupOnce 确保清理任务只启动一次
+	cleanupOnce sync.Once
+	// 默认清理间隔和空闲阈值
+	defaultCleanupInterval = 10 * time.Minute
+	defaultIdleThreshold   = 30 * time.Minute
 )
 
-type bucketLimiter struct {
-	key         string // 限流key
-	lastGetTime int64  //上一次获取token的时间戳
-	limiter     *rate.Limiter
+// BucketLimiter 是基于令牌桶算法的内存限流器，支持动态设置速率和突发容量。
+// 适用场景：API QPS 控制、用户行为限流、任务速率限制等
+type BucketLimiter struct {
+	key         string        // 限流器唯一标识（prefixKey + 自定义 key）
+	lastGetTime atomic.Int64  // 最后一次成功获取令牌的时间戳（UnixNano）
+	limiter     *rate.Limiter // Go 标准库令牌桶
 }
 
+// BucketLimit 表示每秒产生的令牌数，等价于 rate.Limit
 type BucketLimit = rate.Limit
 
-// BucketEvery converts a minimum time interval between events to a Limit.
+// BucketEvery 根据两次事件的最小间隔时间，计算令牌桶速率。
+// 例如：BucketEvery(100ms) 等同 10 次/秒。
 func BucketEvery(interval time.Duration) BucketLimit {
 	return rate.Every(interval)
 }
 
-// NewTokenBucket key限流器名称，r限流器配置，burst桶容量，
-func NewTokenBucket(key string, r BucketLimit, burst int) (*bucketLimiter, bool) {
-	key = prefixKey + key
+// NewTokenBucket 创建或获取限流器，并在首次调用时启动自动清理任务。
+// 参数：key（自定义分类 key）、limit（令牌生成速率, 每秒多少个）、burst（桶容量）
+// 返回：限流器实例，以及是否首次创建。
+func NewTokenBucket(key string, limit BucketLimit, burst int) (*BucketLimiter, bool) {
+	// 启动后台清理
+	ensureCleanup()
 
-	l, ok := limiterMap.Load(key)
-	if ok {
-		return l.(*bucketLimiter), false
+	fullKey := prefixKey + key
+	if l, ok := limiterMap.Load(fullKey); ok {
+		return l.(*BucketLimiter), false
 	}
-	limiter := &bucketLimiter{key, time.Now().Unix(), rate.NewLimiter(r, burst)}
-	limiterMap.Store(key, limiter)
-	return limiter, true
+	bl := &BucketLimiter{
+		key:     fullKey,
+		limiter: rate.NewLimiter(limit, burst),
+	}
+	bl.lastGetTime.Store(time.Now().UnixNano())
+	limiterMap.Store(fullKey, bl)
+	return bl, true
 }
 
-// Allow 判断是否有空余
-func (l *bucketLimiter) Allow() bool {
-	l.lastGetTime = time.Now().Unix()
-	return l.limiter.Allow()
+// Allow 尝试立即获取令牌，成功返回 true（非阻塞），并更新时间戳。
+func (bl *BucketLimiter) Allow() bool {
+	if bl.limiter.Allow() {
+		bl.lastGetTime.Store(time.Now().UnixNano())
+		return true
+	}
+	return false
 }
 
-// Wait 等待xx获取
-func (l *bucketLimiter) Wait(ctx context.Context) error {
-	l.lastGetTime = time.Now().Unix()
-	return l.limiter.Wait(ctx)
+// Wait 阻塞直到获取令牌或 context 超时，成功时更新时间戳。
+func (bl *BucketLimiter) Wait(ctx context.Context) error {
+	err := bl.limiter.Wait(ctx)
+	if err == nil {
+		bl.lastGetTime.Store(time.Now().UnixNano())
+	}
+	return err
 }
 
-// Cancel 把拿到的令牌放回去
-func (l *bucketLimiter) Cancel() {
-	l.limiter.Reserve().Cancel()
+// Reserve 预留一个令牌，由调用方决定是否取消。预留成功时更新时间戳。
+func (bl *BucketLimiter) Reserve() *rate.Reservation {
+	r := bl.limiter.Reserve()
+	if r.OK() {
+		bl.lastGetTime.Store(time.Now().UnixNano())
+	}
+	return r
 }
 
-// SetLimit 重新设置限流器
-func (l *bucketLimiter) SetLimit(newLimit rate.Limit) {
-	l.limiter.SetLimit(newLimit)
+// SetLimit 动态修改令牌生成速率。
+func (bl *BucketLimiter) SetLimit(newLimit rate.Limit) {
+	bl.limiter.SetLimit(newLimit)
 }
 
-// SetBurst 重新设置桶的大小
-func (l *bucketLimiter) SetBurst(newBurst int) {
-	l.limiter.SetBurst(newBurst)
+// SetBurst 动态修改桶容量。
+func (bl *BucketLimiter) SetBurst(newBurst int) {
+	bl.limiter.SetBurst(newBurst)
 }
 
-func (l *bucketLimiter) CloseTokenBucket() {
-	limiterMap.Delete(l.key)
+// Close 注销限流器，从全局缓存中移除。
+func (bl *BucketLimiter) Close() {
+	limiterMap.Delete(bl.key)
+}
+
+// ensureCleanup 启动后台清理协程，仅执行一次。清理超过空闲阈值的限流器。
+func ensureCleanup() {
+	cleanupOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(defaultCleanupInterval)
+			defer ticker.Stop()
+			for range ticker.C {
+				now := time.Now().UnixNano()
+				limiterMap.Range(func(k, v interface{}) bool {
+					bl := v.(*BucketLimiter)
+					if now-bl.lastGetTime.Load() > defaultIdleThreshold.Nanoseconds() {
+						limiterMap.Delete(k)
+					}
+					return true
+				})
+			}
+		}()
+	})
 }
