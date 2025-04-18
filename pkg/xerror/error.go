@@ -1,4 +1,4 @@
-package e
+package xerror
 
 import "encoding/json"
 
