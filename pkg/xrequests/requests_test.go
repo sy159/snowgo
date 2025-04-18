@@ -1,4 +1,4 @@
-package xrequests
+package xrequests_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"snowgo/pkg/xrequests"
 	"testing"
 	"time"
 )
@@ -17,7 +18,7 @@ func TestGet(t *testing.T) {
 	}))
 	defer server.Close()
 
-	resp, err := Get(server.URL)
+	resp, err := xrequests.Get(server.URL)
 	if err != nil {
 		t.Fatalf("Expected no xerror, got %v", err)
 	}
@@ -46,7 +47,7 @@ func TestPost(t *testing.T) {
 	defer server.Close()
 
 	body := `{"name": "test"}`
-	resp, err := Post(server.URL, body)
+	resp, err := xrequests.Post(server.URL, body)
 	if err != nil {
 		t.Fatalf("Expected no xerror, got %v", err)
 	}
@@ -76,7 +77,7 @@ func TestWithHeader(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := Get(server.URL, WithHeader(map[string]string{"Custom-Header": "value"}))
+	_, err := xrequests.Get(server.URL, xrequests.WithHeader(map[string]string{"Custom-Header": "value"}))
 	if err != nil {
 		t.Fatalf("Expected no xerror, got %v", err)
 	}
@@ -93,7 +94,7 @@ func TestWithCtx(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 	defer cancel()
 
-	_, err := Get(server.URL, WithCtx(ctx))
+	_, err := xrequests.Get(server.URL, xrequests.WithCtx(ctx))
 	if err == nil {
 		t.Fatalf("Expected xerror due to context timeout, got no xerror")
 	}
@@ -122,7 +123,7 @@ func TestWithMaxRetryNum(t *testing.T) {
 		Timeout: 1 * time.Second,
 	}
 
-	resp, err := Get(server.URL, WithMaxRetryNum(2), WithClient(defaultClient))
+	resp, err := xrequests.Get(server.URL, xrequests.WithMaxRetryNum(2), xrequests.WithClient(defaultClient))
 	if err != nil {
 		t.Fatalf("预期无错误，但得到的是 %v", err)
 	}
@@ -154,7 +155,7 @@ func TestWithClient(t *testing.T) {
 	}))
 	defer server.Close()
 	customClient := &http.Client{Timeout: 1 * time.Millisecond}
-	res, err := Get(server.URL, WithClient(customClient))
+	res, err := xrequests.Get(server.URL, xrequests.WithClient(customClient))
 	fmt.Println(res, err)
 	if err == nil {
 		t.Fatalf("Expected xerror due to client timeout, got no xerror")
@@ -171,7 +172,7 @@ func TestWithBody(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := Post(server.URL, "", WithBody(`{"name": "test"}`))
+	_, err := xrequests.Post(server.URL, "", xrequests.WithBody(`{"name": "test"}`))
 	if err != nil {
 		t.Fatalf("Expected no xerror, got %v", err)
 	}
@@ -183,7 +184,7 @@ func TestDelete(t *testing.T) {
 	}))
 	defer server.Close()
 
-	resp, err := Delete(server.URL, "")
+	resp, err := xrequests.Delete(server.URL, "")
 	if err != nil {
 		t.Fatalf("Expected no xerror, got %v", err)
 	}
@@ -199,7 +200,7 @@ func TestPut(t *testing.T) {
 	}))
 	defer server.Close()
 
-	resp, err := Put(server.URL, "")
+	resp, err := xrequests.Put(server.URL, "")
 	if err != nil {
 		t.Fatalf("Expected no xerror, got %v", err)
 	}

@@ -46,8 +46,10 @@ func TestBucketEvery(t *testing.T) {
 func TestAllow(t *testing.T) {
 	tb, _ := NewTokenBucket("test:allow", 10, 2)
 
+	first := tb.Allow()
+	second := tb.Allow()
 	// 初始 burst 应该允许 2 次
-	if !tb.Allow() || !tb.Allow() {
+	if !first || !second {
 		t.Errorf("Expected first two Allow() calls to succeed")
 	}
 
