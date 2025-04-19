@@ -28,11 +28,11 @@ func newUser(db *gorm.DB, opts ...gen.DOOption) user {
 	_user.ALL = field.NewAsterisk(tableName)
 	_user.ID = field.NewInt32(tableName, "id")
 	_user.Username = field.NewString(tableName, "username")
-	_user.Password = field.NewString(tableName, "password")
 	_user.Tel = field.NewString(tableName, "tel")
-	_user.Sex = field.NewString(tableName, "sex")
-	_user.WalletAmount = field.NewField(tableName, "wallet_amount")
-	_user.IsDelete = field.NewBool(tableName, "is_delete")
+	_user.Nickname = field.NewString(tableName, "nickname")
+	_user.Password = field.NewString(tableName, "password")
+	_user.Status = field.NewString(tableName, "status")
+	_user.IsDeleted = field.NewBool(tableName, "is_deleted")
 	_user.CreatedAt = field.NewTime(tableName, "created_at")
 	_user.UpdatedAt = field.NewTime(tableName, "updated_at")
 
@@ -44,16 +44,16 @@ func newUser(db *gorm.DB, opts ...gen.DOOption) user {
 type user struct {
 	userDo userDo
 
-	ALL          field.Asterisk
-	ID           field.Int32
-	Username     field.String
-	Password     field.String
-	Tel          field.String
-	Sex          field.String
-	WalletAmount field.Field
-	IsDelete     field.Bool
-	CreatedAt    field.Time
-	UpdatedAt    field.Time
+	ALL       field.Asterisk
+	ID        field.Int32
+	Username  field.String // 登录名，业务唯一
+	Tel       field.String // 手机号码
+	Nickname  field.String // 用户昵称
+	Password  field.String // pwd
+	Status    field.String // 状态：Active 活跃，Disabled 禁用登录
+	IsDeleted field.Bool   // 是否删除：0=未删除，1=已删除
+	CreatedAt field.Time
+	UpdatedAt field.Time
 
 	fieldMap map[string]field.Expr
 }
@@ -72,11 +72,11 @@ func (u *user) updateTableName(table string) *user {
 	u.ALL = field.NewAsterisk(table)
 	u.ID = field.NewInt32(table, "id")
 	u.Username = field.NewString(table, "username")
-	u.Password = field.NewString(table, "password")
 	u.Tel = field.NewString(table, "tel")
-	u.Sex = field.NewString(table, "sex")
-	u.WalletAmount = field.NewField(table, "wallet_amount")
-	u.IsDelete = field.NewBool(table, "is_delete")
+	u.Nickname = field.NewString(table, "nickname")
+	u.Password = field.NewString(table, "password")
+	u.Status = field.NewString(table, "status")
+	u.IsDeleted = field.NewBool(table, "is_deleted")
 	u.CreatedAt = field.NewTime(table, "created_at")
 	u.UpdatedAt = field.NewTime(table, "updated_at")
 
@@ -106,11 +106,11 @@ func (u *user) fillFieldMap() {
 	u.fieldMap = make(map[string]field.Expr, 9)
 	u.fieldMap["id"] = u.ID
 	u.fieldMap["username"] = u.Username
-	u.fieldMap["password"] = u.Password
 	u.fieldMap["tel"] = u.Tel
-	u.fieldMap["sex"] = u.Sex
-	u.fieldMap["wallet_amount"] = u.WalletAmount
-	u.fieldMap["is_delete"] = u.IsDelete
+	u.fieldMap["nickname"] = u.Nickname
+	u.fieldMap["password"] = u.Password
+	u.fieldMap["status"] = u.Status
+	u.fieldMap["is_deleted"] = u.IsDeleted
 	u.fieldMap["created_at"] = u.CreatedAt
 	u.fieldMap["updated_at"] = u.UpdatedAt
 }

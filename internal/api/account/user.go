@@ -11,13 +11,13 @@ import (
 )
 
 type UserInfo struct {
-	ID           int32   `json:"id"`
-	Username     string  `json:"username"`
-	Tel          string  `json:"tel"`
-	Sex          string  `json:"sex"` // M表示男，F表示女
-	WalletAmount float64 `json:"wallet_amount"`
-	CreatedAt    string  `json:"created_at"`
-	UpdatedAt    string  `json:"updated_at"`
+	ID        int32  `json:"id"`
+	Username  string `json:"username"`
+	Tel       string `json:"tel"`
+	Nickname  string `json:"nickname"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 type UserList struct {
@@ -70,13 +70,13 @@ func GetUserInfo(c *gin.Context) {
 		return
 	}
 	xresponse.Success(c, &UserInfo{
-		ID:           user.ID,
-		Username:     user.Username,
-		Tel:          user.Tel,
-		Sex:          user.Sex,
-		WalletAmount: user.WalletAmount.InexactFloat64(),
-		CreatedAt:    user.CreatedAt.Format("2006-01-02 15:04:05.000"),
-		UpdatedAt:    user.UpdatedAt.Format("2006-01-02 15:04:05.000"),
+		ID:        user.ID,
+		Username:  user.Username,
+		Tel:       user.Tel,
+		Nickname:  user.Nickname,
+		Status:    user.Status,
+		CreatedAt: user.CreatedAt.Format("2006-01-02 15:04:05.000"),
+		UpdatedAt: user.UpdatedAt.Format("2006-01-02 15:04:05.000"),
 	})
 }
 
@@ -109,13 +109,13 @@ func GetUserList(c *gin.Context) {
 	userList := make([]*UserInfo, 0, len(res.List))
 	for _, user := range res.List {
 		userList = append(userList, &UserInfo{
-			ID:           user.ID,
-			Username:     user.Username,
-			Tel:          user.Tel,
-			Sex:          user.Sex,
-			WalletAmount: user.WalletAmount.InexactFloat64(),
-			CreatedAt:    user.CreatedAt.Format("2006-01-02 15:04:05.000"),
-			UpdatedAt:    user.UpdatedAt.Format("2006-01-02 15:04:05.000"),
+			ID:        user.ID,
+			Username:  user.Username,
+			Tel:       user.Tel,
+			Nickname:  user.Nickname,
+			Status:    user.Status,
+			CreatedAt: user.CreatedAt.Format("2006-01-02 15:04:05.000"),
+			UpdatedAt: user.UpdatedAt.Format("2006-01-02 15:04:05.000"),
 		})
 	}
 	xresponse.Success(c, &UserList{

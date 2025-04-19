@@ -6,23 +6,21 @@ package model
 
 import (
 	"time"
-
-	"github.com/shopspring/decimal"
 )
 
 const TableNameUser = "user"
 
-// User mapped from table <user>
+// User 用户表
 type User struct {
-	ID           int32            `gorm:"column:id;type:int(11);primaryKey;autoIncrement:true" json:"id"`
-	Username     string           `gorm:"column:username;type:varchar(20);not null;index:idx_username,priority:1" json:"username"`
-	Password     string           `gorm:"column:password;type:varchar(64);not null" json:"password"`
-	Tel          string           `gorm:"column:tel;type:varchar(20);not null;uniqueIndex:uniq_tel,priority:1" json:"tel"`
-	Sex          *string          `gorm:"column:sex;type:char(1);default:M;comment:M表示男，F表示女" json:"sex"` // M表示男，F表示女
-	WalletAmount *decimal.Decimal `gorm:"column:wallet_amount;type:decimal(12,2);default:0.00" json:"wallet_amount"`
-	IsDelete     *bool            `gorm:"column:is_delete;type:tinyint(1);comment:1表示用户已经被删除，0表示可用" json:"is_delete"` // 1表示用户已经被删除，0表示可用
-	CreatedAt    *time.Time       `gorm:"column:created_at;type:datetime(6);default:CURRENT_TIMESTAMP(6)" json:"created_at"`
-	UpdatedAt    *time.Time       `gorm:"column:updated_at;type:datetime(6);default:CURRENT_TIMESTAMP(6)" json:"updated_at"`
+	ID        int32      `gorm:"column:id;type:int(11);primaryKey;autoIncrement:true" json:"id"`
+	Username  string     `gorm:"column:username;type:varchar(64);not null;uniqueIndex:uk_username,priority:1;comment:登录名，业务唯一" json:"username"`                                     // 登录名，业务唯一
+	Tel       string     `gorm:"column:tel;type:varchar(20);not null;uniqueIndex:uk_tel,priority:1;comment:手机号码" json:"tel"`                                                        // 手机号码
+	Nickname  *string    `gorm:"column:nickname;type:varchar(60);comment:用户昵称" json:"nickname"`                                                                                     // 用户昵称
+	Password  string     `gorm:"column:password;type:char(64);not null;comment:pwd" json:"password"`                                                                                // pwd
+	Status    *string    `gorm:"column:status;type:enum('Active','Disabled');not null;index:idx_status,priority:1;default:Active;comment:状态：Active 活跃，Disabled 禁用登录" json:"status"` // 状态：Active 活跃，Disabled 禁用登录
+	IsDeleted bool       `gorm:"column:is_deleted;type:tinyint(1);not null;index:idx_is_deleted,priority:1;comment:是否删除：0=未删除，1=已删除" json:"is_deleted"`                             // 是否删除：0=未删除，1=已删除
+	CreatedAt *time.Time `gorm:"column:created_at;type:datetime(6);not null;default:CURRENT_TIMESTAMP(6)" json:"created_at"`
+	UpdatedAt *time.Time `gorm:"column:updated_at;type:datetime(6);not null;default:CURRENT_TIMESTAMP(6)" json:"updated_at"`
 }
 
 // TableName User's table name

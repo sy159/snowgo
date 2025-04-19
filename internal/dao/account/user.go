@@ -24,7 +24,8 @@ type UserListCondition struct {
 	Ids      []int32 `json:"ids"`
 	Username string  `json:"username"`
 	Tel      string  `json:"tel"`
-	Sex      string  `json:"sex"` // M表示男，F表示女
+	Nickname string  `json:"nickname"`
+	Status   string  `json:"status"`
 	Offset   int32   `json:"offset"`
 	Limit    int32   `json:"limit"`
 }
@@ -38,12 +39,16 @@ func (u *UserDao) CreateUser(ctx context.Context, user *model.User) (*model.User
 	return user, nil
 }
 
-func (u *UserDao) IsNameTelDuplicate(ctx context.Context, username, tel string) (bool, error) {
+// IsNameTelDuplicate 用户名或者电话是否存在了,如果有用户id应该排除
+func (u *UserDao) IsNameTelDuplicate(ctx context.Context, username, tel string, userId int32) (bool, error) {
 	m := u.repo.Query().User
-	_, err := m.WithContext(ctx).
-		Where(m.IsDelete.Is(false)).
-		Where(m.WithContext(ctx).Or(m.Username.Eq(username)).Or(m.Tel.Eq(tel))).
-		First()
+	query := m.WithContext(ctx).
+		Where(m.IsDeleted.Is(false)).
+		Where(m.WithContext(ctx).Or(m.Username.Eq(username)).Or(m.Tel.Eq(tel)))
+	if userId > 0 {
+		query = query.Where(m.ID.Neq(userId))
+	}
+	_, err := query.First()
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
@@ -59,7 +64,7 @@ func (u *UserDao) GetUserById(ctx context.Context, userId int32) (*model.User, e
 		return nil, errors.New("用户id不存在")
 	}
 	m := u.repo.Query().User
-	user, err := u.repo.Query().User.WithContext(ctx).Where(m.ID.Eq(userId), m.IsDelete.Is(false)).First()
+	user, err := u.repo.Query().User.WithContext(ctx).Where(m.ID.Eq(userId), m.IsDeleted.Is(false)).First()
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("该用户不存在")
@@ -73,12 +78,13 @@ func (u *UserDao) GetUserById(ctx context.Context, userId int32) (*model.User, e
 func (u *UserDao) GetUserList(ctx context.Context, condition *UserListCondition) ([]*model.User, int64, error) {
 	m := u.repo.Query().User
 	userList, total, err := m.WithContext(ctx).
-		Where(m.IsDelete.Is(false)).
+		Where(m.IsDeleted.Is(false)).
 		Scopes(
 			u.UserIdsScope(condition.Ids),
 			u.UserNameScope(condition.Username),
 			u.TelScope(condition.Tel),
-			u.SexScope(condition.Sex),
+			u.StatusScope(condition.Status),
+			u.NickNameScope(condition.Nickname),
 		).
 		FindByPage(int(condition.Offset), int(condition.Limit))
 	if err != nil {
@@ -104,7 +110,7 @@ func (u *UserDao) UserNameScope(username string) func(tx gen.Dao) gen.Dao {
 			return tx
 		}
 		m := u.repo.Query().User
-		tx = tx.Where(m.Username.Like("%" + username + "%"))
+		tx = tx.Where(m.Username.Eq(username))
 		return tx
 	}
 }
@@ -120,13 +126,24 @@ func (u *UserDao) TelScope(tel string) func(tx gen.Dao) gen.Dao {
 	}
 }
 
-func (u *UserDao) SexScope(sex string) func(tx gen.Dao) gen.Dao {
+func (u *UserDao) StatusScope(status string) func(tx gen.Dao) gen.Dao {
 	return func(tx gen.Dao) gen.Dao {
-		if len(sex) == 0 {
+		if len(status) == 0 {
 			return tx
 		}
 		m := u.repo.Query().User
-		tx = tx.Where(m.Sex.Eq(sex))
+		tx = tx.Where(m.Status.Eq(status))
+		return tx
+	}
+}
+
+func (u *UserDao) NickNameScope(nickname string) func(tx gen.Dao) gen.Dao {
+	return func(tx gen.Dao) gen.Dao {
+		if len(nickname) == 0 {
+			return tx
+		}
+		m := u.repo.Query().User
+		tx = tx.Where(m.Nickname.Like("%" + nickname + "%"))
 		return tx
 	}
 }
@@ -142,7 +159,7 @@ func (u *UserDao) DeleteById(ctx context.Context, userId int32) error {
 		return errors.New("用户id不存在")
 	}
 	m := u.repo.Query().User
-	_, err := u.repo.Query().User.WithContext(ctx).Where(m.ID.Eq(userId)).UpdateSimple(m.IsDelete.Value(true))
+	_, err := u.repo.Query().User.WithContext(ctx).Where(m.ID.Eq(userId)).UpdateSimple(m.IsDeleted.Value(true))
 	if err != nil {
 		return errors.WithMessage(err, "用户删除异常")
 	}

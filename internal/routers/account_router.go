@@ -9,10 +9,12 @@ import (
 // 用户相关路由
 func userRouters(r *gin.RouterGroup) {
 	userGroup := r.Group("/account")
+
+	adminGroup := userGroup.Group("/admin")
 	{
-		userGroup.GET("/user", GetUserList)
-		userGroup.POST("/user", CreateUser)
-		userGroup.DELETE("/user", DeleteUserById)
-		userGroup.GET("/user/detail", GetUserInfo)
+		adminGroup.GET("/user", GetUserList)
+		adminGroup.POST("/user", CreateUser)
+		adminGroup.DELETE("/user", DeleteUserById)
+		adminGroup.GET("/user/detail", GetUserInfo)
 	}
 }

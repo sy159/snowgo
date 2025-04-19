@@ -17,23 +17,35 @@ import (
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:   db,
-		User: newUser(db, opts...),
+		db:       db,
+		Menu:     newMenu(db, opts...),
+		Role:     newRole(db, opts...),
+		RoleMenu: newRoleMenu(db, opts...),
+		User:     newUser(db, opts...),
+		UserRole: newUserRole(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	User user
+	Menu     menu
+	Role     role
+	RoleMenu roleMenu
+	User     user
+	UserRole userRole
 }
 
 func (q *Query) Available() bool { return q.db != nil }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:   db,
-		User: q.User.clone(db),
+		db:       db,
+		Menu:     q.Menu.clone(db),
+		Role:     q.Role.clone(db),
+		RoleMenu: q.RoleMenu.clone(db),
+		User:     q.User.clone(db),
+		UserRole: q.UserRole.clone(db),
 	}
 }
 
@@ -47,18 +59,30 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:   db,
-		User: q.User.replaceDB(db),
+		db:       db,
+		Menu:     q.Menu.replaceDB(db),
+		Role:     q.Role.replaceDB(db),
+		RoleMenu: q.RoleMenu.replaceDB(db),
+		User:     q.User.replaceDB(db),
+		UserRole: q.UserRole.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	User *userDo
+	Menu     *menuDo
+	Role     *roleDo
+	RoleMenu *roleMenuDo
+	User     *userDo
+	UserRole *userRoleDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		User: q.User.WithContext(ctx),
+		Menu:     q.Menu.WithContext(ctx),
+		Role:     q.Role.WithContext(ctx),
+		RoleMenu: q.RoleMenu.WithContext(ctx),
+		User:     q.User.WithContext(ctx),
+		UserRole: q.UserRole.WithContext(ctx),
 	}
 }
 
