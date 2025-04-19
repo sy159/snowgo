@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Md5 md5加密
@@ -27,6 +28,18 @@ func Sha256(s string) string {
 	m.Write([]byte(s))
 	res := hex.EncodeToString(m.Sum(nil))
 	return res
+}
+
+// HashPassword 生成密码哈希（自动加盐）COST是一个介于4到31之间的整数，更高的值表示更高的计算成本
+func HashPassword(password string) (string, error) {
+	bytesPwd, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytesPwd), err
+}
+
+// CheckPassword 验证密码
+func CheckPassword(hashedPassword, password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+	return err == nil
 }
 
 // PKCS7填充，PKCS5就是blockSize固定为8

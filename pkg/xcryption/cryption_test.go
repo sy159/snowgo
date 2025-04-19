@@ -41,6 +41,21 @@ func TestEncode(t *testing.T) {
 	})
 }
 
+func TestHashPassword(t *testing.T) {
+	pwd := "123456"
+	t.Run("hash pwd", func(t *testing.T) {
+		hashPwd, err := xcryption.HashPassword(pwd)
+		fmt.Println(hashPwd, err)
+		if err != nil {
+			t.Error(err)
+		}
+		isSuccess := xcryption.CheckPassword(hashPwd, pwd)
+		if !isSuccess {
+			t.Error("hash password error")
+		}
+	})
+}
+
 func BenchmarkCrypto(b *testing.B) {
 	plainText, key := "hello world", "aa125678aa125678"
 	for i := 0; i < b.N; i++ {
@@ -67,6 +82,20 @@ func BenchmarkEncode(b *testing.B) {
 		}
 		if uint(i) != id {
 			b.Error("code xerror")
+		}
+	}
+}
+
+func BenchmarkHashPwd(b *testing.B) {
+	pwd := "123456"
+	for i := 0; i < b.N; i++ {
+		hashPwd, err := xcryption.HashPassword(pwd)
+		if err != nil {
+			b.Error(err)
+		}
+		isSuccess := xcryption.CheckPassword(hashPwd, pwd)
+		if !isSuccess {
+			b.Error("hash password error")
 		}
 	}
 }
