@@ -1,0 +1,209 @@
+package account
+
+import (
+	"context"
+	"github.com/pkg/errors"
+	"snowgo/internal/dal/model"
+	"snowgo/internal/dal/repo"
+	"snowgo/pkg/xcache"
+	"snowgo/pkg/xlogger"
+	"sort"
+	"time"
+)
+
+type MenuRepo interface {
+	CreateMenu(ctx context.Context, mn *model.Menu) (*model.Menu, error)
+	UpdateMenu(ctx context.Context, mn *model.Menu) (*model.Menu, error)
+	DeleteById(ctx context.Context, id int32) error
+	GetById(ctx context.Context, id int32) (*model.Menu, error)
+	GetByParentId(ctx context.Context, parentId int32) ([]*model.Menu, error)
+	GetAllMenus(ctx context.Context) ([]*model.Menu, error)
+	IsUsedMenuByIds(ctx context.Context, MenuIds []int32) (bool, error)
+}
+
+type MenuService struct {
+	db      *repo.Repository
+	menuDao MenuRepo
+	cache   xcache.Cache
+}
+
+func NewMenuService(db *repo.Repository, cache xcache.Cache, menuDao MenuRepo) *MenuService {
+	return &MenuService{
+		db:      db,
+		cache:   cache,
+		menuDao: menuDao,
+	}
+}
+
+type MenuParam struct {
+	ID       int32  `json:"id"`
+	ParentID int32  `json:"parent_id"`
+	MenuType string `json:"menu_type" binding:"required,oneof=Dir Menu Btn"`
+	Name     string `json:"name"`
+	Path     string `json:"path"`
+	Icon     string `json:"icon"`
+	Perms    string `json:"perms"`
+	OrderNum int32  `json:"order_num" binding:"required,gte=0"`
+	Status   string `json:"status" binding:"required,oneof=Active Disabled"`
+}
+
+// MenuInfo 返回给前端的树节点结构
+type MenuInfo struct {
+	ID        int32       `json:"id"`
+	ParentID  int32       `json:"parent_id"`
+	MenuType  string      `json:"menu_type"`
+	Name      string      `json:"name"`
+	Path      string      `json:"path"`
+	Icon      string      `json:"icon"`
+	Perms     string      `json:"perms"`
+	OrderNum  int32       `json:"order_num"`
+	Status    string      `json:"status"`
+	CreatedAt time.Time   `json:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at"`
+	Children  []*MenuInfo `json:"children,omitempty"`
+}
+
+// CreateMenu 创建菜单权限
+func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, error) {
+	// 校验父节点
+	if p.ParentID > 0 {
+		if _, err := s.menuDao.GetById(ctx, p.ParentID); err != nil {
+			return 0, errors.New("父级菜单不存在")
+		}
+	}
+
+	menu := &model.Menu{
+		ParentID: p.ParentID,
+		MenuType: p.MenuType,
+		Name:     p.Name,
+		Path:     &p.Path,
+		Icon:     &p.Icon,
+		Perms:    &p.Perms,
+		OrderNum: p.OrderNum,
+		Status:   &p.Status,
+	}
+	menuObj, err := s.menuDao.CreateMenu(ctx, menu)
+	if err != nil {
+		xlogger.Errorf("创建菜单失败: %v", err)
+		return 0, err
+	}
+	return menuObj.ID, nil
+}
+
+// UpdateMenu 更新菜单或按钮，校验同 CreateMenu
+func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
+	if p.ID <= 0 {
+		return errors.New("菜单ID无效")
+	}
+
+	// 校验父节点
+	if p.ParentID > 0 {
+		if p.ParentID == p.ID {
+			return errors.New("父级菜单不能是自己")
+		}
+		if _, err := s.menuDao.GetById(ctx, p.ParentID); err != nil {
+			return errors.New("父级菜单不存在")
+		}
+	}
+	// 更新
+	mn := &model.Menu{
+		ID:       p.ID,
+		ParentID: p.ParentID,
+		MenuType: p.MenuType,
+		Name:     p.Name,
+		Path:     &p.Path,
+		Icon:     &p.Icon,
+		Perms:    &p.Perms,
+		OrderNum: p.OrderNum,
+		Status:   &p.Status,
+	}
+	_, err := s.menuDao.UpdateMenu(ctx, mn)
+	if err != nil {
+		xlogger.Errorf("更新菜单失败: %v", err)
+	}
+	return err
+}
+
+// DeleteMenuById 删除菜单或按钮
+func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
+	if id <= 0 {
+		return errors.New("菜单ID无效")
+	}
+
+	// 可以在此处校验是否存在子节点，若存在可拒绝删除(也可以改为递归删除)
+	subMenus, _ := s.menuDao.GetByParentId(ctx, id)
+	if len(subMenus) > 0 {
+		return errors.New("存在子菜单，无法删除")
+	}
+
+	// 如果被角色使用，也不能删除
+	isUsed, err := s.menuDao.IsUsedMenuByIds(ctx, []int32{id})
+	if err != nil {
+		return errors.WithMessage(err, "")
+	}
+	if isUsed {
+		return errors.New("该菜单权限已被使用，无法删除")
+	}
+	err = s.menuDao.DeleteById(ctx, id)
+	if err != nil {
+		xlogger.Errorf("删除菜单失败: %v", err)
+	}
+	return err
+}
+
+func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
+	menus, err := s.menuDao.GetAllMenus(ctx)
+	if err != nil {
+		xlogger.Errorf("获取全部菜单失败: %v", err)
+		return nil, err
+	}
+
+	// 构造 map[id]MenuInfo
+	nodeMap := make(map[int32]*MenuInfo, len(menus))
+	for _, m := range menus {
+		nodeMap[m.ID] = &MenuInfo{
+			ID:        m.ID,
+			ParentID:  m.ParentID,
+			MenuType:  m.MenuType,
+			Name:      m.Name,
+			Path:      *m.Path,
+			Icon:      *m.Icon,
+			Perms:     *m.Perms,
+			OrderNum:  m.OrderNum,
+			Status:    *m.Status,
+			CreatedAt: *m.CreatedAt,
+			UpdatedAt: *m.UpdatedAt,
+			Children:  []*MenuInfo{},
+		}
+	}
+
+	// 构建树结构
+	var roots []*MenuInfo
+	for _, node := range nodeMap {
+		if node.ParentID == 0 {
+			roots = append(roots, node)
+		} else if parent, ok := nodeMap[node.ParentID]; ok {
+			parent.Children = append(parent.Children, node)
+		} else {
+			xlogger.Errorf("菜单[%d] 的父节点 [%d] 不存在，挂到根节点", node.ID, node.ParentID)
+			roots = append(roots, node)
+		}
+	}
+
+	// 递归排序
+	var sortNodes func(nodes []*MenuInfo)
+	sortNodes = func(nodes []*MenuInfo) {
+		if len(nodes) == 0 {
+			return
+		}
+		sort.SliceStable(nodes, func(i, j int) bool {
+			return nodes[i].OrderNum < nodes[j].OrderNum
+		})
+		for _, n := range nodes {
+			sortNodes(n.Children)
+		}
+	}
+	sortNodes(roots)
+
+	return roots, nil
+}

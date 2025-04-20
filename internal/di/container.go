@@ -23,7 +23,12 @@ type Container struct {
 	Lock       xlock.Lock
 
 	// 这里只提供对api使用的service，不提供dao操作
+	AccountContainer
+}
+
+type AccountContainer struct {
 	UserService *accountService.UserService
+	MenuService *accountService.MenuService
 }
 
 // BuildJwtManager 构建jwt操作
@@ -78,15 +83,20 @@ func NewContainer(jwtConfig config.JwtConfig, rdb *redis.Client, db *gorm.DB, db
 
 	// 构造Dao
 	userDao := accountDao.NewUserDao(repository)
+	menuDao := accountDao.NewMenuDao(repository)
 
 	// 构造Service依赖
 	userService := accountService.NewUserService(repository, userDao, redisCache)
+	menuService := accountService.NewMenuService(repository, redisCache, menuDao)
 
 	return &Container{
-		Cache:       redisCache,
-		JwtManager:  jwtManager,
-		Lock:        lock,
-		UserService: userService,
+		Cache:      redisCache,
+		JwtManager: jwtManager,
+		Lock:       lock,
+		AccountContainer: AccountContainer{
+			UserService: userService,
+			MenuService: menuService,
+		},
 	}
 }
 
@@ -101,4 +111,10 @@ func GetContainer(c *gin.Context) *Container {
 		xlogger.Panic("Invalid container type")
 	}
 	return container
+}
+
+// GetAccountContainer 获取注入的cache、service等
+func GetAccountContainer(c *gin.Context) *AccountContainer {
+	container := GetContainer(c)
+	return &container.AccountContainer
 }

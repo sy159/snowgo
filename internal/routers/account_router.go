@@ -12,9 +12,15 @@ func userRouters(r *gin.RouterGroup) {
 
 	adminGroup := userGroup.Group("/admin")
 	{
+		// 用户
 		adminGroup.GET("/user", GetUserList)
 		adminGroup.POST("/user", CreateUser)
 		adminGroup.DELETE("/user", DeleteUserById)
 		adminGroup.GET("/user/detail", GetUserInfo)
+		// 菜单权限
+		adminGroup.GET("/menu", GetMenuList)
+		adminGroup.POST("/menu", CreateMenu)
+		adminGroup.PUT("/menu", UpdateMenu)
+		adminGroup.DELETE("/menu", DeleteMenuById)
 	}
 }

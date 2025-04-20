@@ -51,6 +51,10 @@ var (
 	UserCreateError       = NewCode(10302, "用户创建失败")
 	UserNameTelEmptyError = NewCode(10303, "用户名或电话不能为空")
 	UserNameTelExistError = NewCode(10303, "用户名或电话已存在")
+
+	MenuNotFound    = NewCode(10401, "菜单不存在")
+	MenuCreateError = NewCode(10402, "菜单创建失败")
+	MenuUpdateError = NewCode(10403, "菜单更新失败")
 )
 
 type Code interface {
