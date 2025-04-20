@@ -43,6 +43,7 @@ func (u *UserDao) CreateUser(ctx context.Context, user *model.User) (*model.User
 func (u *UserDao) IsNameTelDuplicate(ctx context.Context, username, tel string, userId int32) (bool, error) {
 	m := u.repo.Query().User
 	query := m.WithContext(ctx).
+		Select(m.ID).
 		Where(m.IsDeleted.Is(false)).
 		Where(m.WithContext(ctx).Or(m.Username.Eq(username)).Or(m.Tel.Eq(tel)))
 	if userId > 0 {

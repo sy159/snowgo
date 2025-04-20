@@ -29,15 +29,17 @@ type UserList struct {
 func CreateUser(c *gin.Context) {
 	var user account.User
 	if err := c.ShouldBindJSON(&user); err != nil {
-		xresponse.FailByError(c, e.HttpInternalServerError)
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
 	xlogger.Infof("create user: %+v", user)
 
+	// 可以额外校验
 	if user.Username == "" || user.Tel == "" {
 		xresponse.FailByError(c, e.UserNameTelEmptyError)
 		return
 	}
+
 	container := di.GetContainer(c)
 	userId, err := container.UserService.CreateUser(c, &user)
 	if err != nil {
@@ -57,11 +59,10 @@ func GetUserInfo(c *gin.Context) {
 	userIdStr := c.Query("id")
 	userId, err := strconv.Atoi(userIdStr)
 	if err != nil {
-		// 转换失败，处理错误
-		xresponse.FailByError(c, e.HttpInternalServerError)
+		xresponse.FailByError(c, e.HttpBadRequest)
 		return
 	}
-	xlogger.Infof("get user info by id: %+v", userId)
+	xlogger.Infof("get user info by id: %v", userId)
 	container := di.GetContainer(c)
 	user, err := container.UserService.GetUserById(c, int32(userId))
 	if err != nil {
@@ -84,7 +85,7 @@ func GetUserInfo(c *gin.Context) {
 func GetUserList(c *gin.Context) {
 	var userListReq account.UserListCondition
 	if err := c.ShouldBindQuery(&userListReq); err != nil {
-		xresponse.FailByError(c, e.HttpInternalServerError)
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
 	xlogger.Infof("get user list: %+v", userListReq)
@@ -128,7 +129,7 @@ func GetUserList(c *gin.Context) {
 func DeleteUserById(c *gin.Context) {
 	var user UserInfo
 	if err := c.ShouldBindJSON(&user); err != nil {
-		xresponse.FailByError(c, e.HttpInternalServerError)
+		xresponse.FailByError(c, e.HttpBadRequest)
 		return
 	}
 	xlogger.Infof("delete user info by id: %+v", user.ID)

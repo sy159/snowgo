@@ -12,8 +12,8 @@ CREATE TABLE `user`
     `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`id`),
-    UNIQUE KEY uk_username (`username`),
-    UNIQUE KEY uk_tel (`tel`),
+    KEY idx_username (`username`),
+    KEY idx_tel (`tel`),
     KEY          idx_status (`status`),
     KEY          idx_is_deleted (`is_deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
@@ -36,7 +36,7 @@ CREATE TABLE `role`
 # 创建菜单权限表
 CREATE TABLE `menu` (
   `id`           INT(11)       NOT NULL AUTO_INCREMENT,
-  `parent_id`    INT(11)      NULL    COMMENT '父级菜单，NULL=根节点',
+  `parent_id`    INT(11)      NOT NULL  DEFAULT 0   COMMENT '父级菜单，0=根节点',
   `menu_type`    ENUM('Dir','Menu','Btn') NOT NULL COMMENT '类型：Dir/菜单目录, Menu/页面菜单, Btn/按钮操作',
   `name`         VARCHAR(64) NOT NULL COMMENT '节点名称（前端显示）',
   `path`         VARCHAR(128) NULL   COMMENT '前端路由路径，仅 Dir/Menu 生效',

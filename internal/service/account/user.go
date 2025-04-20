@@ -38,9 +38,9 @@ func NewUserService(db *repo.Repository, userDao UserRepo, cache xcache.Cache) *
 }
 
 type User struct {
-	Username string `json:"username"`
+	Username string `json:"username" binding:"required,max=64"`
 	Password string `json:"password"`
-	Tel      string `json:"tel"`
+	Tel      string `json:"tel" binding:"required"`
 	Nickname string `json:"nickname"`
 }
 
@@ -71,10 +71,10 @@ type UserListCondition struct {
 
 // CreateUser 创建用户
 func (u *UserService) CreateUser(ctx context.Context, user *User) (int32, error) {
-	xlogger.Infof("创建用户: %+v", user)
 	// 检查用户名，或者电话是否存在
 	isDuplicate, err := u.userDao.IsNameTelDuplicate(ctx, user.Username, user.Tel, 0)
 	if err != nil {
+		xlogger.Errorf("查询用户名或电话是否存在异常: %v", err)
 		return 0, errors.WithMessage(err, "查询用户名或电话是否存在异常")
 	}
 	if isDuplicate {
@@ -89,14 +89,14 @@ func (u *UserService) CreateUser(ctx context.Context, user *User) (int32, error)
 	activeStatus := constants.UserStatusActive
 	userObj, err := u.userDao.CreateUser(ctx, &model.User{
 		Username:  user.Username,
-		Password:  pwd, // 密码加密(还可以加盐，增加密码难度)
+		Password:  pwd,
 		Tel:       user.Tel,
 		Nickname:  &user.Nickname,
 		Status:    &activeStatus,
 		IsDeleted: false,
 	})
 	if err != nil {
-		xlogger.Errorf("用户创建失败: %v", err)
+		xlogger.Errorf("用户创建失败: %+v err: %v", user, err)
 		return 0, errors.WithMessage(err, "用户创建失败")
 	}
 	return userObj.ID, nil
@@ -104,7 +104,6 @@ func (u *UserService) CreateUser(ctx context.Context, user *User) (int32, error)
 
 // GetUserById 根据id获取用户信息
 func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo, error) {
-	xlogger.Infof("获取用户(%d)信息", userId)
 	if userId <= 0 {
 		return nil, errors.New(e.UserNotFound.GetErrMsg())
 	}
@@ -126,7 +125,6 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 
 // GetUserList 获取用户列表信息
 func (u *UserService) GetUserList(ctx context.Context, condition *UserListCondition) (*UserList, error) {
-	xlogger.Infof("获取用户列表: %+v", condition)
 	userList, total, err := u.userDao.GetUserList(ctx, &account.UserListCondition{
 		Ids:      condition.Ids,
 		Username: condition.Username,
@@ -157,12 +155,12 @@ func (u *UserService) GetUserList(ctx context.Context, condition *UserListCondit
 
 // DeleteById 删除用户
 func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
-	xlogger.Infof("删除用户: %+v", userId)
 	if userId <= 0 {
 		return errors.New(e.UserNotFound.GetErrMsg())
 	}
 	err := u.userDao.DeleteById(ctx, userId)
 	if err != nil {
+		xlogger.Infof("用户删除异常: %v", err)
 		return errors.WithMessage(err, "用户删除异常")
 	}
 	return nil

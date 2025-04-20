@@ -48,7 +48,7 @@ type menu struct {
 
 	ALL       field.Asterisk
 	ID        field.Int32
-	ParentID  field.Int32  // 父级菜单，NULL=根节点
+	ParentID  field.Int32  // 父级菜单，0=根节点
 	MenuType  field.String // 类型：Dir/菜单目录, Menu/页面菜单, Btn/按钮操作
 	Name      field.String // 节点名称（前端显示）
 	Path      field.String // 前端路由路径，仅 Dir/Menu 生效
