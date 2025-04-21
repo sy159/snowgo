@@ -22,5 +22,11 @@ func userRouters(r *gin.RouterGroup) {
 		adminGroup.POST("/menu", CreateMenu)
 		adminGroup.PUT("/menu", UpdateMenu)
 		adminGroup.DELETE("/menu", DeleteMenuById)
+		// 角色管理
+		adminGroup.GET("/role", GetRoleList)
+		adminGroup.GET("/role/detail", GetRoleById)
+		adminGroup.POST("/role", CreateRole)
+		adminGroup.PUT("/role", UpdateRole)
+		adminGroup.DELETE("/role", DeleteRole)
 	}
 }

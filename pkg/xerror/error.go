@@ -50,11 +50,16 @@ var (
 	UserNotFound          = NewCode(10301, "用户不存在")
 	UserCreateError       = NewCode(10302, "用户创建失败")
 	UserNameTelEmptyError = NewCode(10303, "用户名或电话不能为空")
-	UserNameTelExistError = NewCode(10303, "用户名或电话已存在")
+	UserNameTelExistError = NewCode(10304, "用户名或电话已存在")
 
 	MenuNotFound    = NewCode(10401, "菜单不存在")
 	MenuCreateError = NewCode(10402, "菜单创建失败")
 	MenuUpdateError = NewCode(10403, "菜单更新失败")
+
+	RoleNotFound    = NewCode(10501, "角色不存在")
+	RoleCreateError = NewCode(10502, "角色创建失败")
+	RoleUpdateError = NewCode(10503, "角色更新失败")
+	RoleDeleteError = NewCode(10504, "角色删除失败")
 )
 
 type Code interface {

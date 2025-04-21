@@ -6,6 +6,7 @@ import (
 	"gorm.io/gen"
 	"gorm.io/gorm"
 	"snowgo/internal/dal/model"
+	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
 )
 
@@ -28,11 +29,11 @@ type RoleListCondition struct {
 
 func (r *RoleDao) IsCodeExists(ctx context.Context, code string, roleId int32) (bool, error) {
 	m := r.repo.Query().Role
-	query := m.WithContext(ctx).Select(m.ID).Where(m.Code.Eq(code))
+	roleQuery := m.WithContext(ctx).Select(m.ID).Where(m.Code.Eq(code))
 	if roleId > 0 {
-		query = query.Where(m.ID.Neq(roleId))
+		roleQuery = roleQuery.Where(m.ID.Neq(roleId))
 	}
-	_, err := query.First()
+	_, err := roleQuery.First()
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
@@ -45,6 +46,15 @@ func (r *RoleDao) IsCodeExists(ctx context.Context, code string, roleId int32) (
 // CreateRole 创建角色
 func (r *RoleDao) CreateRole(ctx context.Context, role *model.Role) (*model.Role, error) {
 	err := r.repo.Query().WithContext(ctx).Role.Create(role)
+	if err != nil {
+		return nil, errors.WithMessage(err, "角色创建失败")
+	}
+	return role, nil
+}
+
+// TransactionCreateRole 事务创建角色
+func (r *RoleDao) TransactionCreateRole(ctx context.Context, tx *query.Query, role *model.Role) (*model.Role, error) {
+	err := tx.WithContext(ctx).Role.Create(role)
 	if err != nil {
 		return nil, errors.WithMessage(err, "角色创建失败")
 	}
@@ -147,4 +157,51 @@ func (r *RoleDao) IdsScope(ids []int32) func(tx gen.Dao) gen.Dao {
 		m := r.repo.Query().Role
 		return tx.Where(m.ID.In(ids...))
 	}
+}
+
+// TransactionCreateRoleMenu 创建角色与菜单关联关系
+func (r *RoleDao) TransactionCreateRoleMenu(ctx context.Context, tx *query.Query, roleMenuList []*model.RoleMenu) error {
+	err := tx.WithContext(ctx).RoleMenu.CreateInBatches(roleMenuList, 1000)
+	if err != nil {
+		return errors.WithMessage(err, "角色与菜单关联关系创建失败")
+	}
+	return nil
+}
+
+// TransactionDeleteRoleMenu 删除角色与菜单关联关系
+func (r *RoleDao) TransactionDeleteRoleMenu(ctx context.Context, tx *query.Query, roleId int32) error {
+	_, err := tx.WithContext(ctx).RoleMenu.Where(tx.RoleMenu.RoleID.Eq(roleId)).Delete()
+	if err != nil {
+		return errors.WithMessage(err, "角色与菜单关联关系删除失败")
+	}
+	return nil
+}
+
+// TransactionDeleteById 删除角色
+func (r *RoleDao) TransactionDeleteById(ctx context.Context, tx *query.Query, roleId int32) error {
+	if roleId <= 0 {
+		return errors.New("角色id不存在")
+	}
+	_, err := tx.WithContext(ctx).Role.Where(tx.Role.ID.Eq(roleId)).Delete()
+	if err != nil {
+		return errors.WithMessage(err, "角色删除失败")
+	}
+	return nil
+}
+
+// CountMenuByIds 根据菜单ids，获取数量
+func (r *RoleDao) CountMenuByIds(ctx context.Context, ids []int32) (int64, error) {
+	m := r.repo.Query().Menu
+	return m.WithContext(ctx).Where(m.ID.In(ids...)).Count()
+}
+
+// GetMenuIdsByRoleId 根据roleId 获取关联的菜单id
+func (r *RoleDao) GetMenuIdsByRoleId(ctx context.Context, roleId int32) ([]int32, error) {
+	m := r.repo.Query().RoleMenu
+	menuIds := make([]int32, 0, 10)
+	err := m.WithContext(ctx).Select(m.MenuID).Where(m.RoleID.Eq(roleId)).Pluck(m.MenuID, &menuIds)
+	if err != nil {
+		return nil, errors.WithMessage(err, "获取关联的菜单id列表失败")
+	}
+	return menuIds, nil
 }

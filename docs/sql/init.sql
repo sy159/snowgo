@@ -76,13 +76,14 @@ CREATE TABLE `role_menu` (
 
 
 # 插入测试数据
-INSERT INTO user` (username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Shi Xiaoming', '18743585769', '史晓明', 'Kf370RG71fxIUc65iWGFqcRHOs2KHAoZSa96tONX6ECZEulPx8gR4Zzjgy8a', 'Active', 0);
-INSERT INTO user` (username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Lin Yuning', '13446431795', '林宇宁', 'jEwRzhscClfH7V2HBCGpzzrjewgrHWhyadJA9WYjUaUOTySpIR7EehPKNoN2', 'Active', 0);
-INSERT INTO user` (username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Sun Zitao', '18789318732', '孙子韬', 'BXLgZlxBl8vmd5M3Q77b2XyBNzM0cL6zYmXoK2Hy3Y5k3Jp3QsLbV3iOx3Oy', 'Active', 0);
-INSERT INTO user` (username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Gao Yuning', '18746990809', '高宇宁', 'rbbD5MmtNiVTDogHINdc2ZxDCu6Z3d8AYJpnIzr399bAQaaO7IQFJvco7tEp', 'Active', 0);
-INSERT INTO user` (username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Xie Xiaoming', '18782947844', '谢晓明', 'bzemi5P51EPE7KgQjOobsr1I6NDB6Jl9bYKQDzD6eOEq5rtoeKkvY0RZ7JUc', 'Active', 0);
-INSERT INTO user` (username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Duan Yuning', '13421587433', '段宇宁', 'O1pFZfTbY2VGlYS9TnTvrdbuBliopgWNUvPV49g4tImsTkLfrdo9HuEaycFA', 'Active', 0);
-INSERT INTO user` (username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Qian Xiaoming', '13447114679', '钱晓明', 'Mo46wlfxmDkn0pA77SfO7GCoXElPj1tQlsAjpt6qPU4hy5kKMMBVO83ABZVC', 'Active', 0);
-INSERT INTO user` (username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Kong Lu', '13496749646', '孔璐', 'gx0ocyRdQo47TCjGguQl6EaWP8a7XcAtS5m5LHHi5UZ6gfYIlvM8NqjIG6Up', 'Active', 0);
-INSERT INTO user` (username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Wu Zhennan', '18794888670', '武震南', '43PA1LvbzkXitvS7hsd93hvsACKwXlixOJTTrjefLLfi00FRIcWe4QzeEf13', 'Active', 0);
-INSERT INTO user` (username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ( 'Hao Zhiyuan', '18726051605', '郝致远', 'PUNVZbDpolL9Wx0h8hLkK0h9qUQcCmABzNK2sD4zIrGD06QxkZtZebRVucXD', 'Active', 0);
+INSERT INTO `user` (`username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Shi Xiaoming', '18743585769', '史晓明', 'Kf370RG71fxIUc65iWGFqcRHOs2KHAoZSa96tONX6ECZEulPx8gR4Zzjgy8a', 'Active', 0);
+INSERT INTO `user` (`username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Lin Yuning', '13446431795', '林宇宁', 'jEwRzhscClfH7V2HBCGpzzrjewgrHWhyadJA9WYjUaUOTySpIR7EehPKNoN2', 'Active', 0);
+INSERT INTO `user` (`username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Sun Zitao', '18789318732', '孙子韬', 'BXLgZlxBl8vmd5M3Q77b2XyBNzM0cL6zYmXoK2Hy3Y5k3Jp3QsLbV3iOx3Oy', 'Active', 0);
+INSERT INTO `user` (`username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Gao Yuning', '18746990809', '高宇宁', 'rbbD5MmtNiVTDogHINdc2ZxDCu6Z3d8AYJpnIzr399bAQaaO7IQFJvco7tEp', 'Active', 0);
+INSERT INTO `user` (`username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Xie Xiaoming', '18782947844', '谢晓明', 'bzemi5P51EPE7KgQjOobsr1I6NDB6Jl9bYKQDzD6eOEq5rtoeKkvY0RZ7JUc', 'Active', 0);
+INSERT INTO `user` (`username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Duan Yuning', '13421587433', '段宇宁', 'O1pFZfTbY2VGlYS9TnTvrdbuBliopgWNUvPV49g4tImsTkLfrdo9HuEaycFA', 'Active', 0);
+INSERT INTO `user` (`username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Qian Xiaoming', '13447114679', '钱晓明', 'Mo46wlfxmDkn0pA77SfO7GCoXElPj1tQlsAjpt6qPU4hy5kKMMBVO83ABZVC', 'Active', 0);
+INSERT INTO `user` (`username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Kong Lu', '13496749646', '孔璐', 'gx0ocyRdQo47TCjGguQl6EaWP8a7XcAtS5m5LHHi5UZ6gfYIlvM8NqjIG6Up', 'Active', 0);
+INSERT INTO `user` (`username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ('Wu Zhennan', '18794888670', '武震南', '43PA1LvbzkXitvS7hsd93hvsACKwXlixOJTTrjefLLfi00FRIcWe4QzeEf13', 'Active', 0);
+INSERT INTO `user` (`username`, `tel`, `nickname`, `password`, `status`, `is_deleted`) VALUES ( 'Hao Zhiyuan', '18726051605', '郝致远', 'PUNVZbDpolL9Wx0h8hLkK0h9qUQcCmABzNK2sD4zIrGD06QxkZtZebRVucXD', 'Active', 0);
+

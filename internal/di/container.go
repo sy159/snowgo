@@ -29,6 +29,7 @@ type Container struct {
 type AccountContainer struct {
 	UserService *accountService.UserService
 	MenuService *accountService.MenuService
+	RoleService *accountService.RoleService
 }
 
 // BuildJwtManager 构建jwt操作
@@ -84,10 +85,12 @@ func NewContainer(jwtConfig config.JwtConfig, rdb *redis.Client, db *gorm.DB, db
 	// 构造Dao
 	userDao := accountDao.NewUserDao(repository)
 	menuDao := accountDao.NewMenuDao(repository)
+	roleDao := accountDao.NewRoleDao(repository)
 
 	// 构造Service依赖
 	userService := accountService.NewUserService(repository, userDao, redisCache)
 	menuService := accountService.NewMenuService(repository, redisCache, menuDao)
+	roleService := accountService.NewRoleService(repository, roleDao, redisCache)
 
 	return &Container{
 		Cache:      redisCache,
@@ -96,6 +99,7 @@ func NewContainer(jwtConfig config.JwtConfig, rdb *redis.Client, db *gorm.DB, db
 		AccountContainer: AccountContainer{
 			UserService: userService,
 			MenuService: menuService,
+			RoleService: roleService,
 		},
 	}
 }
