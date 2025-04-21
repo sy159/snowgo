@@ -53,7 +53,7 @@ func loadRouter(router *gin.Engine) {
 
 	rootRouters(apiGroup) // 根目录下路由
 	options := []option{  // 根据不同分组注册路由
-		userRouters, // 用户相关路由
+		accountRouters, // 用户相关路由
 	}
 
 	// 注册其他分组下的路由

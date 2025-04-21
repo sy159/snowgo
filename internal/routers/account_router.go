@@ -7,10 +7,10 @@ import (
 )
 
 // 用户相关路由
-func userRouters(r *gin.RouterGroup) {
-	userGroup := r.Group("/account")
+func accountRouters(r *gin.RouterGroup) {
+	accountGroup := r.Group("/account")
 
-	adminGroup := userGroup.Group("/admin")
+	adminGroup := accountGroup.Group("/admin")
 	{
 		// 用户
 		adminGroup.GET("/user", GetUserList)

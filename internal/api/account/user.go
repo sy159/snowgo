@@ -7,7 +7,6 @@ import (
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
-	"strconv"
 )
 
 type UserInfo struct {
@@ -56,18 +55,20 @@ func CreateUser(c *gin.Context) {
 
 // GetUserInfo 用户信息
 func GetUserInfo(c *gin.Context) {
-	userIdStr := c.Query("id")
-	userId, err := strconv.Atoi(userIdStr)
-	if err != nil {
-		xresponse.FailByError(c, e.HttpBadRequest)
+	var param struct {
+		ID int32 `json:"id" binding:"required"`
+	}
+	if err := c.ShouldBindQuery(&param); err != nil {
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	xlogger.Infof("get user info by id: %v", userId)
+
+	xlogger.Infof("get user info by id: %v", param.ID)
 	container := di.GetContainer(c)
-	user, err := container.UserService.GetUserById(c, int32(userId))
+	user, err := container.UserService.GetUserById(c, param.ID)
 	if err != nil {
 		xlogger.Errorf("get user info is err: %+v", err)
-		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.UserNotFound)
 		return
 	}
 	xresponse.Success(c, &UserInfo{
