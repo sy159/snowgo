@@ -9,7 +9,7 @@ import (
 	"snowgo/pkg/xresponse"
 )
 
-type UserInfo struct {
+type UserListInfo struct {
 	ID        int32  `json:"id"`
 	Username  string `json:"username"`
 	Tel       string `json:"tel"`
@@ -19,14 +19,27 @@ type UserInfo struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
+type UserInfo struct {
+	ID        int32  `json:"id"`
+	Username  string `json:"username"`
+	Tel       string `json:"tel"`
+	Nickname  string `json:"nickname"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+	RoleId    int32
+	RoleName  string
+	RoleCode  string
+}
+
 type UserList struct {
-	List  []*UserInfo `json:"list"`
-	Total int64       `json:"total"`
+	List  []*UserListInfo `json:"list"`
+	Total int64           `json:"total"`
 }
 
 // CreateUser 创建用户
 func CreateUser(c *gin.Context) {
-	var user account.User
+	var user account.UserParam
 	if err := c.ShouldBindJSON(&user); err != nil {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
@@ -56,7 +69,7 @@ func CreateUser(c *gin.Context) {
 // GetUserInfo 用户信息
 func GetUserInfo(c *gin.Context) {
 	var param struct {
-		ID int32 `json:"id" binding:"required"`
+		ID int32 `json:"id" binding:"required" uri:"id" form:"id"`
 	}
 	if err := c.ShouldBindQuery(&param); err != nil {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
@@ -79,6 +92,9 @@ func GetUserInfo(c *gin.Context) {
 		Status:    user.Status,
 		CreatedAt: user.CreatedAt.Format("2006-01-02 15:04:05.000"),
 		UpdatedAt: user.UpdatedAt.Format("2006-01-02 15:04:05.000"),
+		RoleId:    user.RoleId,
+		RoleName:  user.RoleName,
+		RoleCode:  user.RoleCode,
 	})
 }
 
@@ -108,9 +124,9 @@ func GetUserList(c *gin.Context) {
 		xresponse.FailByError(c, e.HttpInternalServerError)
 		return
 	}
-	userList := make([]*UserInfo, 0, len(res.List))
+	userList := make([]*UserListInfo, 0, len(res.List))
 	for _, user := range res.List {
-		userList = append(userList, &UserInfo{
+		userList = append(userList, &UserListInfo{
 			ID:        user.ID,
 			Username:  user.Username,
 			Tel:       user.Tel,

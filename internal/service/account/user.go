@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"snowgo/internal/constants"
 	"snowgo/internal/dal/model"
+	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
 	"snowgo/internal/dao/account"
 	"snowgo/pkg/xcache"
@@ -17,6 +18,11 @@ import (
 // UserRepo 定义User相关db操作接口
 type UserRepo interface {
 	CreateUser(ctx context.Context, user *model.User) (*model.User, error)
+	TransactionCreateUser(ctx context.Context, tx *query.Query, user *model.User) (*model.User, error)
+	TransactionCreateUserRole(ctx context.Context, tx *query.Query, userRole *model.UserRole) error
+	TransactionDeleteUserRole(ctx context.Context, tx *query.Query, userId int32) error
+	TransactionDeleteById(ctx context.Context, tx *query.Query, userId int32) error
+	GetRoleByUserId(ctx context.Context, userId int32) (*account.UserRoleInfo, error)
 	IsNameTelDuplicate(ctx context.Context, username, tel string, userId int32) (bool, error)
 	GetUserById(ctx context.Context, userId int32) (*model.User, error)
 	GetUserList(ctx context.Context, condition *account.UserListCondition) ([]*model.User, int64, error)
@@ -37,11 +43,12 @@ func NewUserService(db *repo.Repository, userDao UserRepo, cache xcache.Cache) *
 	}
 }
 
-type User struct {
+type UserParam struct {
 	Username string `json:"username" binding:"required,max=64"`
 	Password string `json:"password"`
 	Tel      string `json:"tel" binding:"required"`
 	Nickname string `json:"nickname"`
+	RoleId   int32  `json:"role_id"`
 }
 
 type UserInfo struct {
@@ -50,6 +57,9 @@ type UserInfo struct {
 	Tel       string
 	Nickname  string
 	Status    string
+	RoleId    int32
+	RoleName  string
+	RoleCode  string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -70,9 +80,9 @@ type UserListCondition struct {
 }
 
 // CreateUser 创建用户
-func (u *UserService) CreateUser(ctx context.Context, user *User) (int32, error) {
+func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int32, error) {
 	// 检查用户名，或者电话是否存在
-	isDuplicate, err := u.userDao.IsNameTelDuplicate(ctx, user.Username, user.Tel, 0)
+	isDuplicate, err := u.userDao.IsNameTelDuplicate(ctx, userParam.Username, userParam.Tel, 0)
 	if err != nil {
 		xlogger.Errorf("查询用户名或电话是否存在异常: %v", err)
 		return 0, errors.WithMessage(err, "查询用户名或电话是否存在异常")
@@ -81,23 +91,43 @@ func (u *UserService) CreateUser(ctx context.Context, user *User) (int32, error)
 		return 0, errors.New(e.UserNameTelExistError.GetErrMsg())
 	}
 	// 创建用户
-	pwd, err := xcryption.HashPassword(user.Password)
+	pwd, err := xcryption.HashPassword(userParam.Password)
 	if err != nil {
 		xlogger.Errorf("密码加密异常: %v", err)
 		return 0, errors.WithMessage(err, "密码加密异常")
 	}
 	activeStatus := constants.UserStatusActive
-	userObj, err := u.userDao.CreateUser(ctx, &model.User{
-		Username:  user.Username,
-		Password:  pwd,
-		Tel:       user.Tel,
-		Nickname:  &user.Nickname,
-		Status:    &activeStatus,
-		IsDeleted: false,
+	var userObj *model.User
+	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 创建用户
+		userObj, err = u.userDao.CreateUser(ctx, &model.User{
+			Username:  userParam.Username,
+			Password:  pwd,
+			Tel:       userParam.Tel,
+			Nickname:  &userParam.Nickname,
+			Status:    &activeStatus,
+			IsDeleted: false,
+		})
+		if err != nil {
+			xlogger.Errorf("用户创建失败: %+v err: %v", userParam, err)
+			return errors.WithMessage(err, "用户创建失败")
+		}
+
+		// 创建用户-role关联
+		err = u.userDao.TransactionCreateUserRole(ctx, tx, &model.UserRole{
+			UserID: userObj.ID,
+			RoleID: userParam.RoleId,
+		})
+		if err != nil {
+			xlogger.Errorf("用户与角色关联关系创建失败: %+v err: %v", userParam, err)
+			return errors.WithMessage(err, "用户与角色关联关系创建失败")
+		}
+
+		return nil
 	})
+
 	if err != nil {
-		xlogger.Errorf("用户创建失败: %+v err: %v", user, err)
-		return 0, errors.WithMessage(err, "用户创建失败")
+		return 0, err
 	}
 	return userObj.ID, nil
 }
@@ -112,12 +142,21 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 		xlogger.Infof("获取用户(%d)信息异常: %v", userId, err)
 		return nil, errors.WithMessage(err, "用户信息查询失败")
 	}
+
+	// 查询角色信息
+	rule, err := u.userDao.GetRoleByUserId(ctx, userId)
+	if err != nil {
+		return nil, errors.WithMessage(err, "用户角色信息查询失败")
+	}
 	return &UserInfo{
 		ID:        user.ID,
 		Username:  user.Username,
 		Tel:       user.Tel,
 		Nickname:  *user.Nickname,
 		Status:    *user.Status,
+		RoleId:    rule.RoleId,
+		RoleCode:  rule.RoleCode,
+		RoleName:  rule.RoleName,
 		CreatedAt: *user.CreatedAt,
 		UpdatedAt: *user.UpdatedAt,
 	}, nil
@@ -158,10 +197,22 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 	if userId <= 0 {
 		return errors.New(e.UserNotFound.GetErrMsg())
 	}
-	err := u.userDao.DeleteById(ctx, userId)
-	if err != nil {
-		xlogger.Infof("用户删除异常: %v", err)
-		return errors.WithMessage(err, "用户删除异常")
-	}
-	return nil
+	err := u.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 删除用户
+		err := u.userDao.TransactionDeleteById(ctx, tx, userId)
+		if err != nil {
+			xlogger.Infof("用户删除异常: %v", err)
+			return errors.WithMessage(err, "用户删除异常")
+		}
+
+		// 删除用户-角色关联关系
+		err = u.userDao.TransactionDeleteUserRole(ctx, tx, userId)
+		if err != nil {
+			xlogger.Errorf("用户与角色关联关系删除失败: %v", err)
+			return errors.WithMessage(err, "用户与角色关联关系删除失败")
+		}
+		return nil
+	})
+
+	return err
 }

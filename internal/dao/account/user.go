@@ -6,6 +6,7 @@ import (
 	"gorm.io/gen"
 	"gorm.io/gorm"
 	"snowgo/internal/dal/model"
+	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
 )
 
@@ -30,6 +31,13 @@ type UserListCondition struct {
 	Limit    int32   `json:"limit"`
 }
 
+type UserRoleInfo struct {
+	UserId   int32  `json:"user_id"`
+	RoleId   int32  `json:"role_id"`
+	RoleName string `json:"role_name"`
+	RoleCode string `json:"role_code"`
+}
+
 // CreateUser 创建用户
 func (u *UserDao) CreateUser(ctx context.Context, user *model.User) (*model.User, error) {
 	err := u.repo.Query().WithContext(ctx).User.Create(user)
@@ -39,17 +47,73 @@ func (u *UserDao) CreateUser(ctx context.Context, user *model.User) (*model.User
 	return user, nil
 }
 
+// TransactionCreateUser 创建用户
+func (u *UserDao) TransactionCreateUser(ctx context.Context, tx *query.Query, user *model.User) (*model.User, error) {
+	err := tx.WithContext(ctx).User.Create(user)
+	if err != nil {
+		return nil, errors.WithMessage(err, "用户创建失败")
+	}
+	return user, nil
+}
+
+// TransactionCreateUserRole 创建用户-rule关联
+func (u *UserDao) TransactionCreateUserRole(ctx context.Context, tx *query.Query, userRole *model.UserRole) error {
+	err := tx.WithContext(ctx).UserRole.Create(userRole)
+	if err != nil {
+		return errors.WithMessage(err, "用户与角色关联关系创建失败")
+	}
+	return nil
+}
+
+// TransactionDeleteUserRole 删除用户与角色关联关系
+func (u *UserDao) TransactionDeleteUserRole(ctx context.Context, tx *query.Query, userId int32) error {
+	_, err := tx.WithContext(ctx).UserRole.Where(tx.UserRole.UserID.Eq(userId)).Delete()
+	if err != nil {
+		return errors.WithMessage(err, "用户与角色关联关系删除失败")
+	}
+	return nil
+}
+
+// TransactionDeleteById 删除用户
+func (u *UserDao) TransactionDeleteById(ctx context.Context, tx *query.Query, userId int32) error {
+	if userId <= 0 {
+		return errors.New("用户id不存在")
+	}
+	_, err := tx.User.WithContext(ctx).Where(tx.User.ID.Eq(userId)).UpdateSimple(tx.User.IsDeleted.Value(true))
+	if err != nil {
+		return errors.WithMessage(err, "用户删除异常")
+	}
+	return nil
+}
+
+func (u *UserDao) GetRoleByUserId(ctx context.Context, userId int32) (*UserRoleInfo, error) {
+	if userId <= 0 {
+		return nil, errors.New("用户id不存在")
+	}
+	m := u.repo.Query().UserRole
+	role := u.repo.Query().Role
+
+	var userRoleInfo *UserRoleInfo
+	err := m.WithContext(ctx).
+		Where(m.UserID.Eq(userId)).
+		LeftJoin(role, m.RoleID.EqCol(role.ID)).
+		Select(m.UserID, m.RoleID, role.Name.As("role_name"), role.Code.As("role_code")).
+		Limit(1).
+		Scan(&userRoleInfo)
+	return userRoleInfo, err
+}
+
 // IsNameTelDuplicate 用户名或者电话是否存在了,如果有用户id应该排除
 func (u *UserDao) IsNameTelDuplicate(ctx context.Context, username, tel string, userId int32) (bool, error) {
 	m := u.repo.Query().User
-	query := m.WithContext(ctx).
+	userQuery := m.WithContext(ctx).
 		Select(m.ID).
 		Where(m.IsDeleted.Is(false)).
 		Where(m.WithContext(ctx).Or(m.Username.Eq(username)).Or(m.Tel.Eq(tel)))
 	if userId > 0 {
-		query = query.Where(m.ID.Neq(userId))
+		userQuery = userQuery.Where(m.ID.Neq(userId))
 	}
-	_, err := query.First()
+	_, err := userQuery.First()
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
