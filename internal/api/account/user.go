@@ -69,7 +69,7 @@ func CreateUser(c *gin.Context) {
 // GetUserInfo 用户信息
 func GetUserInfo(c *gin.Context) {
 	var param struct {
-		ID int32 `json:"id" binding:"required" uri:"id" form:"id"`
+		ID int32 `json:"id" uri:"id" form:"id" binding:"required"`
 	}
 	if err := c.ShouldBindQuery(&param); err != nil {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())

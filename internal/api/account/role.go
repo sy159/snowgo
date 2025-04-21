@@ -50,7 +50,7 @@ func UpdateRole(c *gin.Context) {
 // DeleteRole 删除角色
 func DeleteRole(c *gin.Context) {
 	var param struct {
-		ID int32 `json:"id" binding:"required"`
+		ID int32 `json:"id" uri:"id" form:"id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&param); err != nil {
 		xresponse.FailByError(c, e.HttpBadRequest)
@@ -100,7 +100,7 @@ func GetRoleList(c *gin.Context) {
 // GetRoleById 获取角色详情（带菜单权限）
 func GetRoleById(c *gin.Context) {
 	var param struct {
-		ID int32 `form:"id" binding:"required"`
+		ID int32 `json:"id" uri:"id" form:"id" binding:"required"`
 	}
 	if err := c.ShouldBindQuery(&param); err != nil {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
