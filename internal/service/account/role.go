@@ -97,7 +97,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 			return 0, errors.WithMessage(err, "校验设置的菜单失败")
 		}
 		if menuLen != int64(len(param.MenuIds)) {
-			return 0, errors.WithMessage(err, "设置的菜单不存在")
+			return 0, errors.New("设置的菜单不存在")
 		}
 	}
 
@@ -174,7 +174,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 			return errors.WithMessage(err, "校验设置的菜单失败")
 		}
 		if menuLen != int64(len(param.MenuIds)) {
-			return errors.WithMessage(err, "设置的菜单不存在")
+			return errors.New("设置的菜单不存在")
 		}
 	}
 
