@@ -25,6 +25,7 @@ type RoleRepo interface {
 	TransactionCreateRoleMenu(ctx context.Context, tx *query.Query, roleMenuList []*model.RoleMenu) error
 	TransactionDeleteRoleMenu(ctx context.Context, tx *query.Query, roleId int32) error
 	TransactionDeleteById(ctx context.Context, tx *query.Query, roleId int32) error
+	IsUsedUserByIds(ctx context.Context, userId int32) (bool, error)
 	CountMenuByIds(ctx context.Context, ids []int32) (int64, error)
 	GetMenuIdsByRoleId(ctx context.Context, roleId int32) ([]int32, error)
 }
@@ -232,7 +233,16 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 		return errors.New("角色ID无效")
 	}
 
-	err := s.db.WriteQuery().Transaction(func(tx *query.Query) error {
+	// 如果用户使用了角色，不能删除
+	isUsed, err := s.roleDao.IsUsedUserByIds(ctx, id)
+	if err != nil {
+		return errors.WithMessage(err, "")
+	}
+	if isUsed {
+		return errors.New("该角色已被使用，无法删除")
+	}
+
+	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 删除角色
 		err := s.roleDao.TransactionDeleteById(ctx, tx, id)
 		if err != nil {

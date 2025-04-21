@@ -189,6 +189,19 @@ func (r *RoleDao) TransactionDeleteById(ctx context.Context, tx *query.Query, ro
 	return nil
 }
 
+// IsUsedUserByIds 判断角色是否被使用过
+func (r *RoleDao) IsUsedUserByIds(ctx context.Context, roleId int32) (bool, error) {
+	m := r.repo.Query().UserRole
+	_, err := m.WithContext(ctx).Select(m.ID).Where(m.RoleID.Eq(roleId)).First()
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return true, errors.WithStack(err)
+	}
+	return true, nil
+}
+
 // CountMenuByIds 根据菜单ids，获取数量
 func (r *RoleDao) CountMenuByIds(ctx context.Context, ids []int32) (int64, error) {
 	m := r.repo.Query().Menu
