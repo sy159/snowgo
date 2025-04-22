@@ -19,6 +19,7 @@ import (
 type UserRepo interface {
 	CreateUser(ctx context.Context, user *model.User) (*model.User, error)
 	TransactionCreateUser(ctx context.Context, tx *query.Query, user *model.User) (*model.User, error)
+	TransactionUpdateUser(ctx context.Context, tx *query.Query, userId int32, username, tel, nickname string) error
 	TransactionCreateUserRole(ctx context.Context, tx *query.Query, userRole *model.UserRole) error
 	TransactionDeleteUserRole(ctx context.Context, tx *query.Query, userId int32) error
 	TransactionDeleteById(ctx context.Context, tx *query.Query, userId int32) error
@@ -46,6 +47,7 @@ func NewUserService(db *repo.Repository, userDao UserRepo, cache xcache.Cache) *
 }
 
 type UserParam struct {
+	ID       int32  `json:"id"`
 	Username string `json:"username" binding:"required,max=64"`
 	Password string `json:"password"`
 	Tel      string `json:"tel" binding:"required"`
@@ -115,7 +117,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 	var userObj *model.User
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 创建用户
-		userObj, err = u.userDao.CreateUser(ctx, &model.User{
+		userObj, err = u.userDao.TransactionCreateUser(ctx, tx, &model.User{
 			Username:  userParam.Username,
 			Password:  pwd,
 			Tel:       userParam.Tel,
@@ -147,6 +149,76 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		return 0, err
 	}
 	return userObj.ID, nil
+}
+
+// UpdateUser 更新用户
+func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int32, error) {
+	if userParam.ID <= 0 {
+		return 0, errors.New(e.UserNotFound.GetErrMsg())
+	}
+	// 获取用户信息
+	_, err := u.userDao.GetUserById(ctx, userParam.ID)
+	if err != nil {
+		xlogger.Infof("获取用户(%d)信息异常: %v", userParam.ID, err)
+		return 0, errors.WithMessage(err, "用户信息查询失败")
+	}
+
+	// 检查用户名，或者电话是否存在
+	isDuplicate, err := u.userDao.IsNameTelDuplicate(ctx, userParam.Username, userParam.Tel, userParam.ID)
+	if err != nil {
+		xlogger.Errorf("查询用户名或电话是否存在异常: %v", err)
+		return 0, errors.WithMessage(err, "查询用户名或电话是否存在异常")
+	}
+	if isDuplicate {
+		return 0, errors.New(e.UserNameTelExistError.GetErrMsg())
+	}
+
+	// 检查设置的角色id是否存在
+	if userParam.RoleId > 0 {
+		isExist, err := u.userDao.IsExistByRoleId(ctx, userParam.RoleId)
+		if err != nil {
+			xlogger.Errorf("查询角色id存在异常: %v", err)
+			return 0, errors.WithMessage(err, "查询角色id存在异常")
+		}
+		if !isExist {
+			return 0, errors.New("设置的角色不存在")
+		}
+	}
+
+	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 更新用户
+		err = u.userDao.TransactionUpdateUser(ctx, tx, userParam.ID, userParam.Username, userParam.Tel, userParam.Nickname)
+		if err != nil {
+			xlogger.Errorf("用户更新失败: %+v err: %v", userParam, err)
+			return errors.WithMessage(err, "用户更新失败")
+		}
+
+		// 删除用户关联角色
+		err = u.userDao.TransactionDeleteUserRole(ctx, tx, userParam.ID)
+		if err != nil {
+			xlogger.Errorf("用户与角色关联关系删除失败: %v", err)
+			return errors.WithMessage(err, "用户与角色关联关系删除失败")
+		}
+
+		// 创建用户-role关联, 设置roleId才去创建
+		if userParam.RoleId > 0 {
+			err = u.userDao.TransactionCreateUserRole(ctx, tx, &model.UserRole{
+				UserID: userParam.ID,
+				RoleID: userParam.RoleId,
+			})
+			if err != nil {
+				xlogger.Errorf("用户与角色关联关系创建失败: %+v err: %v", userParam, err)
+				return errors.WithMessage(err, "用户与角色关联关系创建失败")
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return userParam.ID, nil
 }
 
 // GetUserById 根据id获取用户信息

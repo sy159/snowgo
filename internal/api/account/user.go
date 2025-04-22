@@ -66,6 +66,29 @@ func CreateUser(c *gin.Context) {
 	xresponse.Success(c, &gin.H{"id": userId})
 }
 
+// UpdateUser 更新用户
+func UpdateUser(c *gin.Context) {
+	var user account.UserParam
+	if err := c.ShouldBindJSON(&user); err != nil {
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
+		return
+	}
+	xlogger.Infof("update user: %+v", user)
+
+	container := di.GetContainer(c)
+	userId, err := container.UserService.UpdateUser(c, &user)
+	if err != nil {
+		if err.Error() == e.UserNameTelExistError.GetErrMsg() {
+			xresponse.FailByError(c, e.UserNameTelExistError)
+			return
+		}
+		xlogger.Errorf("update user info is err: %+v", err)
+		xresponse.FailByError(c, e.UserUpdateError)
+		return
+	}
+	xresponse.Success(c, &gin.H{"id": userId})
+}
+
 // GetUserInfo 用户信息
 func GetUserInfo(c *gin.Context) {
 	var param struct {

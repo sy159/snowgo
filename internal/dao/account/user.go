@@ -56,6 +56,19 @@ func (u *UserDao) TransactionCreateUser(ctx context.Context, tx *query.Query, us
 	return user, nil
 }
 
+// TransactionUpdateUser 更新用户
+func (u *UserDao) TransactionUpdateUser(ctx context.Context, tx *query.Query, userId int32, username, tel, nickname string) error {
+	_, err := tx.WithContext(ctx).User.Where(tx.User.ID.Eq(userId)).UpdateSimple(
+		tx.User.Username.Value(username),
+		tx.User.Tel.Value(tel),
+		tx.User.Nickname.Value(nickname),
+	)
+	if err != nil {
+		return errors.WithMessage(err, "用户更新失败")
+	}
+	return nil
+}
+
 // TransactionCreateUserRole 创建用户-rule关联
 func (u *UserDao) TransactionCreateUserRole(ctx context.Context, tx *query.Query, userRole *model.UserRole) error {
 	err := tx.WithContext(ctx).UserRole.Create(userRole)

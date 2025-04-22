@@ -49,8 +49,9 @@ var (
 var (
 	UserNotFound          = NewCode(10301, "用户不存在")
 	UserCreateError       = NewCode(10302, "用户创建失败")
-	UserNameTelEmptyError = NewCode(10303, "用户名或电话不能为空")
-	UserNameTelExistError = NewCode(10304, "用户名或电话已存在")
+	UserUpdateError       = NewCode(10303, "用户更新失败")
+	UserNameTelEmptyError = NewCode(10304, "用户名或电话不能为空")
+	UserNameTelExistError = NewCode(10305, "用户名或电话已存在")
 
 	MenuNotFound    = NewCode(10401, "菜单不存在")
 	MenuCreateError = NewCode(10402, "菜单创建失败")
