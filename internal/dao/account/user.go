@@ -123,6 +123,22 @@ func (u *UserDao) IsNameTelDuplicate(ctx context.Context, username, tel string, 
 	return true, nil
 }
 
+// IsExistByRoleId roleId是否存在
+func (u *UserDao) IsExistByRoleId(ctx context.Context, roleId int32) (bool, error) {
+	if roleId < 0 {
+		return true, errors.New("角色不存在")
+	}
+	m := u.repo.Query().Role
+	_, err := m.WithContext(ctx).Select(m.ID).Where(m.ID.Eq(roleId)).First()
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return true, errors.WithStack(err)
+	}
+	return true, nil
+}
+
 // GetUserById 查询用户by id
 func (u *UserDao) GetUserById(ctx context.Context, userId int32) (*model.User, error) {
 	if userId <= 0 {

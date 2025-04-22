@@ -24,6 +24,7 @@ type UserRepo interface {
 	TransactionDeleteById(ctx context.Context, tx *query.Query, userId int32) error
 	GetRoleByUserId(ctx context.Context, userId int32) (*account.UserRoleInfo, error)
 	IsNameTelDuplicate(ctx context.Context, username, tel string, userId int32) (bool, error)
+	IsExistByRoleId(ctx context.Context, roleId int32) (bool, error)
 	GetUserById(ctx context.Context, userId int32) (*model.User, error)
 	GetUserList(ctx context.Context, condition *account.UserListCondition) ([]*model.User, int64, error)
 	DeleteById(ctx context.Context, userId int32) error
@@ -90,7 +91,20 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 	if isDuplicate {
 		return 0, errors.New(e.UserNameTelExistError.GetErrMsg())
 	}
-	// 创建用户
+
+	// 检查设置的角色id是否存在
+	if userParam.RoleId > 0 {
+		isExist, err := u.userDao.IsExistByRoleId(ctx, userParam.RoleId)
+		if err != nil {
+			xlogger.Errorf("查询角色id存在异常: %v", err)
+			return 0, errors.WithMessage(err, "查询角色id存在异常")
+		}
+		if !isExist {
+			return 0, errors.New("设置的角色不存在")
+		}
+	}
+
+	// 加密密码
 	pwd, err := xcryption.HashPassword(userParam.Password)
 	if err != nil {
 		xlogger.Errorf("密码加密异常: %v", err)
@@ -113,14 +127,16 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 			return errors.WithMessage(err, "用户创建失败")
 		}
 
-		// 创建用户-role关联
-		err = u.userDao.TransactionCreateUserRole(ctx, tx, &model.UserRole{
-			UserID: userObj.ID,
-			RoleID: userParam.RoleId,
-		})
-		if err != nil {
-			xlogger.Errorf("用户与角色关联关系创建失败: %+v err: %v", userParam, err)
-			return errors.WithMessage(err, "用户与角色关联关系创建失败")
+		// 创建用户-role关联, 设置roleId才去创建
+		if userParam.RoleId > 0 {
+			err = u.userDao.TransactionCreateUserRole(ctx, tx, &model.UserRole{
+				UserID: userObj.ID,
+				RoleID: userParam.RoleId,
+			})
+			if err != nil {
+				xlogger.Errorf("用户与角色关联关系创建失败: %+v err: %v", userParam, err)
+				return errors.WithMessage(err, "用户与角色关联关系创建失败")
+			}
 		}
 
 		return nil
