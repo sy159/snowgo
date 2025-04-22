@@ -31,4 +31,10 @@ func accountRouters(r *gin.RouterGroup) {
 		adminGroup.PUT("/role", UpdateRole)
 		adminGroup.DELETE("/role", DeleteRole)
 	}
+
+	authGroup := accountGroup.Group("/auth")
+	{
+		authGroup.POST("/login", Login)
+		authGroup.POST("/refresh-token", RefreshToken)
+	}
 }

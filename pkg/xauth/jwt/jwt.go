@@ -119,7 +119,7 @@ func (m *Manager) ParseToken(tokenStr string) (*Claims, error) {
 }
 
 // RefreshTokens 用 refresh token 刷新令牌对
-func (m *Manager) RefreshTokens(refreshToken string) (newRefreshToken, accessToken string, err error) {
+func (m *Manager) RefreshTokens(refreshToken string) (accessToken, newRefreshToken string, err error) {
 	claims, err := m.ParseToken(refreshToken)
 	if err != nil {
 		return "", "", errors.Wrap(err, "Parse Refresh Token error")
@@ -130,7 +130,7 @@ func (m *Manager) RefreshTokens(refreshToken string) (newRefreshToken, accessTok
 		return "", "", ErrTokenExpired
 	}
 	// 检查令牌类型是否为 refresh
-	if claims.IsRefreshToken() {
+	if !claims.IsRefreshToken() {
 		return "", "", ErrInvalidTokenType
 	}
 
@@ -144,7 +144,7 @@ func (m *Manager) RefreshTokens(refreshToken string) (newRefreshToken, accessTok
 	if err != nil {
 		return "", "", errors.Wrap(err, "Generate Access Token error")
 	}
-	return newRefreshToken, accessToken, nil
+	return accessToken, newRefreshToken, nil
 }
 
 // IsAccessToken 判断是否是 access token

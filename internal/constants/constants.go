@@ -6,7 +6,8 @@ const (
 
 // CacheMenuTree 缓存相关key
 const (
-	CacheMenuTree = "account:menu_data"
+	CacheMenuTree         = "account:menu_data"
+	CacheRefreshJtiPrefix = "jwt:refresh:jti:"
 )
 
 // 用户相关

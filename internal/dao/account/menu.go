@@ -3,7 +3,6 @@ package account
 import (
 	"context"
 	"github.com/pkg/errors"
-	"gorm.io/gorm"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/repo"
 )
@@ -20,7 +19,7 @@ func NewMenuDao(repo *repo.Repository) *MenuDao {
 func (d *MenuDao) CreateMenu(ctx context.Context, menu *model.Menu) (*model.Menu, error) {
 	err := d.repo.Query().WithContext(ctx).Menu.Create(menu)
 	if err != nil {
-		return nil, errors.WithMessage(err, "菜单创建失败")
+		return nil, errors.WithStack(err)
 	}
 	return menu, nil
 }
@@ -35,7 +34,7 @@ func (d *MenuDao) UpdateMenu(ctx context.Context, menu *model.Menu) (*model.Menu
 		Where(m.ID.Eq(menu.ID)).
 		Save(menu)
 	if err != nil {
-		return nil, errors.WithMessage(err, "菜单更新失败")
+		return nil, errors.WithStack(err)
 	}
 	return menu, nil
 }
@@ -50,7 +49,7 @@ func (d *MenuDao) DeleteById(ctx context.Context, id int32) error {
 		Where(m.ID.Eq(id)).
 		Delete()
 	if err != nil {
-		return errors.WithMessage(err, "菜单删除失败")
+		return errors.WithStack(err)
 	}
 	return nil
 }
@@ -65,10 +64,7 @@ func (d *MenuDao) GetById(ctx context.Context, id int32) (*model.Menu, error) {
 		Where(m.ID.Eq(id)).
 		First()
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("菜单不存在")
-		}
-		return nil, errors.WithMessage(err, "菜单查询失败")
+		return nil, errors.WithStack(err)
 	}
 	return menu, nil
 }
@@ -78,7 +74,7 @@ func (d *MenuDao) GetByParentId(ctx context.Context, parentId int32) ([]*model.M
 	m := d.repo.Query().Menu
 	menus, err := m.WithContext(ctx).Where(m.ParentID.Eq(parentId)).Find()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return menus, nil
 }
@@ -87,7 +83,7 @@ func (d *MenuDao) GetByParentId(ctx context.Context, parentId int32) ([]*model.M
 func (d *MenuDao) GetAllMenus(ctx context.Context) ([]*model.Menu, error) {
 	menus, err := d.repo.Query().WithContext(ctx).Menu.Find()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return menus, nil
 }
@@ -100,9 +96,6 @@ func (d *MenuDao) IsUsedMenuByIds(ctx context.Context, MenuIds []int32) (bool, e
 	m := d.repo.Query().RoleMenu
 	_, err := m.WithContext(ctx).Select(m.ID).Where(m.MenuID.In(MenuIds...)).First()
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, nil
-		}
 		return true, errors.WithStack(err)
 	}
 	return true, nil

@@ -43,6 +43,7 @@ var (
 	TokenInvalid         = NewCode(10203, "token无效")
 	TokenTypeError       = NewCode(10204, "token类型必须为access")
 	TokenExpired         = NewCode(10205, "token已过期")
+	TokenError           = NewCode(10206, "token异常")
 )
 
 // account相关 103开头

@@ -27,6 +27,7 @@ type UserRepo interface {
 	IsNameTelDuplicate(ctx context.Context, username, tel string, userId int32) (bool, error)
 	IsExistByRoleId(ctx context.Context, roleId int32) (bool, error)
 	GetUserById(ctx context.Context, userId int32) (*model.User, error)
+	GetUserByUsername(ctx context.Context, username string) (*model.User, error)
 	GetUserList(ctx context.Context, condition *account.UserListCondition) ([]*model.User, int64, error)
 	DeleteById(ctx context.Context, userId int32) error
 	ResetPwdById(ctx context.Context, userId int32, password string) error
@@ -338,4 +339,32 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 		return errors.WithMessage(err, "用户信息查询失败")
 	}
 	return nil
+}
+
+// Authenticate 重置用户密码
+func (u *UserService) Authenticate(ctx context.Context, username, password string) (*UserInfo, error) {
+	if len(username) <= 0 {
+		return nil, errors.New(e.UserNotFound.GetErrMsg())
+	}
+
+	user, err := u.userDao.GetUserByUsername(ctx, username)
+	if err != nil {
+		xlogger.Infof("获取用户(%s)信息异常: %v", username, err)
+		return nil, errors.WithMessage(err, "用户信息查询失败")
+	}
+
+	// 密码加密
+	isOk := xcryption.CheckPassword(user.Password, password)
+	if !isOk {
+		return nil, errors.New(e.AuthError.GetErrMsg())
+	}
+	return &UserInfo{
+		ID:        user.ID,
+		Username:  user.Username,
+		Tel:       user.Tel,
+		Nickname:  *user.Nickname,
+		Status:    *user.Status,
+		CreatedAt: *user.CreatedAt,
+		UpdatedAt: *user.UpdatedAt,
+	}, nil
 }

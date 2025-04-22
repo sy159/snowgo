@@ -114,15 +114,15 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("refresh token with access token", func(t *testing.T) {
-		accessToken, err := jwtManager.GenerateAccessToken(userId, username)
+		refreshToken, err := jwtManager.GenerateRefreshToken(userId, username)
 		if err != nil {
 			t.Fatalf("generate access token error: %v", err)
 		}
-		accessToken, refreshToken, err := jwtManager.RefreshTokens(accessToken)
+		accessToken, newRefreshToken, err := jwtManager.RefreshTokens(refreshToken)
 		if err != nil {
 			t.Fatalf("generate refresh token error: %v", err)
 		}
-		fmt.Println(accessToken, refreshToken)
+		fmt.Println(accessToken, newRefreshToken)
 	})
 
 }
