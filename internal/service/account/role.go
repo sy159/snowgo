@@ -70,12 +70,12 @@ type RoleList struct {
 }
 
 type RoleListCondition struct {
-	Ids    []int32 `json:"ids"`
-	Name   string  `json:"name"`
-	Code   string  `json:"code"`
-	Status string  `json:"status"`
-	Offset int32   `json:"offset"`
-	Limit  int32   `json:"limit"`
+	Ids    []int32 `json:"ids" form:"ids"`
+	Name   string  `json:"name" form:"name"`
+	Code   string  `json:"code" form:"code"`
+	Status string  `json:"status" form:"status"`
+	Offset int32   `json:"offset" form:"offset"`
+	Limit  int32   `json:"limit" form:"limit"`
 }
 
 // CreateRole 创建角色
