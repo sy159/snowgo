@@ -4,6 +4,11 @@ const (
 	CONTAINER = "snowgo.internal.di.container" // 注册的container名
 )
 
+// CacheMenuTree 缓存相关key
+const (
+	CacheMenuTree = "account:menu_data"
+)
+
 // 用户相关
 const (
 	UserStatusActive   = "Active"

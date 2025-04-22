@@ -2,7 +2,9 @@ package account
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/pkg/errors"
+	"snowgo/internal/constants"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/repo"
 	"snowgo/pkg/xcache"
@@ -87,6 +89,11 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		xlogger.Errorf("创建菜单失败: %v", err)
 		return 0, err
 	}
+
+	// 清理菜单树缓存
+	if _, err := s.cache.Delete(ctx, constants.CacheMenuTree); err != nil {
+		xlogger.Errorf("清理菜单树缓存失败: %v", err)
+	}
 	return menuObj.ID, nil
 }
 
@@ -121,6 +128,11 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 	if err != nil {
 		xlogger.Errorf("更新菜单失败: %v", err)
 	}
+
+	// 清理菜单树缓存
+	if _, err := s.cache.Delete(ctx, constants.CacheMenuTree); err != nil {
+		xlogger.Errorf("清理菜单树缓存失败: %v", err)
+	}
 	return err
 }
 
@@ -148,10 +160,24 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 	if err != nil {
 		xlogger.Errorf("删除菜单失败: %v", err)
 	}
+
+	// 清理菜单树缓存
+	if _, err := s.cache.Delete(ctx, constants.CacheMenuTree); err != nil {
+		xlogger.Errorf("清理菜单树缓存失败: %v", err)
+	}
 	return err
 }
 
 func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
+	// 尝试缓存
+	if data, err := s.cache.Get(ctx, constants.CacheMenuTree); err == nil && data != "" {
+		var tree []*MenuInfo
+		if err := json.Unmarshal([]byte(data), &tree); err == nil {
+			xlogger.Infof("缓存获取菜单树")
+			return tree, nil
+		}
+	}
+
 	menus, err := s.menuDao.GetAllMenus(ctx)
 	if err != nil {
 		xlogger.Errorf("获取全部菜单失败: %v", err)
@@ -205,5 +231,11 @@ func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 	}
 	sortNodes(roots)
 
+	// 缓存结果 15天
+	if bs, err := json.Marshal(roots); err == nil {
+		if err := s.cache.Set(ctx, constants.CacheMenuTree, string(bs), 15*24*time.Hour); err != nil {
+			xlogger.Errorf("缓存菜单树失败: %v", err)
+		}
+	}
 	return roots, nil
 }
