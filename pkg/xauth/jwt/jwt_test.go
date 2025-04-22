@@ -9,8 +9,8 @@ import (
 )
 
 func TestJwt(t *testing.T) {
-	var userId uint = 1
-	username, role := "test", "admin"
+	var userId int64 = 1
+	username := "test"
 	jwtManager := jwt.NewJwtManager(&jwt.Config{
 		JwtSecret:             "Tphdi%Aapi5iXsX67F7MX5ZRJxZF*6wK",
 		Issuer:                "test-snow",
@@ -19,7 +19,7 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("jwt token", func(t *testing.T) {
-		accessToken, refreshToken, err := jwtManager.GenerateTokens(userId, username, role)
+		accessToken, refreshToken, err := jwtManager.GenerateTokens(userId, username)
 		if err != nil {
 			t.Fatalf("get refresh token is err: %v", err)
 		}
@@ -30,7 +30,7 @@ func TestJwt(t *testing.T) {
 			t.Fatalf("get token info is err: %v", err)
 		}
 		fmt.Printf("token info is: %+v\n", parseToken)
-		if parseToken.UserId != userId || parseToken.Role != role || parseToken.Username != username {
+		if parseToken.UserId != userId || parseToken.Username != username {
 			t.Fatal("token info is err")
 		}
 
@@ -43,7 +43,7 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("jwt auth", func(t *testing.T) {
-		accessToken, refreshToken, err := jwtManager.GenerateTokens(userId, username, role)
+		accessToken, refreshToken, err := jwtManager.GenerateTokens(userId, username)
 		if err != nil {
 			t.Fatalf("get refresh token is err: %v", err)
 		}
@@ -80,7 +80,7 @@ func TestJwt(t *testing.T) {
 			RefreshExpirationTime: -1,
 		})
 
-		accessToken, err := expiredManager.GenerateAccessToken(userId, username, role)
+		accessToken, err := expiredManager.GenerateAccessToken(userId, username)
 		if err != nil {
 			t.Fatalf("generate expired token error: %v\n", err)
 		}
@@ -100,7 +100,7 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("invalid token type", func(t *testing.T) {
-		refreshToken, err := jwtManager.GenerateRefreshToken(userId, username, role)
+		refreshToken, err := jwtManager.GenerateRefreshToken(userId, username)
 		if err != nil {
 			t.Fatalf("generate refresh token error: %v", err)
 		}
@@ -114,7 +114,7 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("refresh token with access token", func(t *testing.T) {
-		accessToken, err := jwtManager.GenerateAccessToken(userId, username, role)
+		accessToken, err := jwtManager.GenerateAccessToken(userId, username)
 		if err != nil {
 			t.Fatalf("generate access token error: %v", err)
 		}

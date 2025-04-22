@@ -1,6 +1,9 @@
 package jwt
 
 import (
+	"fmt"
+	"github.com/google/uuid"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -36,24 +39,28 @@ func NewJwtManager(conf *Config) *Manager {
 // Claims 自定义声明
 type Claims struct {
 	GrantType string `json:"grant_type"` // 授权类型，区分 accessToken 与 refreshToken
-	UserId    uint   `json:"user_id"`
+	UserId    int64  `json:"user_id"`
 	Username  string `json:"username"`
-	Role      string `json:"role"`
+	//Role      string `json:"role"`
 	jwt.RegisteredClaims
 }
 
 // GenerateAccessToken 创建 access token
-func (m *Manager) GenerateAccessToken(userId uint, username, role string) (string, error) {
-	exp := time.Now().Add(time.Duration(m.jwtConf.AccessExpirationTime) * time.Minute)
+func (m *Manager) GenerateAccessToken(userId int64, username string) (string, error) {
+	now := time.Now()
+	exp := now.Add(time.Duration(m.jwtConf.AccessExpirationTime) * time.Minute)
 	exp = time.Unix(exp.Unix(), 0) // 去除纳秒
 	accessClaims := Claims{
 		GrantType: accessType,
 		UserId:    userId,
 		Username:  username,
-		Role:      role,
+		//Role:      role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(exp),
 			Issuer:    m.jwtConf.Issuer,
+			Subject:   strconv.FormatInt(userId, 10),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ID:        uuid.NewString(), // jti
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
@@ -61,17 +68,21 @@ func (m *Manager) GenerateAccessToken(userId uint, username, role string) (strin
 }
 
 // GenerateRefreshToken 创建 refresh token
-func (m *Manager) GenerateRefreshToken(userId uint, username, role string) (string, error) {
-	exp := time.Now().Add(time.Duration(m.jwtConf.RefreshExpirationTime) * time.Minute)
+func (m *Manager) GenerateRefreshToken(userId int64, username string) (string, error) {
+	now := time.Now()
+	exp := now.Add(time.Duration(m.jwtConf.RefreshExpirationTime) * time.Minute)
 	exp = time.Unix(exp.Unix(), 0) // 去除纳秒
 	refreshClaims := Claims{
 		GrantType: refreshType,
 		UserId:    userId,
 		Username:  username,
-		Role:      role,
+		//Role:      role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(exp),
 			Issuer:    m.jwtConf.Issuer,
+			Subject:   fmt.Sprintf("snowgo: %d", userId),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ID:        uuid.NewString(), // jti
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
@@ -79,12 +90,12 @@ func (m *Manager) GenerateRefreshToken(userId uint, username, role string) (stri
 }
 
 // GenerateTokens 创建一对 access + refresh token
-func (m *Manager) GenerateTokens(userId uint, username, role string) (accessToken, refreshToken string, err error) {
-	accessToken, err = m.GenerateAccessToken(userId, username, role)
+func (m *Manager) GenerateTokens(userId int64, username string) (accessToken, refreshToken string, err error) {
+	accessToken, err = m.GenerateAccessToken(userId, username)
 	if err != nil {
 		return "", "", errors.Wrap(err, "Generate Access Token error")
 	}
-	refreshToken, err = m.GenerateRefreshToken(userId, username, role)
+	refreshToken, err = m.GenerateRefreshToken(userId, username)
 	if err != nil {
 		return "", "", errors.Wrap(err, "Generate Refresh Token error")
 	}
@@ -124,12 +135,12 @@ func (m *Manager) RefreshTokens(refreshToken string) (newRefreshToken, accessTok
 	}
 
 	// 生成新的刷新令牌(这里如果重新生成，refresh token的过期时间又要重新算，如果沿用以前的，就是严格按照refresh token过期时间来)
-	newRefreshToken, err = m.GenerateRefreshToken(claims.UserId, claims.Username, claims.Role)
+	newRefreshToken, err = m.GenerateRefreshToken(claims.UserId, claims.Username)
 	if err != nil {
 		return "", "", errors.Wrap(err, "Generate Refresh Token error")
 	}
 	// 生成新的访问令牌
-	accessToken, err = m.GenerateAccessToken(claims.UserId, claims.Username, claims.Role)
+	accessToken, err = m.GenerateAccessToken(claims.UserId, claims.Username)
 	if err != nil {
 		return "", "", errors.Wrap(err, "Generate Access Token error")
 	}

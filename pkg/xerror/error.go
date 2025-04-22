@@ -52,6 +52,7 @@ var (
 	UserUpdateError       = NewCode(10303, "用户更新失败")
 	UserNameTelEmptyError = NewCode(10304, "用户名或电话不能为空")
 	UserNameTelExistError = NewCode(10305, "用户名或电话已存在")
+	AuthError             = NewCode(10306, "用户名或密码错误")
 
 	MenuNotFound    = NewCode(10401, "菜单不存在")
 	MenuCreateError = NewCode(10402, "菜单创建失败")
