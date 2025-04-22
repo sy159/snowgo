@@ -163,3 +163,27 @@ func DeleteUserById(c *gin.Context) {
 	}
 	xresponse.Success(c, &gin.H{"id": user.ID})
 }
+
+func ResetPwdById(c *gin.Context) {
+	var param struct {
+		ID       int32  `json:"id" form:"id" binding:"required"`
+		Password string `json:"password" form:"password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&param); err != nil {
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
+		return
+	}
+	xlogger.Infof("reset user pwd by id: %+v", param.ID)
+	if param.ID < 1 {
+		xresponse.FailByError(c, e.UserNotFound)
+		return
+	}
+	container := di.GetContainer(c)
+	err := container.UserService.ResetPwdById(c, param.ID, param.Password)
+	if err != nil {
+		xlogger.Errorf("delete user is err: %+v", err)
+		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
+		return
+	}
+	xresponse.Success(c, &gin.H{"id": param.ID})
+}

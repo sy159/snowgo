@@ -264,3 +264,16 @@ func (u *UserDao) UpdateUser(ctx context.Context, user *model.User) (*model.User
 	}
 	return user, nil
 }
+
+// ResetPwdById 重置密码
+func (u *UserDao) ResetPwdById(ctx context.Context, userId int32, password string) error {
+	if userId <= 0 {
+		return errors.New("用户id不存在")
+	}
+	m := u.repo.Query().User
+	_, err := u.repo.Query().User.WithContext(ctx).Where(m.ID.Eq(userId)).UpdateSimple(m.Password.Value(password))
+	if err != nil {
+		return errors.WithMessage(err, "修改密码异常")
+	}
+	return nil
+}

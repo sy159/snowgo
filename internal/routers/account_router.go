@@ -17,6 +17,7 @@ func accountRouters(r *gin.RouterGroup) {
 		adminGroup.POST("/user", CreateUser)
 		adminGroup.DELETE("/user", DeleteUserById)
 		adminGroup.GET("/user/detail", GetUserInfo)
+		adminGroup.POST("/user/pwd", ResetPwdById)
 		// 菜单权限
 		adminGroup.GET("/menu", GetMenuList)
 		adminGroup.POST("/menu", CreateMenu)

@@ -28,6 +28,7 @@ type UserRepo interface {
 	GetUserById(ctx context.Context, userId int32) (*model.User, error)
 	GetUserList(ctx context.Context, condition *account.UserListCondition) ([]*model.User, int64, error)
 	DeleteById(ctx context.Context, userId int32) error
+	ResetPwdById(ctx context.Context, userId int32, password string) error
 }
 
 type UserService struct {
@@ -239,4 +240,30 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 	})
 
 	return err
+}
+
+// ResetPwdById 重置用户密码
+func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password string) error {
+	if userId <= 0 {
+		return errors.New(e.UserNotFound.GetErrMsg())
+	}
+
+	_, err := u.userDao.GetUserById(ctx, userId)
+	if err != nil {
+		xlogger.Infof("获取用户(%d)信息异常: %v", userId, err)
+		return errors.WithMessage(err, "用户信息查询失败")
+	}
+
+	// 密码加密
+	pwd, err := xcryption.HashPassword(password)
+	if err != nil {
+		xlogger.Errorf("密码加密异常: %v", err)
+		return errors.WithMessage(err, "密码加密异常")
+	}
+	err = u.userDao.ResetPwdById(ctx, userId, pwd)
+	if err != nil {
+		xlogger.Infof("修改用户(%d)密码异常: %v", userId, err)
+		return errors.WithMessage(err, "用户信息查询失败")
+	}
+	return nil
 }
