@@ -160,9 +160,17 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 	}
 
 	// 查询角色信息
-	rule, err := u.userDao.GetRoleByUserId(ctx, userId)
+	role, err := u.userDao.GetRoleByUserId(ctx, userId)
 	if err != nil {
 		return nil, errors.WithMessage(err, "用户角色信息查询失败")
+	}
+	var roleId int32
+	roleCode := ""
+	roleName := ""
+	if role != nil {
+		roleId = role.RoleId
+		roleCode = role.RoleCode
+		roleName = role.RoleName
 	}
 	return &UserInfo{
 		ID:        user.ID,
@@ -170,9 +178,9 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 		Tel:       user.Tel,
 		Nickname:  *user.Nickname,
 		Status:    *user.Status,
-		RoleId:    rule.RoleId,
-		RoleCode:  rule.RoleCode,
-		RoleName:  rule.RoleName,
+		RoleId:    roleId,
+		RoleCode:  roleCode,
+		RoleName:  roleName,
 		CreatedAt: *user.CreatedAt,
 		UpdatedAt: *user.UpdatedAt,
 	}, nil
