@@ -37,7 +37,7 @@ func CreateMenu(c *gin.Context) {
 	menuId, err := container.MenuService.CreateMenu(c, &menuParam)
 	if err != nil {
 		xlogger.Errorf("create menu is err: %+v", err)
-		xresponse.FailByError(c, e.MenuCreateError)
+		xresponse.Fail(c, e.MenuCreateError.GetErrCode(), err.Error())
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": menuId})
@@ -56,7 +56,7 @@ func UpdateMenu(c *gin.Context) {
 	err := container.MenuService.UpdateMenu(c, &menuParam)
 	if err != nil {
 		xlogger.Errorf("update menu is err: %+v", err)
-		xresponse.FailByError(c, e.MenuUpdateError)
+		xresponse.Fail(c, e.MenuUpdateError.GetErrCode(), err.Error())
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": menuParam.ID})
@@ -80,7 +80,7 @@ func GetMenuList(c *gin.Context) {
 func DeleteMenuById(c *gin.Context) {
 	var menuParam account.MenuInfo
 	if err := c.ShouldBindJSON(&menuParam); err != nil {
-		xresponse.FailByError(c, e.HttpBadRequest)
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
 	xlogger.Infof("delete menu by id: %+v", menuParam.ID)

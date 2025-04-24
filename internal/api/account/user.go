@@ -60,7 +60,7 @@ func CreateUser(c *gin.Context) {
 			return
 		}
 		xlogger.Errorf("create user info is err: %+v", err)
-		xresponse.FailByError(c, e.UserCreateError)
+		xresponse.Fail(c, e.UserCreateError.GetErrCode(), err.Error())
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": userId})
@@ -83,7 +83,7 @@ func UpdateUser(c *gin.Context) {
 			return
 		}
 		xlogger.Errorf("update user info is err: %+v", err)
-		xresponse.FailByError(c, e.UserUpdateError)
+		xresponse.Fail(c, e.UserUpdateError.GetErrCode(), err.Error())
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": userId})
@@ -104,7 +104,7 @@ func GetUserInfo(c *gin.Context) {
 	user, err := container.UserService.GetUserById(c, param.ID)
 	if err != nil {
 		xlogger.Errorf("get user info is err: %+v", err)
-		xresponse.FailByError(c, e.UserNotFound)
+		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
 		return
 	}
 	xresponse.Success(c, &UserInfo{
@@ -144,7 +144,7 @@ func GetUserList(c *gin.Context) {
 	res, err := container.UserService.GetUserList(c, &userListReq)
 	if err != nil {
 		xlogger.Errorf("get user list is err: %+v", err)
-		xresponse.FailByError(c, e.HttpInternalServerError)
+		xresponse.Fail(c, e.HttpInternalServerError.GetErrCode(), err.Error())
 		return
 	}
 	userList := make([]*UserListInfo, 0, len(res.List))
@@ -181,7 +181,7 @@ func DeleteUserById(c *gin.Context) {
 	err := container.UserService.DeleteById(c, user.ID)
 	if err != nil {
 		xlogger.Errorf("delete user is err: %+v", err)
-		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
+		xresponse.Fail(c, e.UserDeleteError.GetErrCode(), err.Error())
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": user.ID})

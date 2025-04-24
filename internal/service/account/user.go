@@ -149,6 +149,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 	if err != nil {
 		return 0, err
 	}
+	xlogger.Infof("用户创建成功: %+v", userObj)
 	return userObj.ID, nil
 }
 
@@ -158,7 +159,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		return 0, errors.New(e.UserNotFound.GetErrMsg())
 	}
 	// 获取用户信息
-	_, err := u.userDao.GetUserById(ctx, userParam.ID)
+	oldUser, err := u.userDao.GetUserById(ctx, userParam.ID)
 	if err != nil {
 		xlogger.Infof("获取用户(%d)信息异常: %v", userParam.ID, err)
 		return 0, errors.WithMessage(err, "用户信息查询失败")
@@ -219,6 +220,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 	if err != nil {
 		return 0, err
 	}
+	xlogger.Infof("用户更新成功: old=%+v new=%+v", oldUser, userParam)
 	return userParam.ID, nil
 }
 
@@ -311,7 +313,7 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 		}
 		return nil
 	})
-
+	xlogger.Infof("用户删除成功: %d", userId)
 	return err
 }
 
@@ -341,7 +343,7 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 	return nil
 }
 
-// Authenticate 重置用户密码
+// Authenticate 用户登录校验
 func (u *UserService) Authenticate(ctx context.Context, username, password string) (*UserInfo, error) {
 	if len(username) <= 0 {
 		return nil, errors.New(e.UserNotFound.GetErrMsg())

@@ -84,8 +84,9 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 	menuObj, err := s.menuDao.CreateMenu(ctx, menu)
 	if err != nil {
 		xlogger.Errorf("创建菜单失败: %v", err)
-		return 0, err
+		return 0, errors.WithMessage(err, "创建菜单失败")
 	}
+	xlogger.Infof("菜单创建成功: %+v", menuObj)
 
 	// 清理菜单树缓存
 	if _, err := s.cache.Delete(ctx, constants.CacheMenuTree); err != nil {
@@ -98,6 +99,12 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 	if p.ID <= 0 {
 		return errors.New("菜单ID无效")
+	}
+
+	// 获取原始角色信息（可选）
+	oldMenu, err := s.menuDao.GetById(ctx, p.ID)
+	if err != nil {
+		return errors.WithMessage(err, "菜单不存在")
 	}
 
 	// 校验父节点
@@ -120,16 +127,18 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		Perms:    &p.Perms,
 		OrderNum: p.OrderNum,
 	}
-	_, err := s.menuDao.UpdateMenu(ctx, mn)
+	_, err = s.menuDao.UpdateMenu(ctx, mn)
 	if err != nil {
 		xlogger.Errorf("更新菜单失败: %v", err)
+		return errors.WithMessage(err, "更新菜单失败")
 	}
+	xlogger.Infof("菜单更新成功: old=%+v new=%+v", oldMenu, mn)
 
 	// 清理菜单树缓存
 	if _, err := s.cache.Delete(ctx, constants.CacheMenuTree); err != nil {
 		xlogger.Errorf("清理菜单树缓存失败: %v", err)
 	}
-	return err
+	return nil
 }
 
 // DeleteMenuById 删除菜单或按钮
@@ -147,7 +156,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 	// 如果被角色使用，也不能删除
 	isUsed, err := s.menuDao.IsUsedMenuByIds(ctx, []int32{id})
 	if err != nil {
-		return errors.WithMessage(err, "")
+		return errors.WithMessage(err, "查询角色是否被使用失败")
 	}
 	if isUsed {
 		return errors.New("该菜单权限已被使用，无法删除")
@@ -155,13 +164,15 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 	err = s.menuDao.DeleteById(ctx, id)
 	if err != nil {
 		xlogger.Errorf("删除菜单失败: %v", err)
+		return errors.WithMessage(err, "删除菜单失败")
 	}
+	xlogger.Infof("菜单删除成功: %d", id)
 
 	// 清理菜单树缓存
 	if _, err := s.cache.Delete(ctx, constants.CacheMenuTree); err != nil {
 		xlogger.Errorf("清理菜单树缓存失败: %v", err)
 	}
-	return err
+	return nil
 }
 
 func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
@@ -177,7 +188,7 @@ func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 	menus, err := s.menuDao.GetAllMenus(ctx)
 	if err != nil {
 		xlogger.Errorf("获取全部菜单失败: %v", err)
-		return nil, err
+		return nil, errors.WithMessage(err, "获取全部菜单失败")
 	}
 
 	// 构造 map[id]MenuInfo

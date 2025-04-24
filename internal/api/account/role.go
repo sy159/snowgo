@@ -22,7 +22,7 @@ func CreateRole(c *gin.Context) {
 	roleID, err := container.RoleService.CreateRole(c, &param)
 	if err != nil {
 		xlogger.Errorf("create role is err: %+v", err)
-		xresponse.FailByError(c, e.RoleCreateError)
+		xresponse.Fail(c, e.RoleCreateError.GetErrCode(), err.Error())
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": roleID})
@@ -41,7 +41,7 @@ func UpdateRole(c *gin.Context) {
 	err := container.RoleService.UpdateRole(c, &param)
 	if err != nil {
 		xlogger.Errorf("update role is err: %+v", err)
-		xresponse.FailByError(c, e.RoleUpdateError)
+		xresponse.Fail(c, e.RoleUpdateError.GetErrCode(), err.Error())
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": param.ID})
@@ -62,7 +62,7 @@ func DeleteRole(c *gin.Context) {
 	err := container.RoleService.DeleteRole(c, param.ID)
 	if err != nil {
 		xlogger.Errorf("delete role is err: %+v", err)
-		xresponse.FailByError(c, e.RoleDeleteError)
+		xresponse.Fail(c, e.RoleDeleteError.GetErrCode(), err.Error())
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": param.ID})
@@ -112,7 +112,7 @@ func GetRoleById(c *gin.Context) {
 	role, err := container.RoleService.GetRoleById(c, param.ID)
 	if err != nil {
 		xlogger.Errorf("get role by id is err: %+v", err)
-		xresponse.FailByError(c, e.RoleNotFound)
+		xresponse.Fail(c, e.RoleNotFound.GetErrCode(), err.Error())
 		return
 	}
 	xresponse.Success(c, role)
