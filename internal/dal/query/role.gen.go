@@ -30,7 +30,6 @@ func newRole(db *gorm.DB, opts ...gen.DOOption) role {
 	_role.Code = field.NewString(tableName, "code")
 	_role.Name = field.NewString(tableName, "name")
 	_role.Description = field.NewString(tableName, "description")
-	_role.Status = field.NewString(tableName, "status")
 	_role.CreatedAt = field.NewTime(tableName, "created_at")
 	_role.UpdatedAt = field.NewTime(tableName, "updated_at")
 
@@ -47,7 +46,6 @@ type role struct {
 	Code        field.String // 角色代码，如 admin、normal
 	Name        field.String // 前端展示用名称
 	Description field.String // 角色描述
-	Status      field.String // 状态：Active=启用，Disabled=停用
 	CreatedAt   field.Time
 	UpdatedAt   field.Time
 
@@ -70,7 +68,6 @@ func (r *role) updateTableName(table string) *role {
 	r.Code = field.NewString(table, "code")
 	r.Name = field.NewString(table, "name")
 	r.Description = field.NewString(table, "description")
-	r.Status = field.NewString(table, "status")
 	r.CreatedAt = field.NewTime(table, "created_at")
 	r.UpdatedAt = field.NewTime(table, "updated_at")
 
@@ -97,12 +94,11 @@ func (r *role) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (r *role) fillFieldMap() {
-	r.fieldMap = make(map[string]field.Expr, 7)
+	r.fieldMap = make(map[string]field.Expr, 6)
 	r.fieldMap["id"] = r.ID
 	r.fieldMap["code"] = r.Code
 	r.fieldMap["name"] = r.Name
 	r.fieldMap["description"] = r.Description
-	r.fieldMap["status"] = r.Status
 	r.fieldMap["created_at"] = r.CreatedAt
 	r.fieldMap["updated_at"] = r.UpdatedAt
 }

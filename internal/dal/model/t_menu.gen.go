@@ -13,14 +13,13 @@ const TableNameMenu = "menu"
 // Menu 菜单权限表
 type Menu struct {
 	ID        int32      `gorm:"column:id;type:int(11);primaryKey;autoIncrement:true" json:"id"`
-	ParentID  int32      `gorm:"column:parent_id;type:int(11);not null;comment:父级菜单，0=根节点" json:"parent_id"`                                          // 父级菜单，0=根节点
-	MenuType  string     `gorm:"column:menu_type;type:enum('Dir','Menu','Btn');not null;comment:类型：Dir/菜单目录, Menu/页面菜单, Btn/按钮操作" json:"menu_type"`   // 类型：Dir/菜单目录, Menu/页面菜单, Btn/按钮操作
-	Name      string     `gorm:"column:name;type:varchar(64);not null;comment:节点名称（前端显示）" json:"name"`                                                // 节点名称（前端显示）
-	Path      *string    `gorm:"column:path;type:varchar(128);comment:前端路由路径，仅 Dir/Menu 生效" json:"path"`                                              // 前端路由路径，仅 Dir/Menu 生效
-	Icon      *string    `gorm:"column:icon;type:varchar(64);comment:节点图标，仅 Dir/Menu 生效" json:"icon"`                                                 // 节点图标，仅 Dir/Menu 生效
-	Perms     *string    `gorm:"column:perms;type:varchar(100);comment:权限标识，如 system:user:add，仅 Btn生效" json:"perms"`                                  // 权限标识，如 system:user:add，仅 Btn生效
-	OrderNum  int32      `gorm:"column:order_num;type:int(11);not null;comment:排序号" json:"order_num"`                                                 // 排序号
-	Status    *string    `gorm:"column:status;type:enum('Active','Disabled');not null;default:Active;comment:状态：Active=启用，Disabled=停用" json:"status"` // 状态：Active=启用，Disabled=停用
+	ParentID  int32      `gorm:"column:parent_id;type:int(11);not null;comment:父级菜单，0=根节点" json:"parent_id"`                                        // 父级菜单，0=根节点
+	MenuType  string     `gorm:"column:menu_type;type:enum('Dir','Menu','Btn');not null;comment:类型：Dir/菜单目录, Menu/页面菜单, Btn/按钮操作" json:"menu_type"` // 类型：Dir/菜单目录, Menu/页面菜单, Btn/按钮操作
+	Name      string     `gorm:"column:name;type:varchar(64);not null;comment:节点名称（前端显示）" json:"name"`                                              // 节点名称（前端显示）
+	Path      *string    `gorm:"column:path;type:varchar(128);comment:前端路由路径，仅 Dir/Menu 生效" json:"path"`                                            // 前端路由路径，仅 Dir/Menu 生效
+	Icon      *string    `gorm:"column:icon;type:varchar(64);comment:节点图标，仅 Dir/Menu 生效" json:"icon"`                                               // 节点图标，仅 Dir/Menu 生效
+	Perms     *string    `gorm:"column:perms;type:varchar(100);comment:权限标识，如 system:user:add，仅 Btn生效" json:"perms"`                                // 权限标识，如 system:user:add，仅 Btn生效
+	OrderNum  int32      `gorm:"column:order_num;type:int(11);not null;comment:排序号" json:"order_num"`                                               // 排序号
 	CreatedAt *time.Time `gorm:"column:created_at;type:datetime(6);not null;default:CURRENT_TIMESTAMP(6)" json:"created_at"`
 	UpdatedAt *time.Time `gorm:"column:updated_at;type:datetime(6);not null;default:CURRENT_TIMESTAMP(6)" json:"updated_at"`
 }

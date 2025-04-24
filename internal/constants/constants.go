@@ -7,6 +7,7 @@ const (
 // CacheMenuTree 缓存相关key
 const (
 	CacheMenuTree         = "account:menu_data"
+	CacheRolePermsMap     = "account:role_perms_map"
 	CacheRefreshJtiPrefix = "jwt:refresh:jti:"
 )
 

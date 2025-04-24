@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"snowgo/internal/constants"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/repo"
 	"snowgo/internal/dao/account"
@@ -28,6 +27,8 @@ type RoleRepo interface {
 	IsUsedUserByIds(ctx context.Context, userId int32) (bool, error)
 	CountMenuByIds(ctx context.Context, ids []int32) (int64, error)
 	GetMenuIdsByRoleId(ctx context.Context, roleId int32) ([]int32, error)
+	GetMenuPermsByRoleId(ctx context.Context, roleId int32) ([]string, error)
+	ListRoleMenuPerms(ctx context.Context) ([]*account.RoleMenuPerm, error)
 }
 
 type RoleService struct {
@@ -47,7 +48,6 @@ type RoleParam struct {
 	Name        string  `json:"name" binding:"required,max=128"`
 	Code        string  `json:"code" binding:"required,max=64"`
 	Description string  `json:"description"`
-	Status      string  `json:"status" binding:"required,oneof=Active Disabled"`
 	MenuIds     []int32 `json:"menu_ids" binding:"required"`
 }
 
@@ -57,7 +57,6 @@ type RoleInfo struct {
 	Name        string    `json:"name"`
 	Code        string    `json:"code"`
 	Description string    `json:"description"`
-	Status      string    `json:"status"`
 	MenuIds     []int32   `json:"menu_ids"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -73,7 +72,6 @@ type RoleListCondition struct {
 	Ids    []int32 `json:"ids" form:"ids"`
 	Name   string  `json:"name" form:"name"`
 	Code   string  `json:"code" form:"code"`
-	Status string  `json:"status" form:"status"`
 	Offset int32   `json:"offset" form:"offset"`
 	Limit  int32   `json:"limit" form:"limit"`
 }
@@ -102,15 +100,10 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 		}
 	}
 
-	// 默认启用状态
-	if param.Status == "" {
-		param.Status = constants.ActiveStatus
-	}
 	role := &model.Role{
 		Name:        &param.Name,
 		Code:        param.Code,
 		Description: &param.Description,
-		Status:      &param.Status,
 	}
 
 	var roleObj *model.Role
@@ -188,7 +181,6 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 			Name:        &param.Name,
 			Code:        param.Code,
 			Description: &param.Description,
-			Status:      &param.Status,
 		})
 		if err != nil {
 			return errors.WithMessage(err, "更新角色失败")
@@ -288,7 +280,6 @@ func (s *RoleService) GetRoleById(ctx context.Context, id int32) (*RoleInfo, err
 		Name:        *r.Name,
 		Code:        r.Code,
 		Description: *r.Description,
-		Status:      *r.Status,
 		MenuIds:     menuIds,
 		CreatedAt:   *r.CreatedAt,
 		UpdatedAt:   *r.UpdatedAt,
@@ -302,7 +293,6 @@ func (s *RoleService) ListRoles(ctx context.Context, cond *RoleListCondition) (*
 		Ids:    cond.Ids,
 		Name:   cond.Name,
 		Code:   cond.Code,
-		Status: cond.Status,
 		Offset: cond.Offset,
 		Limit:  cond.Limit,
 	})
@@ -317,7 +307,6 @@ func (s *RoleService) ListRoles(ctx context.Context, cond *RoleListCondition) (*
 			Name:        *r.Name,
 			Code:        r.Code,
 			Description: *r.Description,
-			Status:      *r.Status,
 			CreatedAt:   *r.CreatedAt,
 			UpdatedAt:   *r.UpdatedAt,
 		})

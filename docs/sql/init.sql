@@ -25,8 +25,6 @@ CREATE TABLE `role`
     `code`         VARCHAR(64) NOT NULL COMMENT '角色代码，如 admin、normal',
     `name` VARCHAR(128) NULL COMMENT '前端展示用名称',
     `description`  TEXT NULL COMMENT '角色描述',
-    `status`       ENUM('Active','Disabled') NOT NULL DEFAULT 'Active'
-                   COMMENT '状态：Active=启用，Disabled=停用',
     `created_at`   DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at`   DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`id`),
@@ -43,8 +41,6 @@ CREATE TABLE `menu` (
   `icon`         VARCHAR(64)  NULL   COMMENT '节点图标，仅 Dir/Menu 生效',
   `perms`        VARCHAR(100) NULL   COMMENT '权限标识，如 system:user:add，仅 Btn生效',
   `order_num`    INT          NOT NULL DEFAULT 0 COMMENT '排序号',
-  `status`       ENUM('Active','Disabled') NOT NULL DEFAULT 'Active'
-                 COMMENT '状态：Active=启用，Disabled=停用',
   `created_at`   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at`   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`)

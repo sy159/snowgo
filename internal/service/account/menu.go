@@ -46,7 +46,6 @@ type MenuParam struct {
 	Icon     string `json:"icon"`
 	Perms    string `json:"perms"`
 	OrderNum int32  `json:"order_num" binding:"required,gte=0"`
-	Status   string `json:"status" binding:"required,oneof=Active Disabled"`
 }
 
 // MenuInfo 返回给前端的树节点结构
@@ -59,7 +58,6 @@ type MenuInfo struct {
 	Icon      string      `json:"icon"`
 	Perms     string      `json:"perms"`
 	OrderNum  int32       `json:"order_num"`
-	Status    string      `json:"status"`
 	CreatedAt time.Time   `json:"created_at"`
 	UpdatedAt time.Time   `json:"updated_at"`
 	Children  []*MenuInfo `json:"children,omitempty"`
@@ -82,7 +80,6 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		Icon:     &p.Icon,
 		Perms:    &p.Perms,
 		OrderNum: p.OrderNum,
-		Status:   &p.Status,
 	}
 	menuObj, err := s.menuDao.CreateMenu(ctx, menu)
 	if err != nil {
@@ -122,7 +119,6 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		Icon:     &p.Icon,
 		Perms:    &p.Perms,
 		OrderNum: p.OrderNum,
-		Status:   &p.Status,
 	}
 	_, err := s.menuDao.UpdateMenu(ctx, mn)
 	if err != nil {
@@ -196,7 +192,6 @@ func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 			Icon:      *m.Icon,
 			Perms:     *m.Perms,
 			OrderNum:  m.OrderNum,
-			Status:    *m.Status,
 			CreatedAt: *m.CreatedAt,
 			UpdatedAt: *m.UpdatedAt,
 			Children:  []*MenuInfo{},

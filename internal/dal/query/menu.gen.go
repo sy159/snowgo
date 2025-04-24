@@ -34,7 +34,6 @@ func newMenu(db *gorm.DB, opts ...gen.DOOption) menu {
 	_menu.Icon = field.NewString(tableName, "icon")
 	_menu.Perms = field.NewString(tableName, "perms")
 	_menu.OrderNum = field.NewInt32(tableName, "order_num")
-	_menu.Status = field.NewString(tableName, "status")
 	_menu.CreatedAt = field.NewTime(tableName, "created_at")
 	_menu.UpdatedAt = field.NewTime(tableName, "updated_at")
 
@@ -55,7 +54,6 @@ type menu struct {
 	Icon      field.String // 节点图标，仅 Dir/Menu 生效
 	Perms     field.String // 权限标识，如 system:user:add，仅 Btn生效
 	OrderNum  field.Int32  // 排序号
-	Status    field.String // 状态：Active=启用，Disabled=停用
 	CreatedAt field.Time
 	UpdatedAt field.Time
 
@@ -82,7 +80,6 @@ func (m *menu) updateTableName(table string) *menu {
 	m.Icon = field.NewString(table, "icon")
 	m.Perms = field.NewString(table, "perms")
 	m.OrderNum = field.NewInt32(table, "order_num")
-	m.Status = field.NewString(table, "status")
 	m.CreatedAt = field.NewTime(table, "created_at")
 	m.UpdatedAt = field.NewTime(table, "updated_at")
 
@@ -109,7 +106,7 @@ func (m *menu) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (m *menu) fillFieldMap() {
-	m.fieldMap = make(map[string]field.Expr, 11)
+	m.fieldMap = make(map[string]field.Expr, 10)
 	m.fieldMap["id"] = m.ID
 	m.fieldMap["parent_id"] = m.ParentID
 	m.fieldMap["menu_type"] = m.MenuType
@@ -118,7 +115,6 @@ func (m *menu) fillFieldMap() {
 	m.fieldMap["icon"] = m.Icon
 	m.fieldMap["perms"] = m.Perms
 	m.fieldMap["order_num"] = m.OrderNum
-	m.fieldMap["status"] = m.Status
 	m.fieldMap["created_at"] = m.CreatedAt
 	m.fieldMap["updated_at"] = m.UpdatedAt
 }

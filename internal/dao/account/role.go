@@ -27,6 +27,12 @@ type RoleListCondition struct {
 	Limit  int32   `json:"limit"`
 }
 
+// RoleMenuPerm 用于接收 JOIN 查询结果
+type RoleMenuPerm struct {
+	RoleID int32  `gorm:"column:role_id"`
+	Perms  string `gorm:"column:perms"`
+}
+
 func (r *RoleDao) IsCodeExists(ctx context.Context, code string, roleId int32) (bool, error) {
 	m := r.repo.Query().Role
 	roleQuery := m.WithContext(ctx).Select(m.ID).Where(m.Code.Eq(code))
@@ -107,7 +113,6 @@ func (r *RoleDao) GetRoleList(ctx context.Context, cond *RoleListCondition) ([]*
 		Scopes(
 			r.NameScope(cond.Name),
 			r.CodeScope(cond.Code),
-			r.StatusScope(cond.Status),
 			r.IdsScope(cond.Ids),
 		).FindByPage(int(cond.Offset), int(cond.Limit))
 	if err != nil {
@@ -133,16 +138,6 @@ func (r *RoleDao) CodeScope(code string) func(tx gen.Dao) gen.Dao {
 		}
 		m := r.repo.Query().Role
 		return tx.Where(m.Code.Eq(code))
-	}
-}
-
-func (r *RoleDao) StatusScope(status string) func(tx gen.Dao) gen.Dao {
-	return func(tx gen.Dao) gen.Dao {
-		if status == "" {
-			return tx
-		}
-		m := r.repo.Query().Role
-		return tx.Where(m.Status.Eq(status))
 	}
 }
 
@@ -214,4 +209,36 @@ func (r *RoleDao) GetMenuIdsByRoleId(ctx context.Context, roleId int32) ([]int32
 		return nil, errors.WithStack(err)
 	}
 	return menuIds, nil
+}
+
+// GetMenuPermsByRoleId 根据roleId 获取关联的菜单perms
+func (r *RoleDao) GetMenuPermsByRoleId(ctx context.Context, roleId int32) ([]string, error) {
+	m := r.repo.Query().RoleMenu
+	menu := r.repo.Query().Menu
+	menuPermsList := make([]string, 0, 10)
+	err := m.WithContext(ctx).
+		Join(menu, m.MenuID.EqCol(menu.ID)).
+		Where(m.RoleID.Eq(roleId), menu.Perms.IsNotNull()).
+		Select(menu.Perms).
+		Pluck(menu.Perms, &menuPermsList)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return menuPermsList, nil
+}
+
+// ListRoleMenuPerms 查询每个角色绑定的接口perms权限名
+func (r *RoleDao) ListRoleMenuPerms(ctx context.Context) ([]*RoleMenuPerm, error) {
+	var rows []*RoleMenuPerm
+	m := r.repo.Query().RoleMenu
+	menu := r.repo.Query().Menu
+	err := m.WithContext(ctx).
+		Join(menu, m.MenuID.EqCol(menu.ID)).
+		Where(menu.Perms.IsNotNull()).
+		Select(m.RoleID, menu.Perms).
+		Scan(&rows)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return rows, nil
 }
