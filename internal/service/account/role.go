@@ -2,6 +2,9 @@ package account
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"snowgo/internal/constants"
 	"snowgo/internal/dal/query"
 	"time"
 
@@ -215,6 +218,13 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 	}
 
 	xlogger.Infof("角色更新成功: old=%+v new=%+v", oldRole, ruleObj)
+
+	// 清楚角色对应接口权限缓存
+	cacheKey := fmt.Sprintf("%s%d", constants.CacheRolePermsPrefix, param.ID)
+	if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
+		xlogger.Errorf("清楚角色对应接口权限缓存失败: %v", err)
+	}
+
 	return nil
 }
 
@@ -254,6 +264,13 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 		return err
 	}
 	xlogger.Infof("角色删除成功: %d", id)
+
+	// 清楚角色对应接口权限缓存
+	cacheKey := fmt.Sprintf("%s%d", constants.CacheRolePermsPrefix, id)
+	if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
+		xlogger.Errorf("清楚角色对应接口权限缓存失败: %v", err)
+	}
+
 	return nil
 }
 
@@ -312,4 +329,31 @@ func (s *RoleService) ListRoles(ctx context.Context, cond *RoleListCondition) (*
 		})
 	}
 	return &RoleList{List: infos, Total: total}, nil
+}
+
+// GetRolePermsListByRuleID 获取角色对应接口权限列表
+func (s *RoleService) GetRolePermsListByRuleID(ctx context.Context, roleId int32) ([]string, error) {
+	// todo 修改菜单权限也要更新缓存
+	// 尝试从缓存读取
+	cacheKey := fmt.Sprintf("%s%d", constants.CacheRolePermsPrefix, roleId)
+	if data, err := s.cache.Get(ctx, cacheKey); err == nil && data != "" {
+		var m []string
+		if err := json.Unmarshal([]byte(data), &m); err == nil {
+			return m, nil
+		}
+	}
+
+	// 获取roleId: perms数组
+	menuPermsList, err := s.roleDao.GetMenuPermsByRoleId(ctx, roleId)
+	if err != nil {
+		xlogger.Errorf("list role menu perms is err: %v", err)
+		return nil, err
+	}
+
+	// 缓存结果 15天
+	if b, err := json.Marshal(menuPermsList); err == nil {
+		_ = s.cache.Set(ctx, cacheKey, string(b), 15*24*time.Hour)
+	}
+
+	return menuPermsList, nil
 }

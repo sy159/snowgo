@@ -228,7 +228,7 @@ func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 
 	// 缓存结果 15天
 	if bs, err := json.Marshal(roots); err == nil {
-		if err := s.cache.Set(ctx, constants.CacheMenuTree, string(bs), 15*24*time.Hour); err != nil {
+		if err := s.cache.Set(ctx, constants.CacheMenuTree, string(bs), constants.CacheMenuTreeExpirationDay*24*time.Hour); err != nil {
 			xlogger.Errorf("缓存菜单树失败: %v", err)
 		}
 	}
