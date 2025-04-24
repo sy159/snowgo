@@ -6,10 +6,11 @@ const (
 
 // CacheMenuTree 缓存相关key
 const (
-	CacheMenuTree              = "account:menu_data" // 菜单权限数据缓存key
-	CacheMenuTreeExpirationDay = 15                  // 菜单权限缓存天数
-	CacheRolePermsPrefix       = "account:role_perms:"
-	CacheRefreshJtiPrefix      = "jwt:refresh:jti:"
+	CacheMenuTree               = "account:menu_data"   // 菜单权限数据缓存key
+	CacheMenuTreeExpirationDay  = 15                    // 菜单权限缓存天数
+	CacheRolePermsPrefix        = "account:role_perms:" // 角色对应 接口权限key
+	CacheRolePermsExpirationDay = 15                    // 角色对应 接口权限缓存天数
+	CacheRefreshJtiPrefix       = "jwt:refresh:jti:"
 )
 
 // 用户相关

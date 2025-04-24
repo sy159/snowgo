@@ -3,6 +3,7 @@ package account
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/pkg/errors"
 	"snowgo/internal/constants"
 	"snowgo/internal/dal/model"
@@ -20,7 +21,8 @@ type MenuRepo interface {
 	GetById(ctx context.Context, id int32) (*model.Menu, error)
 	GetByParentId(ctx context.Context, parentId int32) ([]*model.Menu, error)
 	GetAllMenus(ctx context.Context) ([]*model.Menu, error)
-	IsUsedMenuByIds(ctx context.Context, MenuIds []int32) (bool, error)
+	IsUsedMenuByIds(ctx context.Context, menuIds []int32) (bool, error)
+	GetRoleIdsByIds(ctx context.Context, menuId int32) ([]int32, error)
 }
 
 type MenuService struct {
@@ -133,6 +135,21 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		return errors.WithMessage(err, "更新菜单失败")
 	}
 	xlogger.Infof("菜单更新成功: old=%+v new=%+v", oldMenu, mn)
+
+	// 如果修改了接口权限，需要更新角色-接口权限数据缓存
+	if *oldMenu.Perms != p.Perms {
+		roleIds, err := s.menuDao.GetRoleIdsByIds(ctx, p.ID)
+		if err != nil {
+			xlogger.Errorf("获取角色ids异常: %v", err)
+		}
+		for _, roleId := range roleIds {
+			// 清除角色对应接口权限缓存
+			cacheKey := fmt.Sprintf("%s%d", constants.CacheRolePermsPrefix, roleId)
+			if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
+				xlogger.Errorf("清除角色对应接口权限缓存失败: %v", err)
+			}
+		}
+	}
 
 	// 清理菜单树缓存
 	if _, err := s.cache.Delete(ctx, constants.CacheMenuTree); err != nil {

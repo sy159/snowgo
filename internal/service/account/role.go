@@ -219,10 +219,10 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 
 	xlogger.Infof("角色更新成功: old=%+v new=%+v", oldRole, ruleObj)
 
-	// 清楚角色对应接口权限缓存
+	// 清除角色对应接口权限缓存
 	cacheKey := fmt.Sprintf("%s%d", constants.CacheRolePermsPrefix, param.ID)
 	if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
-		xlogger.Errorf("清楚角色对应接口权限缓存失败: %v", err)
+		xlogger.Errorf("清除角色对应接口权限缓存失败: %v", err)
 	}
 
 	return nil
@@ -265,10 +265,10 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 	}
 	xlogger.Infof("角色删除成功: %d", id)
 
-	// 清楚角色对应接口权限缓存
+	// 清除角色对应接口权限缓存
 	cacheKey := fmt.Sprintf("%s%d", constants.CacheRolePermsPrefix, id)
 	if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
-		xlogger.Errorf("清楚角色对应接口权限缓存失败: %v", err)
+		xlogger.Errorf("清除角色对应接口权限缓存失败: %v", err)
 	}
 
 	return nil
@@ -333,7 +333,6 @@ func (s *RoleService) ListRoles(ctx context.Context, cond *RoleListCondition) (*
 
 // GetRolePermsListByRuleID 获取角色对应接口权限列表
 func (s *RoleService) GetRolePermsListByRuleID(ctx context.Context, roleId int32) ([]string, error) {
-	// todo 修改菜单权限也要更新缓存
 	// 尝试从缓存读取
 	cacheKey := fmt.Sprintf("%s%d", constants.CacheRolePermsPrefix, roleId)
 	if data, err := s.cache.Get(ctx, cacheKey); err == nil && data != "" {
@@ -352,7 +351,7 @@ func (s *RoleService) GetRolePermsListByRuleID(ctx context.Context, roleId int32
 
 	// 缓存结果 15天
 	if b, err := json.Marshal(menuPermsList); err == nil {
-		_ = s.cache.Set(ctx, cacheKey, string(b), 15*24*time.Hour)
+		_ = s.cache.Set(ctx, cacheKey, string(b), constants.CacheRolePermsExpirationDay*24*time.Hour)
 	}
 
 	return menuPermsList, nil

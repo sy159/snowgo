@@ -89,14 +89,28 @@ func (d *MenuDao) GetAllMenus(ctx context.Context) ([]*model.Menu, error) {
 }
 
 // IsUsedMenuByIds 判断菜单是否被使用过
-func (d *MenuDao) IsUsedMenuByIds(ctx context.Context, MenuIds []int32) (bool, error) {
-	if len(MenuIds) == 0 {
+func (d *MenuDao) IsUsedMenuByIds(ctx context.Context, menuIds []int32) (bool, error) {
+	if len(menuIds) == 0 {
 		return false, nil
 	}
 	m := d.repo.Query().RoleMenu
-	_, err := m.WithContext(ctx).Select(m.ID).Where(m.MenuID.In(MenuIds...)).First()
+	_, err := m.WithContext(ctx).Select(m.ID).Where(m.MenuID.In(menuIds...)).First()
 	if err != nil {
 		return true, errors.WithStack(err)
 	}
 	return true, nil
+}
+
+// GetRoleIdsByIds 根据menuId拿到所有的role
+func (d *MenuDao) GetRoleIdsByIds(ctx context.Context, menuId int32) ([]int32, error) {
+	var roleIds []int32
+	if menuId < 1 {
+		return roleIds, errors.New("menuId不存在")
+	}
+	m := d.repo.Query().RoleMenu
+	err := m.WithContext(ctx).Where(m.MenuID.Eq(menuId)).Select(m.RoleID).Pluck(m.RoleID, &roleIds)
+	if err != nil {
+		return roleIds, errors.WithStack(err)
+	}
+	return roleIds, nil
 }
