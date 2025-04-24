@@ -65,14 +65,14 @@ func RefreshToken(c *gin.Context) {
 	// 检查 jti 是否使用过（防止重放攻击、每个refresh token只能使用一次）
 	claims, err := jwtMgr.ParseToken(req.RefreshToken)
 	if err != nil {
-		xresponse.Fail(c, e.TokenError.GetErrCode(), err.Error())
+		xresponse.Fail(c, e.TokenInvalid.GetErrCode(), err.Error())
 		return
 	}
 
 	jtiKey := constants.CacheRefreshJtiPrefix + claims.ID
 	if del, _ := container.Cache.Delete(c, jtiKey); del == 0 {
 		xlogger.Errorf("refresh token reuse attempt: userID=%d, jti=%s", claims.UserId, claims.ID)
-		xresponse.FailByError(c, e.TokenInvalid)
+		xresponse.FailByError(c, e.TokenUseDError)
 		return
 	}
 

@@ -38,7 +38,7 @@ func JWTAuth() func(c *gin.Context) {
 		// parts[1]是获取到的tokenString，我们使用之前定义好的解析JWT的函数来解析它
 		mc, err := jwtManager.ParseToken(parts[1])
 		if err != nil {
-			xresponse.FailByError(c, e.TokenInvalid)
+			xresponse.Fail(c, e.TokenInvalid.GetErrCode(), err.Error())
 			c.Abort()
 			return
 		}
