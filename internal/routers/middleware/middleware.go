@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -14,7 +15,6 @@ import (
 	"snowgo/config"
 	"snowgo/internal/constants"
 	"snowgo/internal/di"
-	"snowgo/pkg"
 	"snowgo/pkg/xcolor"
 	"snowgo/pkg/xdatabase/mysql"
 	"snowgo/pkg/xdatabase/redis"
@@ -46,9 +46,9 @@ func AccessLogger() gin.HandlerFunc {
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
 		method := c.Request.Method
-		requestID := uuid.New().String()
+		traceId := uuid.New().String()
 		// 将请求 ID 存储到 Gin 上下文中
-		c.Set("request_id", requestID)
+		c.Set("trace_id", traceId)
 
 		// 处理ico请求，不记录日志
 		if c.Request.URL.Path == "/favicon.ico" {
@@ -94,7 +94,7 @@ func AccessLogger() gin.HandlerFunc {
 				zap.String("ip", c.ClientIP()),
 				zap.Duration("cost", cost),
 				zap.String("res", writer.body.String()),
-				zap.String("request_id", requestID),
+				zap.String("trace_id", traceId),
 				zap.String("user-agent", c.Request.UserAgent()),
 				zap.String("errors", c.Errors.ByType(gin.ErrorTypePrivate).String()),
 			)
@@ -121,40 +121,54 @@ func AccessLogger() gin.HandlerFunc {
 func Recovery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
-			if err := recover(); err != nil {
-				// Check for a broken connection, as it is not really a
-				// condition that warrants a panic stack trace.
+			if r := recover(); r != nil {
+				// 统一转换为error类型
+				var err error
+				switch v := r.(type) {
+				case error:
+					err = v
+				default:
+					err = fmt.Errorf("panic: %v", v)
+				}
+
+				// 检测 broken pipe 类错误（支持错误链）
 				var brokenPipe bool
-				if ne, ok := err.(*net.OpError); ok {
-					if se, ok := ne.Err.(*os.SyscallError); ok {
-						if strings.Contains(strings.ToLower(se.Error()), "broken pipe") || strings.Contains(strings.ToLower(se.Error()), "connection reset by peer") {
-							brokenPipe = true
-						}
-					}
+				var ne *net.OpError
+				var se *os.SyscallError
+				if errors.As(err, &ne) && errors.As(ne.Err, &se) {
+					msg := strings.ToLower(se.Error())
+					brokenPipe = strings.Contains(msg, "broken pipe") ||
+						strings.Contains(msg, "connection reset by peer")
 				}
 
-				if brokenPipe {
-					httpRequest, _ := httputil.DumpRequest(c.Request, false)
-					xlogger.Error(c.Request.URL.Path,
-						zap.Any("error", err),
-						zap.String("request", string(httpRequest)),
-					)
-					// If the connection is dead, we can't write a status to it.
-					_ = c.Error(err.(error)) // nolint: err check
-					c.Abort()
-					return
-				}
+				// 记录请求详情（过滤敏感头）
+				httpRequest, _ := httputil.DumpRequest(c.Request, false)
 
-				xlogger.Error("[Recovery from panic]",
-					zap.String("error", pkg.ErrorToString(err)),
+				// 结构化日志字段
+				logFields := []zap.Field{
+					zap.Error(err), // 自动记录错误链
 					zap.String("method", c.Request.Method),
 					zap.String("path", c.Request.URL.Path),
 					zap.String("query", c.Request.URL.RawQuery),
 					zap.String("ip", c.ClientIP()),
-					zap.String("request_id", c.GetString("request_id")),
-					zap.String("user-agent", c.Request.UserAgent()),
-				)
-				//c.AbortWithStatus(http.StatusInternalServerError)  // 直接状态码为500
+					zap.String("trace_id", c.GetString("trace_id")),
+					zap.String("user_agent", c.Request.UserAgent()),
+					zap.ByteString("request", httpRequest),
+				}
+
+				if brokenPipe {
+					// 连接已中断场景处理
+					xlogger.Error("[Broken Connection] "+c.Request.URL.Path, logFields...)
+					_ = c.Error(err) // 标记错误但不写响应
+					c.Abort()
+					return
+				}
+
+				// 常规 panic 处理（附加堆栈）
+				logFields = append(logFields, zap.Stack("stack"))
+				xlogger.Error("[Recovery from panic]", logFields...)
+
+				// 返回标准化错误响应
 				xresponse.FailByError(c, e.HttpInternalServerError)
 				c.Abort()
 			}
