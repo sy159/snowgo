@@ -3,6 +3,7 @@ package middleware
 import (
 	"github.com/pkg/errors"
 	"snowgo/config"
+	"snowgo/internal/di"
 	"snowgo/pkg/xauth/jwt"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xresponse"
@@ -59,5 +60,44 @@ func JWTAuth() func(c *gin.Context) {
 		c.Set("userId", mc.UserId)
 		c.Set("username", mc.Username)
 		c.Next() // 后续的处理函数可以用过c.Get("userId")来获取当前请求的用户信息
+	}
+}
+
+// PermissionAuth 接口权限校验
+func PermissionAuth(requiredPerm string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 拿到 userId
+		uidIfc, exists := c.Get("userId")
+		if !exists {
+			xresponse.FailByError(c, e.HttpUnauthorized)
+			c.Abort()
+			return
+		}
+		userId := uidIfc.(int32)
+
+		container := di.GetContainer(c)
+		// 拿该用户的perms列表
+		perms, err := container.UserService.GetPermsListById(c, userId)
+		if err != nil {
+			xresponse.FailByError(c, e.HttpInternalServerError)
+			c.Abort()
+			return
+		}
+
+		// 校验是否有接口权限
+		allowed := false
+		for _, p := range perms {
+			if p == requiredPerm {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			xresponse.FailByError(c, e.HttpForbidden)
+			c.Abort()
+			return
+		}
+
+		c.Next()
 	}
 }
