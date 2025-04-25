@@ -116,6 +116,21 @@ func (u *UserDao) GetRoleByUserId(ctx context.Context, userId int32) (*UserRoleI
 	return userRoleInfo, err
 }
 
+// GetRoleIdByUserId 只返回 roleId，如果没找到记录则返回 0
+func (u *UserDao) GetRoleIdByUserId(ctx context.Context, userId int32) (int32, error) {
+	if userId <= 0 {
+		return 0, errors.New("用户 id 不合法")
+	}
+
+	var roleId int32
+	m := u.repo.Query().UserRole
+	err := m.WithContext(ctx).Select(m.RoleID).Where(m.UserID.Eq(userId)).Limit(1).Scan(&roleId)
+	if err != nil {
+		return 0, errors.WithStack(err)
+	}
+	return roleId, nil
+}
+
 // IsNameTelDuplicate 用户名或者电话是否存在了,如果有用户id应该排除
 func (u *UserDao) IsNameTelDuplicate(ctx context.Context, username, tel string, userId int32) (bool, error) {
 	m := u.repo.Query().User

@@ -2,6 +2,7 @@ package account
 
 import (
 	"context"
+	"fmt"
 	"github.com/pkg/errors"
 	"snowgo/internal/constants"
 	"snowgo/internal/dal/model"
@@ -12,6 +13,7 @@ import (
 	"snowgo/pkg/xcryption"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
+	"strconv"
 	"time"
 )
 
@@ -24,6 +26,7 @@ type UserRepo interface {
 	TransactionDeleteUserRole(ctx context.Context, tx *query.Query, userId int32) error
 	TransactionDeleteById(ctx context.Context, tx *query.Query, userId int32) error
 	GetRoleByUserId(ctx context.Context, userId int32) (*account.UserRoleInfo, error)
+	GetRoleIdByUserId(ctx context.Context, userId int32) (int32, error)
 	IsNameTelDuplicate(ctx context.Context, username, tel string, userId int32) (bool, error)
 	IsExistByRoleId(ctx context.Context, roleId int32) (bool, error)
 	GetUserById(ctx context.Context, userId int32) (*model.User, error)
@@ -34,16 +37,18 @@ type UserRepo interface {
 }
 
 type UserService struct {
-	db      *repo.Repository
-	userDao UserRepo
-	cache   xcache.Cache
+	db          *repo.Repository
+	userDao     UserRepo
+	cache       xcache.Cache
+	roleService *RoleService
 }
 
-func NewUserService(db *repo.Repository, userDao UserRepo, cache xcache.Cache) *UserService {
+func NewUserService(db *repo.Repository, userDao UserRepo, cache xcache.Cache, roleService *RoleService) *UserService {
 	return &UserService{
-		db:      db,
-		cache:   cache,
-		userDao: userDao,
+		db:          db,
+		cache:       cache,
+		userDao:     userDao,
+		roleService: roleService,
 	}
 }
 
@@ -221,6 +226,12 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		return 0, err
 	}
 	xlogger.Infof("用户更新成功: old=%+v new=%+v", oldUser, userParam)
+
+	// 清除用户对应角色缓存
+	cacheKey := fmt.Sprintf("%s%d", constants.CacheUserRolePrefix, userParam.ID)
+	if _, err := u.cache.Delete(ctx, cacheKey); err != nil {
+		xlogger.Errorf("清除用户对应角色缓存失败: %v", err)
+	}
 	return userParam.ID, nil
 }
 
@@ -314,6 +325,12 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 		return nil
 	})
 	xlogger.Infof("用户删除成功: %d", userId)
+
+	// 清除用户对应角色缓存
+	cacheKey := fmt.Sprintf("%s%d", constants.CacheUserRolePrefix, userId)
+	if _, err := u.cache.Delete(ctx, cacheKey); err != nil {
+		xlogger.Errorf("清除用户对应角色缓存失败: %v", err)
+	}
 	return err
 }
 
@@ -369,4 +386,58 @@ func (u *UserService) Authenticate(ctx context.Context, username, password strin
 		CreatedAt: *user.CreatedAt,
 		UpdatedAt: *user.UpdatedAt,
 	}, nil
+}
+
+// GetRoleIdByUserId 根据userId拿该用户角色
+func (u *UserService) GetRoleIdByUserId(ctx context.Context, userId int32) (int32, error) {
+	if userId <= 0 {
+		return 0, errors.New(e.UserNotFound.GetErrMsg())
+	}
+
+	// 读缓存 user->roleId
+	cacheKey := fmt.Sprintf("%s%d", constants.CacheUserRolePrefix, userId)
+	if data, err := u.cache.Get(ctx, cacheKey); err == nil && data != "" {
+		if roleId, strErr := strconv.Atoi(data); strErr == nil {
+			return int32(roleId), nil
+		}
+	}
+
+	//  缓存未命中或解析失败：查库拿 RoleId
+	roleId, err := u.userDao.GetRoleIdByUserId(ctx, userId)
+	if err != nil {
+		xlogger.Errorf("查询用户角色id失败 uid=%d: %v", userId, err)
+		return 0, errors.WithMessage(err, "查询用户角色id失败")
+	}
+
+	// 写缓存（即便 roleId=0 也写，防止下次打表）
+	_ = u.cache.Set(ctx, cacheKey, strconv.Itoa(int(roleId)), constants.CacheUserRoleExpirationDay*24*time.Hour)
+
+	return roleId, nil
+}
+
+// GetPermsListById 根据userId拿该用户所有接口权限标识
+func (u *UserService) GetPermsListById(ctx context.Context, userId int32) ([]string, error) {
+	if userId <= 0 {
+		return nil, errors.New(e.UserNotFound.GetErrMsg())
+	}
+
+	// 根据userId拿到roleId
+	roleId, err := u.GetRoleIdByUserId(ctx, userId)
+	if err != nil {
+		xlogger.Errorf("GetPermsListById 查询用户角色失败 uid=%d: %v", userId, err)
+		return nil, err
+	}
+
+	// 如果没分配角色，直接返回空 perms
+	if roleId <= 0 {
+		return []string{}, nil
+	}
+
+	// 根据roleId拿到接口的perms列表
+	permsList, err := u.roleService.GetRolePermsListByRuleID(ctx, roleId)
+	if err != nil {
+		xlogger.Errorf("GetPermsListById 获取角色权限失败 rid=%d: %v", roleId, err)
+		return nil, err
+	}
+	return permsList, nil
 }
