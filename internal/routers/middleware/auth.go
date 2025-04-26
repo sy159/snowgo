@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"snowgo/config"
 	"snowgo/internal/di"
+	"snowgo/pkg/xauth"
 	"snowgo/pkg/xauth/jwt"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xresponse"
@@ -57,8 +58,8 @@ func JWTAuth() func(c *gin.Context) {
 		}
 
 		// 将当前请求的username信息保存到请求的上下文c上
-		c.Set("userId", mc.UserId)
-		c.Set("username", mc.Username)
+		c.Set(xauth.XUserId, mc.UserId)
+		c.Set(xauth.XUserName, mc.Username)
 		c.Next() // 后续的处理函数可以用过c.Get("userId")来获取当前请求的用户信息
 	}
 }

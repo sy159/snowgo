@@ -1,6 +1,7 @@
 package api
 
 import (
+	"snowgo/pkg/xauth"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
 	str "snowgo/pkg/xstr_tool"
@@ -11,7 +12,7 @@ import (
 
 // Index 首页
 func Index(c *gin.Context) {
-	traceId := c.GetString("trace_id")
+	traceId := c.GetString(xauth.XTraceId)
 	timestamp := time.Now().Unix()
 	xlogger.Infof("index traceId: %s time: %s\n", traceId, time.Now().Format("2006-01-02 15:04:05.000"))
 

@@ -1,7 +1,9 @@
 package constants
 
 const (
-	CONTAINER = "snowgo.internal.di.container" // 注册的container名
+	CONTAINER      = "snowgo.internal.di.container" // 注册的container名
+	ActiveStatus   = "Active"
+	DisabledStatus = "Disabled"
 )
 
 // CacheMenuTree 缓存相关key
@@ -19,9 +21,6 @@ const (
 const (
 	UserStatusActive   = "Active"
 	UserStatusDisabled = "Disabled" //被禁用
-
-	ActiveStatus   = "Active"
-	DisabledStatus = "Disabled"
 
 	// MenuTypeDir 菜单相关
 	MenuTypeDir  = "Dir"

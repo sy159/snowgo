@@ -15,6 +15,7 @@ import (
 	"snowgo/config"
 	"snowgo/internal/constants"
 	"snowgo/internal/di"
+	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcolor"
 	"snowgo/pkg/xdatabase/mysql"
 	"snowgo/pkg/xdatabase/redis"
@@ -48,7 +49,9 @@ func AccessLogger() gin.HandlerFunc {
 		method := c.Request.Method
 		traceId := uuid.New().String()
 		// 将请求 ID 存储到 Gin 上下文中
-		c.Set("trace_id", traceId)
+		c.Set(xauth.XTraceId, traceId)
+		c.Set(xauth.XIp, c.ClientIP())
+		c.Set(xauth.XUserAgent, c.Request.UserAgent())
 
 		// 处理ico请求，不记录日志
 		if c.Request.URL.Path == "/favicon.ico" {
@@ -95,7 +98,7 @@ func AccessLogger() gin.HandlerFunc {
 				zap.Duration("cost", cost),
 				zap.String("res", writer.body.String()),
 				zap.String("trace_id", traceId),
-				zap.String("user-agent", c.Request.UserAgent()),
+				zap.String("user_agent", c.Request.UserAgent()),
 				zap.String("errors", c.Errors.ByType(gin.ErrorTypePrivate).String()),
 			)
 		} else {
