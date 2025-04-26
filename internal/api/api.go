@@ -11,9 +11,9 @@ import (
 
 // Index 首页
 func Index(c *gin.Context) {
-	requestId := c.GetString("request_id")
+	traceId := c.GetString("trace_id")
 	timestamp := time.Now().Unix()
-	xlogger.Infof("index request_id: %s time: %s\n", requestId, time.Now().Format("2006-01-02 15:04:05.000"))
+	xlogger.Infof("index traceId: %s time: %s\n", traceId, time.Now().Format("2006-01-02 15:04:05.000"))
 
 	// redis测试
 	//container := di.GetContainer(c)
@@ -36,10 +36,10 @@ func Index(c *gin.Context) {
 	//}
 
 	xresponse.Success(c, gin.H{
-		"requestId":  requestId,
+		"trace_id":   traceId,
 		"timestamp":  timestamp,
-		"clientIp":   c.ClientIP(),
-		"random_str": str.RandStr(8, str.LowerFlag|str.UpperFlag|str.DigitFlag),
+		"client_ip":  c.ClientIP(),
+		"random_str": str.RandStr(10, str.LowerFlag|str.UpperFlag|str.DigitFlag),
 	})
 	// Json会返回data，code，msg所有
 	//xresponse.Json(c, 200021, "定制化信息", nil)
