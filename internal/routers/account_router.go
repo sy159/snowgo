@@ -1,17 +1,15 @@
 package routers
 
 import (
-	. "snowgo/internal/api/account"
-	"snowgo/internal/routers/middleware"
-
 	"github.com/gin-gonic/gin"
+	. "snowgo/internal/api/account"
 )
 
 // 用户相关路由
 func accountRouters(r *gin.RouterGroup) {
 	accountGroup := r.Group("/account")
 
-	adminGroup := accountGroup.Group("/admin", middleware.JWTAuth())
+	adminGroup := accountGroup.Group("/admin")
 	{
 		// 用户
 		adminGroup.GET("/user", GetUserList)

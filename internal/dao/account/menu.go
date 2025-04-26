@@ -3,6 +3,7 @@ package account
 import (
 	"context"
 	"github.com/pkg/errors"
+	"gorm.io/gorm"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/repo"
 )
@@ -96,6 +97,9 @@ func (d *MenuDao) IsUsedMenuByIds(ctx context.Context, menuIds []int32) (bool, e
 	m := d.repo.Query().RoleMenu
 	_, err := m.WithContext(ctx).Select(m.ID).Where(m.MenuID.In(menuIds...)).First()
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
 		return true, errors.WithStack(err)
 	}
 	return true, nil

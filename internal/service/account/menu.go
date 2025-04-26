@@ -8,7 +8,6 @@ import (
 	"snowgo/internal/constants"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/repo"
-	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xlogger"
 	"sort"
@@ -194,8 +193,6 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 }
 
 func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
-	userContext, err2 := xauth.GetUserContext(ctx)
-	fmt.Println("===========", userContext, err2)
 	// 尝试缓存
 	if data, err := s.cache.Get(ctx, constants.CacheMenuTree); err == nil && data != "" {
 		var tree []*MenuInfo
