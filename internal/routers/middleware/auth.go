@@ -68,17 +68,17 @@ func JWTAuth() func(c *gin.Context) {
 func PermissionAuth(requiredPerm string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 拿到 userId
-		uidIfc, exists := c.Get("userId")
+		uidIfc, exists := c.Get(xauth.XUserId)
 		if !exists {
 			xresponse.FailByError(c, e.HttpUnauthorized)
 			c.Abort()
 			return
 		}
-		userId := uidIfc.(int32)
+		userId := uidIfc.(int64)
 
 		container := di.GetContainer(c)
 		// 拿该用户的perms列表
-		perms, err := container.UserService.GetPermsListById(c, userId)
+		perms, err := container.UserService.GetPermsListById(c, int32(userId))
 		if err != nil {
 			xresponse.FailByError(c, e.HttpInternalServerError)
 			c.Abort()
