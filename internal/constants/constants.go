@@ -4,6 +4,19 @@ const (
 	CONTAINER      = "snowgo.internal.di.container" // 注册的container名
 	ActiveStatus   = "Active"
 	DisabledStatus = "Disabled"
+
+	OperatorUser   = "User"
+	OperatorSystem = "System"
+	OperatorJob    = "Job"
+	OperatorApi    = "Api"
+
+	ActionCreate = "Create"
+	ActionUpdate = "Update"
+	ActionDelete = "Delete"
+
+	ResourceUser = "User"
+	ResourceRole = "Role"
+	ResourceMenu = "Menu"
 )
 
 // CacheMenuTree 缓存相关key

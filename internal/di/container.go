@@ -8,7 +8,9 @@ import (
 	"snowgo/internal/constants"
 	"snowgo/internal/dal/repo"
 	accountDao "snowgo/internal/dao/account"
+	"snowgo/internal/dao/log"
 	accountService "snowgo/internal/service/account"
+	logService "snowgo/internal/service/log"
 	"snowgo/pkg/xauth/jwt"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xlock"
@@ -86,11 +88,13 @@ func NewContainer(jwtConfig config.JwtConfig, rdb *redis.Client, db *gorm.DB, db
 	userDao := accountDao.NewUserDao(repository)
 	menuDao := accountDao.NewMenuDao(repository)
 	roleDao := accountDao.NewRoleDao(repository)
+	operationLogDao := log.NewOperationLogDao(repository)
 
 	// 构造Service依赖
+	operationLogService := logService.NewOperationLogService(repository, operationLogDao)
 	menuService := accountService.NewMenuService(repository, redisCache, menuDao)
 	roleService := accountService.NewRoleService(repository, roleDao, redisCache)
-	userService := accountService.NewUserService(repository, userDao, redisCache, roleService)
+	userService := accountService.NewUserService(repository, userDao, redisCache, roleService, operationLogService)
 
 	return &Container{
 		Cache:      redisCache,

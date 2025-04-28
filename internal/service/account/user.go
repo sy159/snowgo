@@ -9,6 +9,8 @@ import (
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
 	"snowgo/internal/dao/account"
+	"snowgo/internal/service/log"
+	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xcryption"
 	e "snowgo/pkg/xerror"
@@ -41,14 +43,17 @@ type UserService struct {
 	userDao     UserRepo
 	cache       xcache.Cache
 	roleService *RoleService
+	logService  *log.OperationLogService
 }
 
-func NewUserService(db *repo.Repository, userDao UserRepo, cache xcache.Cache, roleService *RoleService) *UserService {
+func NewUserService(db *repo.Repository, userDao UserRepo, cache xcache.Cache, roleService *RoleService,
+	logService *log.OperationLogService) *UserService {
 	return &UserService{
 		db:          db,
 		cache:       cache,
 		userDao:     userDao,
 		roleService: roleService,
+		logService:  logService,
 	}
 }
 
@@ -91,6 +96,12 @@ type UserListCondition struct {
 
 // CreateUser 创建用户
 func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int32, error) {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+
 	// 检查用户名，或者电话是否存在
 	isDuplicate, err := u.userDao.IsNameTelDuplicate(ctx, userParam.Username, userParam.Tel, 0)
 	if err != nil {
@@ -148,6 +159,26 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 			}
 		}
 
+		// 创建操作日志
+		err = u.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+			OperatorID:   int32(userContext.UserId),
+			OperatorName: userContext.Username,
+			OperatorType: constants.OperatorUser,
+			Resource:     constants.ResourceUser,
+			ResourceID:   userObj.ID,
+			TraceID:      userContext.TraceId,
+			Action:       constants.ActionCreate,
+			BeforeData:   "",
+			AfterData:    userObj,
+			Description: fmt.Sprintf("用户(%d-%s)创建了用户(%d-%s)",
+				userContext.UserId, userContext.Username, userObj.ID, userObj.Username),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.Errorf("操作日志创建失败: %+v err: %v", userParam, err)
+			return errors.WithMessage(err, "操作日志创建失败")
+		}
+
 		return nil
 	})
 
@@ -160,6 +191,12 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 
 // UpdateUser 更新用户
 func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int32, error) {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+
 	if userParam.ID <= 0 {
 		return 0, errors.New(e.UserNotFound.GetErrMsg())
 	}
@@ -217,6 +254,26 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 				xlogger.Errorf("用户与角色关联关系创建失败: %+v err: %v", userParam, err)
 				return errors.WithMessage(err, "用户与角色关联关系创建失败")
 			}
+		}
+
+		// 创建操作日志
+		err = u.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+			OperatorID:   int32(userContext.UserId),
+			OperatorName: userContext.Username,
+			OperatorType: constants.OperatorUser,
+			Resource:     constants.ResourceUser,
+			ResourceID:   userParam.ID,
+			TraceID:      userContext.TraceId,
+			Action:       constants.ActionUpdate,
+			BeforeData:   oldUser,
+			AfterData:    userParam,
+			Description: fmt.Sprintf("用户(%d-%s)修改了了用户(%d-%s)信息",
+				userContext.UserId, userContext.Username, userParam.ID, userParam.Username),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.Errorf("操作日志创建失败: %+v err: %v", userParam, err)
+			return errors.WithMessage(err, "操作日志创建失败")
 		}
 
 		return nil
@@ -305,10 +362,16 @@ func (u *UserService) GetUserList(ctx context.Context, condition *UserListCondit
 
 // DeleteById 删除用户
 func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
+	if err != nil {
+		return err
+	}
+
 	if userId <= 0 {
 		return errors.New(e.UserNotFound.GetErrMsg())
 	}
-	err := u.db.WriteQuery().Transaction(func(tx *query.Query) error {
+	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 删除用户
 		err := u.userDao.TransactionDeleteById(ctx, tx, userId)
 		if err != nil {
@@ -322,6 +385,27 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 			xlogger.Errorf("用户与角色关联关系删除失败: %v", err)
 			return errors.WithMessage(err, "用户与角色关联关系删除失败")
 		}
+
+		// 创建操作日志
+		err = u.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+			OperatorID:   int32(userContext.UserId),
+			OperatorName: userContext.Username,
+			OperatorType: constants.OperatorUser,
+			Resource:     constants.ResourceUser,
+			ResourceID:   userId,
+			TraceID:      userContext.TraceId,
+			Action:       constants.ActionDelete,
+			BeforeData:   "",
+			AfterData:    "",
+			Description: fmt.Sprintf("用户(%d-%s)删除了用户(%d)",
+				userContext.UserId, userContext.Username, userId),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.Errorf("操作日志创建失败: %v", err)
+			return errors.WithMessage(err, "操作日志创建失败")
+		}
+
 		return nil
 	})
 	xlogger.Infof("用户删除成功: %d", userId)

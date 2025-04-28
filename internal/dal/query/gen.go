@@ -17,35 +17,38 @@ import (
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:       db,
-		Menu:     newMenu(db, opts...),
-		Role:     newRole(db, opts...),
-		RoleMenu: newRoleMenu(db, opts...),
-		User:     newUser(db, opts...),
-		UserRole: newUserRole(db, opts...),
+		db:           db,
+		Menu:         newMenu(db, opts...),
+		OperationLog: newOperationLog(db, opts...),
+		Role:         newRole(db, opts...),
+		RoleMenu:     newRoleMenu(db, opts...),
+		User:         newUser(db, opts...),
+		UserRole:     newUserRole(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	Menu     menu
-	Role     role
-	RoleMenu roleMenu
-	User     user
-	UserRole userRole
+	Menu         menu
+	OperationLog operationLog
+	Role         role
+	RoleMenu     roleMenu
+	User         user
+	UserRole     userRole
 }
 
 func (q *Query) Available() bool { return q.db != nil }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:       db,
-		Menu:     q.Menu.clone(db),
-		Role:     q.Role.clone(db),
-		RoleMenu: q.RoleMenu.clone(db),
-		User:     q.User.clone(db),
-		UserRole: q.UserRole.clone(db),
+		db:           db,
+		Menu:         q.Menu.clone(db),
+		OperationLog: q.OperationLog.clone(db),
+		Role:         q.Role.clone(db),
+		RoleMenu:     q.RoleMenu.clone(db),
+		User:         q.User.clone(db),
+		UserRole:     q.UserRole.clone(db),
 	}
 }
 
@@ -59,30 +62,33 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:       db,
-		Menu:     q.Menu.replaceDB(db),
-		Role:     q.Role.replaceDB(db),
-		RoleMenu: q.RoleMenu.replaceDB(db),
-		User:     q.User.replaceDB(db),
-		UserRole: q.UserRole.replaceDB(db),
+		db:           db,
+		Menu:         q.Menu.replaceDB(db),
+		OperationLog: q.OperationLog.replaceDB(db),
+		Role:         q.Role.replaceDB(db),
+		RoleMenu:     q.RoleMenu.replaceDB(db),
+		User:         q.User.replaceDB(db),
+		UserRole:     q.UserRole.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	Menu     *menuDo
-	Role     *roleDo
-	RoleMenu *roleMenuDo
-	User     *userDo
-	UserRole *userRoleDo
+	Menu         *menuDo
+	OperationLog *operationLogDo
+	Role         *roleDo
+	RoleMenu     *roleMenuDo
+	User         *userDo
+	UserRole     *userRoleDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		Menu:     q.Menu.WithContext(ctx),
-		Role:     q.Role.WithContext(ctx),
-		RoleMenu: q.RoleMenu.WithContext(ctx),
-		User:     q.User.WithContext(ctx),
-		UserRole: q.UserRole.WithContext(ctx),
+		Menu:         q.Menu.WithContext(ctx),
+		OperationLog: q.OperationLog.WithContext(ctx),
+		Role:         q.Role.WithContext(ctx),
+		RoleMenu:     q.RoleMenu.WithContext(ctx),
+		User:         q.User.WithContext(ctx),
+		UserRole:     q.UserRole.WithContext(ctx),
 	}
 }
 
