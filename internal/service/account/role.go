@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"snowgo/internal/constants"
 	"snowgo/internal/dal/query"
+	"snowgo/internal/service/log"
+	"snowgo/pkg/xauth"
 	"time"
 
 	"github.com/pkg/errors"
@@ -35,14 +37,15 @@ type RoleRepo interface {
 }
 
 type RoleService struct {
-	db      *repo.Repository
-	roleDao RoleRepo
-	cache   xcache.Cache
+	db         *repo.Repository
+	roleDao    RoleRepo
+	cache      xcache.Cache
+	logService *log.OperationLogService
 }
 
 // NewRoleService 构造函数
-func NewRoleService(db *repo.Repository, roleDao RoleRepo, cache xcache.Cache) *RoleService {
-	return &RoleService{db: db, roleDao: roleDao, cache: cache}
+func NewRoleService(db *repo.Repository, roleDao RoleRepo, cache xcache.Cache, logService *log.OperationLogService) *RoleService {
+	return &RoleService{db: db, roleDao: roleDao, cache: cache, logService: logService}
 }
 
 // RoleParam 创建或更新角色输入
@@ -81,6 +84,12 @@ type RoleListCondition struct {
 
 // CreateRole 创建角色
 func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, error) {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+
 	// 校验 code 是否存在
 	exists, err := s.roleDao.IsCodeExists(ctx, param.Code, 0)
 	if err != nil {
@@ -135,6 +144,26 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 			}
 		}
 
+		// 创建操作日志
+		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+			OperatorID:   int32(userContext.UserId),
+			OperatorName: userContext.Username,
+			OperatorType: constants.OperatorUser,
+			Resource:     constants.ResourceRole,
+			ResourceID:   roleObj.ID,
+			TraceID:      userContext.TraceId,
+			Action:       constants.ActionCreate,
+			BeforeData:   "",
+			AfterData:    param,
+			Description: fmt.Sprintf("用户(%d-%s)创建了角色(%d-%s)",
+				userContext.UserId, userContext.Username, roleObj.ID, role.Code),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.Errorf("操作日志创建失败: %+v err: %v", roleObj, err)
+			return errors.WithMessage(err, "操作日志创建失败")
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -146,6 +175,12 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 
 // UpdateRole 更新角色信息
 func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
+	if err != nil {
+		return err
+	}
+
 	if param.ID <= 0 {
 		return errors.New("角色ID无效")
 	}
@@ -211,6 +246,27 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 				return errors.WithMessage(err, "角色与菜单关联关系创建失败")
 			}
 		}
+
+		// 创建操作日志
+		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+			OperatorID:   int32(userContext.UserId),
+			OperatorName: userContext.Username,
+			OperatorType: constants.OperatorUser,
+			Resource:     constants.ResourceRole,
+			ResourceID:   param.ID,
+			TraceID:      userContext.TraceId,
+			Action:       constants.ActionUpdate,
+			BeforeData:   oldRole,
+			AfterData:    param,
+			Description: fmt.Sprintf("用户(%d-%s)修改了角色(%d-%s)信息",
+				userContext.UserId, userContext.Username, param.ID, param.Code),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.Errorf("操作日志创建失败: %+v err: %v", param, err)
+			return errors.WithMessage(err, "操作日志创建失败")
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -230,6 +286,12 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 
 // DeleteRole 删除角色
 func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
+	if err != nil {
+		return err
+	}
+
 	xlogger.Infof("删除角色: %d", id)
 	if id <= 0 {
 		return errors.New("角色ID无效")
@@ -258,6 +320,27 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 			xlogger.Errorf("角色与菜单关联关系删除失败: %v", err)
 			return errors.WithMessage(err, "角色与菜单关联关系删除失败")
 		}
+
+		// 创建操作日志
+		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+			OperatorID:   int32(userContext.UserId),
+			OperatorName: userContext.Username,
+			OperatorType: constants.OperatorUser,
+			Resource:     constants.ResourceRole,
+			ResourceID:   id,
+			TraceID:      userContext.TraceId,
+			Action:       constants.ActionDelete,
+			BeforeData:   "",
+			AfterData:    "",
+			Description: fmt.Sprintf("用户(%d-%s)删除了角色(%d)",
+				userContext.UserId, userContext.Username, id),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.Errorf("操作日志创建失败: %v", err)
+			return errors.WithMessage(err, "操作日志创建失败")
+		}
+
 		return nil
 	})
 	if err != nil {

@@ -93,7 +93,7 @@ func NewContainer(jwtConfig config.JwtConfig, rdb *redis.Client, db *gorm.DB, db
 	// 构造Service依赖
 	operationLogService := logService.NewOperationLogService(repository, operationLogDao)
 	menuService := accountService.NewMenuService(repository, redisCache, menuDao)
-	roleService := accountService.NewRoleService(repository, roleDao, redisCache)
+	roleService := accountService.NewRoleService(repository, roleDao, redisCache, operationLogService)
 	userService := accountService.NewUserService(repository, userDao, redisCache, roleService, operationLogService)
 
 	return &Container{

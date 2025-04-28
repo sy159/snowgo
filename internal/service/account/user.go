@@ -169,7 +169,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 			TraceID:      userContext.TraceId,
 			Action:       constants.ActionCreate,
 			BeforeData:   "",
-			AfterData:    userObj,
+			AfterData:    userParam,
 			Description: fmt.Sprintf("用户(%d-%s)创建了用户(%d-%s)",
 				userContext.UserId, userContext.Username, userObj.ID, userObj.Username),
 			IP: userContext.IP,
@@ -267,7 +267,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 			Action:       constants.ActionUpdate,
 			BeforeData:   oldUser,
 			AfterData:    userParam,
-			Description: fmt.Sprintf("用户(%d-%s)修改了了用户(%d-%s)信息",
+			Description: fmt.Sprintf("用户(%d-%s)修改了用户(%d-%s)信息",
 				userContext.UserId, userContext.Username, userParam.ID, userParam.Username),
 			IP: userContext.IP,
 		})
