@@ -7,7 +7,10 @@ import (
 	"github.com/pkg/errors"
 	"snowgo/internal/constants"
 	"snowgo/internal/dal/model"
+	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
+	"snowgo/internal/service/log"
+	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xlogger"
 	"sort"
@@ -16,8 +19,11 @@ import (
 
 type MenuRepo interface {
 	CreateMenu(ctx context.Context, mn *model.Menu) (*model.Menu, error)
+	TransactionCreateMenu(ctx context.Context, tx *query.Query, menu *model.Menu) (*model.Menu, error)
 	UpdateMenu(ctx context.Context, mn *model.Menu) (*model.Menu, error)
+	TransactionUpdateMenu(ctx context.Context, tx *query.Query, menu *model.Menu) (*model.Menu, error)
 	DeleteById(ctx context.Context, id int32) error
+	TransactionDeleteById(ctx context.Context, tx *query.Query, id int32) error
 	GetById(ctx context.Context, id int32) (*model.Menu, error)
 	GetByParentId(ctx context.Context, parentId int32) ([]*model.Menu, error)
 	GetAllMenus(ctx context.Context) ([]*model.Menu, error)
@@ -26,16 +32,18 @@ type MenuRepo interface {
 }
 
 type MenuService struct {
-	db      *repo.Repository
-	menuDao MenuRepo
-	cache   xcache.Cache
+	db         *repo.Repository
+	menuDao    MenuRepo
+	cache      xcache.Cache
+	logService *log.OperationLogService
 }
 
-func NewMenuService(db *repo.Repository, cache xcache.Cache, menuDao MenuRepo) *MenuService {
+func NewMenuService(db *repo.Repository, cache xcache.Cache, menuDao MenuRepo, logService *log.OperationLogService) *MenuService {
 	return &MenuService{
-		db:      db,
-		cache:   cache,
-		menuDao: menuDao,
+		db:         db,
+		cache:      cache,
+		menuDao:    menuDao,
+		logService: logService,
 	}
 }
 
@@ -67,6 +75,12 @@ type MenuInfo struct {
 
 // CreateMenu 创建菜单权限
 func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, error) {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+
 	// 校验父节点
 	if p.ParentID > 0 {
 		if _, err := s.menuDao.GetById(ctx, p.ParentID); err != nil {
@@ -83,11 +97,42 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		Perms:    &p.Perms,
 		OrderNum: p.OrderNum,
 	}
-	menuObj, err := s.menuDao.CreateMenu(ctx, menu)
+	var menuObj *model.Menu
+
+	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 创建菜单
+		menuObj, err = s.menuDao.TransactionCreateMenu(ctx, tx, menu)
+		if err != nil {
+			xlogger.Errorf("创建菜单失败: %v", err)
+			return errors.WithMessage(err, "创建菜单失败")
+		}
+
+		// 创建操作日志
+		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+			OperatorID:   int32(userContext.UserId),
+			OperatorName: userContext.Username,
+			OperatorType: constants.OperatorUser,
+			Resource:     constants.ResourceMenu,
+			ResourceID:   menuObj.ID,
+			TraceID:      userContext.TraceId,
+			Action:       constants.ActionCreate,
+			BeforeData:   "",
+			AfterData:    menuObj,
+			Description: fmt.Sprintf("用户(%d-%s)创建了%s类型的菜单(%d-%s)",
+				userContext.UserId, userContext.Username, menuObj.MenuType, menuObj.ID, menuObj.Name),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.Errorf("操作日志创建失败: %+v err: %v", menuObj, err)
+			return errors.WithMessage(err, "操作日志创建失败")
+		}
+
+		return nil
+	})
 	if err != nil {
-		xlogger.Errorf("创建菜单失败: %v", err)
-		return 0, errors.WithMessage(err, "创建菜单失败")
+		return 0, err
 	}
+
 	xlogger.Infof("菜单创建成功: %+v", menuObj)
 
 	// 清理菜单树缓存
@@ -99,6 +144,12 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 
 // UpdateMenu 更新菜单或按钮，校验同 CreateMenu
 func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
+	if err != nil {
+		return err
+	}
+
 	if p.ID <= 0 {
 		return errors.New("菜单ID无效")
 	}
@@ -129,11 +180,40 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		Perms:    &p.Perms,
 		OrderNum: p.OrderNum,
 	}
-	_, err = s.menuDao.UpdateMenu(ctx, mn)
+
+	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		menuObj, err := s.menuDao.TransactionUpdateMenu(ctx, tx, mn)
+		if err != nil {
+			xlogger.Errorf("更新菜单失败: %v", err)
+			return errors.WithMessage(err, "更新菜单失败")
+		}
+
+		// 创建操作日志
+		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+			OperatorID:   int32(userContext.UserId),
+			OperatorName: userContext.Username,
+			OperatorType: constants.OperatorUser,
+			Resource:     constants.ResourceMenu,
+			ResourceID:   p.ID,
+			TraceID:      userContext.TraceId,
+			Action:       constants.ActionUpdate,
+			BeforeData:   oldMenu,
+			AfterData:    menuObj,
+			Description: fmt.Sprintf("用户(%d-%s)修改了%s类型的菜单(%d-%s)信息",
+				userContext.UserId, userContext.Username, p.MenuType, p.ID, p.Name),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.Errorf("操作日志创建失败: %+v err: %v", p, err)
+			return errors.WithMessage(err, "操作日志创建失败")
+		}
+
+		return nil
+	})
 	if err != nil {
-		xlogger.Errorf("更新菜单失败: %v", err)
-		return errors.WithMessage(err, "更新菜单失败")
+		return err
 	}
+
 	xlogger.Infof("菜单更新成功: old=%+v new=%+v", oldMenu, mn)
 
 	// 如果修改了接口权限，需要更新角色-接口权限数据缓存
@@ -160,6 +240,12 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 
 // DeleteMenuById 删除菜单或按钮
 func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
+	if err != nil {
+		return err
+	}
+
 	if id <= 0 {
 		return errors.New("菜单ID无效")
 	}
@@ -178,11 +264,38 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 	if isUsed {
 		return errors.New("该菜单权限已被使用，无法删除")
 	}
-	err = s.menuDao.DeleteById(ctx, id)
-	if err != nil {
-		xlogger.Errorf("删除菜单失败: %v", err)
-		return errors.WithMessage(err, "删除菜单失败")
-	}
+
+	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 删除菜单
+		err = s.menuDao.TransactionDeleteById(ctx, tx, id)
+		if err != nil {
+			xlogger.Errorf("删除菜单失败: %v", err)
+			return errors.WithMessage(err, "删除菜单失败")
+		}
+
+		// 创建操作日志
+		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+			OperatorID:   int32(userContext.UserId),
+			OperatorName: userContext.Username,
+			OperatorType: constants.OperatorUser,
+			Resource:     constants.ResourceMenu,
+			ResourceID:   id,
+			TraceID:      userContext.TraceId,
+			Action:       constants.ActionDelete,
+			BeforeData:   "",
+			AfterData:    "",
+			Description: fmt.Sprintf("用户(%d-%s)删除了菜单(%d)",
+				userContext.UserId, userContext.Username, id),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.Errorf("操作日志创建失败: %v", err)
+			return errors.WithMessage(err, "操作日志创建失败")
+		}
+
+		return nil
+	})
+
 	xlogger.Infof("菜单删除成功: %d", id)
 
 	// 清理菜单树缓存

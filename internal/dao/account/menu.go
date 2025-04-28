@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
 	"snowgo/internal/dal/model"
+	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
 )
 
@@ -19,6 +20,15 @@ func NewMenuDao(repo *repo.Repository) *MenuDao {
 // CreateMenu 创建菜单或按钮
 func (d *MenuDao) CreateMenu(ctx context.Context, menu *model.Menu) (*model.Menu, error) {
 	err := d.repo.Query().WithContext(ctx).Menu.Create(menu)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return menu, nil
+}
+
+// TransactionCreateMenu 创建菜单或按钮
+func (d *MenuDao) TransactionCreateMenu(ctx context.Context, tx *query.Query, menu *model.Menu) (*model.Menu, error) {
+	err := tx.WithContext(ctx).Menu.Create(menu)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -40,6 +50,18 @@ func (d *MenuDao) UpdateMenu(ctx context.Context, menu *model.Menu) (*model.Menu
 	return menu, nil
 }
 
+// TransactionUpdateMenu 更新菜单
+func (d *MenuDao) TransactionUpdateMenu(ctx context.Context, tx *query.Query, menu *model.Menu) (*model.Menu, error) {
+	if menu.ID <= 0 {
+		return nil, errors.New("菜单ID无效")
+	}
+	err := tx.WithContext(ctx).Menu.Where(tx.Menu.ID.Eq(menu.ID)).Save(menu)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return menu, nil
+}
+
 // DeleteById 删除菜单
 func (d *MenuDao) DeleteById(ctx context.Context, id int32) error {
 	if id <= 0 {
@@ -49,6 +71,18 @@ func (d *MenuDao) DeleteById(ctx context.Context, id int32) error {
 	_, err := m.WithContext(ctx).
 		Where(m.ID.Eq(id)).
 		Delete()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
+}
+
+// TransactionDeleteById 删除菜单
+func (d *MenuDao) TransactionDeleteById(ctx context.Context, tx *query.Query, id int32) error {
+	if id <= 0 {
+		return errors.New("菜单ID无效")
+	}
+	_, err := tx.WithContext(ctx).Menu.Where(tx.Menu.ID.Eq(id)).Delete()
 	if err != nil {
 		return errors.WithStack(err)
 	}
