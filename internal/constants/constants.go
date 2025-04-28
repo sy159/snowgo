@@ -1,6 +1,8 @@
 package constants
 
 const (
+	DefaultLimit = 10 // 分页默认10条数据
+
 	CONTAINER      = "snowgo.internal.di.container" // 注册的container名
 	ActiveStatus   = "Active"
 	DisabledStatus = "Disabled"

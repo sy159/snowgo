@@ -2,6 +2,7 @@ package account
 
 import (
 	"github.com/gin-gonic/gin"
+	"snowgo/internal/constants"
 	"snowgo/internal/di"
 	"snowgo/internal/service/account"
 	e "snowgo/pkg/xerror"
@@ -44,7 +45,8 @@ func CreateUser(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	xlogger.Infof("create user: %+v", user)
+	xlogger.Infof("create user: (用户名: %s, 电话: %s, 昵称: %s, 角色: %d)",
+		user.Username, user.Tel, user.Nickname, user.RoleId)
 
 	// 可以额外校验
 	if user.Username == "" || user.Tel == "" {
@@ -137,7 +139,7 @@ func GetUserList(c *gin.Context) {
 		xresponse.FailByError(c, e.LimitErrorRequests)
 		return
 	} else if userListReq.Limit == 0 {
-		userListReq.Limit = 10 // 默认长度为10
+		userListReq.Limit = constants.DefaultLimit
 	}
 
 	container := di.GetContainer(c)
