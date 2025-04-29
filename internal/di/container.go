@@ -26,12 +26,17 @@ type Container struct {
 
 	// 这里只提供对api使用的service，不提供dao操作
 	AccountContainer
+	SystemContainer
 }
 
 type AccountContainer struct {
 	UserService *accountService.UserService
 	MenuService *accountService.MenuService
 	RoleService *accountService.RoleService
+}
+
+type SystemContainer struct {
+	OperationLogService *logService.OperationLogService
 }
 
 // BuildJwtManager 构建jwt操作
@@ -105,6 +110,9 @@ func NewContainer(jwtConfig config.JwtConfig, rdb *redis.Client, db *gorm.DB, db
 			MenuService: menuService,
 			RoleService: roleService,
 		},
+		SystemContainer: SystemContainer{
+			OperationLogService: operationLogService,
+		},
 	}
 }
 
@@ -125,4 +133,10 @@ func GetContainer(c *gin.Context) *Container {
 func GetAccountContainer(c *gin.Context) *AccountContainer {
 	container := GetContainer(c)
 	return &container.AccountContainer
+}
+
+// GetSystemContainer 获取注入的cache、service等
+func GetSystemContainer(c *gin.Context) *SystemContainer {
+	container := GetContainer(c)
+	return &container.SystemContainer
 }
