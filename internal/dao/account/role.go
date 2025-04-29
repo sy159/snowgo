@@ -218,7 +218,7 @@ func (r *RoleDao) GetMenuPermsByRoleId(ctx context.Context, roleId int32) ([]str
 	menuPermsList := make([]string, 0, 10)
 	err := m.WithContext(ctx).
 		Join(menu, m.MenuID.EqCol(menu.ID)).
-		Where(m.RoleID.Eq(roleId), menu.Perms.IsNotNull()).
+		Where(m.RoleID.Eq(roleId), menu.Perms.IsNotNull(), menu.Perms.Neq("")).
 		Select(menu.Perms).
 		Pluck(menu.Perms, &menuPermsList)
 	if err != nil {

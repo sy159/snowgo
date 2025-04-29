@@ -120,6 +120,9 @@ INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `per
 INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `order_num`) VALUES (17, 15, 'Btn', '添加菜单', '', '', 'account:menu:create', 2);
 INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `order_num`) VALUES (18, 15, 'Btn', '更新菜单', '', '', 'account:menu:update', 3);
 INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `order_num`) VALUES (19, 15, 'Btn', '删除菜单', '', '', 'account:menu:delete', 4);
+INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `order_num`) VALUES (20, 0, 'Dir', '系统管理', '', '', '', 2);
+INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `order_num`) VALUES (21, 20, 'Menu', '操作日志管理', '/system/operation-log', 'fa fa-pencil-square-o', '', 1);
+INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `order_num`) VALUES (22, 21, 'Btn', '操作日志列表', '', '', 'system:operation-log:list', 1);
 
 # 角色数据
 INSERT INTO `role` (`id`, `code`, `name`, `description`) VALUES (1, 'admin', '管理员', '平台管理员角色');
@@ -145,6 +148,9 @@ INSERT INTO `role_menu` (`role_id`, `menu_id`) VALUES (1, 16);
 INSERT INTO `role_menu` (`role_id`, `menu_id`) VALUES (1, 17);
 INSERT INTO `role_menu` (`role_id`, `menu_id`) VALUES (1, 18);
 INSERT INTO `role_menu` (`role_id`, `menu_id`) VALUES (1, 19);
+INSERT INTO `role_menu` (`role_id`, `menu_id`) VALUES (1, 20);
+INSERT INTO `role_menu` (`role_id`, `menu_id`) VALUES (1, 21);
+INSERT INTO `role_menu` (`role_id`, `menu_id`) VALUES (1, 22);
 
 # 用户角色关联数据
 INSERT INTO `user_role` (`user_id`, `role_id`) VALUES (1, 1);
