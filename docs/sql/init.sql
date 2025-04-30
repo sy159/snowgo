@@ -127,8 +127,7 @@ INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `per
 # 角色数据
 INSERT INTO `role` (`id`, `code`, `name`, `description`) VALUES (1, 'admin', '管理员', '平台管理员角色');
 
-#
-角色菜单关联数据
+# 角色菜单关联数据
 INSERT INTO `role_menu` (`role_id`, `menu_id`) VALUES (1, 1);
 INSERT INTO `role_menu` (`role_id`, `menu_id`) VALUES (1, 2);
 INSERT INTO `role_menu` (`role_id`, `menu_id`) VALUES (1, 3);
