@@ -53,6 +53,9 @@ func AccessLogger() gin.HandlerFunc {
 		c.Set(xauth.XIp, c.ClientIP())
 		c.Set(xauth.XUserAgent, c.Request.UserAgent())
 
+		// trace_id放入header中
+		c.Writer.Header().Set(xauth.XTraceId, traceId)
+
 		// 处理ico请求，不记录日志
 		if c.Request.URL.Path == "/favicon.ico" {
 			c.AbortWithStatus(http.StatusNoContent)
