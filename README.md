@@ -140,6 +140,10 @@ defer redis.CloseRedis(redis.RDB)
 go mod download
 go mod tidy
 ```
+初始化项目(初始化数据等)
+```shell
+make init
+```
 启动项目
 ```shell
 go run main.go

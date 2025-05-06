@@ -1,4 +1,5 @@
 # 创建user表
+DROP TABLE IF EXISTS `user`;
 CREATE TABLE `user`
 (
     `id`         INT(11)     NOT NULL AUTO_INCREMENT,
@@ -20,6 +21,7 @@ CREATE TABLE `user`
   COLLATE = utf8mb4_unicode_ci COMMENT ='用户表';
 
 # 创建角色表
+DROP TABLE IF EXISTS `role`;
 CREATE TABLE `role`
 (
     `id`          INT(11)      NOT NULL AUTO_INCREMENT,
@@ -35,6 +37,7 @@ CREATE TABLE `role`
   COLLATE = utf8mb4_unicode_ci COMMENT ='角色表';
 
 # 创建菜单权限表
+DROP TABLE IF EXISTS `menu`;
 CREATE TABLE `menu`
 (
     `id`         INT(11)                   NOT NULL AUTO_INCREMENT,
@@ -53,6 +56,7 @@ CREATE TABLE `menu`
   COLLATE = utf8mb4_unicode_ci COMMENT ='菜单权限表';
 
 # 用户-角色关联表
+DROP TABLE IF EXISTS `user_role`;
 CREATE TABLE `user_role`
 (
     `id`         BIGINT      NOT NULL AUTO_INCREMENT,
@@ -68,6 +72,7 @@ CREATE TABLE `user_role`
   COLLATE = utf8mb4_unicode_ci COMMENT ='用户-角色关联表';
 
 # 创建角色-菜单权限表
+DROP TABLE IF EXISTS `role_menu`;
 CREATE TABLE `role_menu`
 (
     `id`         BIGINT      NOT NULL AUTO_INCREMENT,
@@ -83,6 +88,7 @@ CREATE TABLE `role_menu`
   COLLATE = utf8mb4_unicode_ci COMMENT ='角色-菜单权限表';
 
 # 创建操作日志表
+DROP TABLE IF EXISTS `operation_log`;
 CREATE TABLE `operation_log`
 (
     `id`            BIGINT      NOT NULL AUTO_INCREMENT COMMENT '日志主键',
