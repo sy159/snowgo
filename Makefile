@@ -4,7 +4,7 @@ PORT := 8000
 .PHONY: init
 init:
 	@echo "开始初始化数据库..."
-	@go run ./internal/dal/cmd/init.go
+	@go run ./internal/dal/cmd/init/main.go
 
 docker-build: name ?= snowgo
 docker-build: version ?= v1.0
@@ -27,7 +27,7 @@ docker-stop:
 .PHONY: gen
 gen: do ?= init
 gen:
-	go run ./internal/dal/cmd/gen.go $(do) && make gen-query
+	go run ./internal/dal/cmd/gen/main.go $(do) && make gen-query
 	# git add ./internal/dal/
 gen-query:
-	go run ./internal/dal/cmd/gen.go query
+	go run ./internal/dal/cmd/gen/main.go query
