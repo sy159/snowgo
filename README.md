@@ -203,3 +203,5 @@ docker-compose up -d
    - [Gin 官方文档](https://gin-gonic.com/)
    - [GORM 文档](https://gorm.io/zh_CN/docs/)
    - [Gen 工具](https://gorm.io/zh_CN/gen/dao.html)
+   - [JWT 文档](https://jwt.io/introduction/)
+   - [项目接口 文档](https://apifox.com/apidoc/shared-becb3022-d340-491c-bdd7-1f4d4b84620f)
