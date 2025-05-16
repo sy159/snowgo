@@ -167,7 +167,7 @@ docker build -t snowgo:v1.0.0 .
 ```
 配置.env相关信息(服务端口、使用镜像等)
 ```shell
-vim .env
+vim .env  # 修改ENV=container，会使用config.container.yaml的配置文件，里面包含了数据库、redis、nginx
 ```
 修改配置文件(地址更换完docker compose服务名)
 ```shell
@@ -177,6 +177,7 @@ vim config$.{env}.yaml
 ```shell
 docker-compose up -d
 ```
+
 
 ------------
 ### 📢 注意事项

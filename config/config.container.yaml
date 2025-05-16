@@ -1,0 +1,50 @@
+application:
+  enableAccessLog: true  # 是否打开访问记录，文件地址在logger配置
+  enablePprof: true  # 是否打开pprof
+  server:
+    name: snowgo容器测试环境 # 服务名
+    version: v1
+    addr: 0.0.0.0  # 服务地址
+    port: 8000  # 端口号
+    readTimeout: 40 # 单位s 当客户端发送请求后，服务器读取请求的时间超过该值，服务器将自动关闭连接。
+    writeTimeout: 40 # 单位s 当服务器处理请求后，写入响应的时间超过该值，服务器将自动关闭连接。
+    maxHeaderMB: 4 # 单位M
+
+log:
+  writer: file  # 日志输出的位置：console控制台输出，file输出到文件，multi控制台跟日志文件同时输出
+  accountEncoder: json  # 访问文件解析格式：normal正常格式输出；json输出为json
+  logEncoder: json  # log文件解析格式：normal正常格式输出；json输出为json
+  accountFileMaxAgeDay: 30 # 访问文件最多保留多少天
+  logFileMaxAgeDay: 30 # 日志文件最多保留多少天
+
+mysql:
+  separationRW: false  # 是否配置读写分离
+  dsn: root:zx.123@tcp(snowgo-mysql:3306)/snowgo?charset=utf8mb4&parseTime=true&loc=Local
+  tablePre: ""  # 表前缀
+  maxIdleConns: 10  # 设置闲置的连接数，默认值为2；推荐 ((核心数 * 2) + 有效磁盘数)
+  maxOpenConns: 40  # 设置最大打开的连接数，默认值为0，表示不限制。
+  connMaxIdleTime: 30  # 连接空闲最大等待时间。单位min
+  connMaxLifeTime: 180  # 设置了连接可复用的最大时间。单位min
+  printSqlLog: true  # 是否打印具体SQL
+  slowThresholdTime: 3000 # 慢sql阈值 单位ms(在设置printSqlLog=true有用)
+  mainsDSN:
+    - root:zx.123@tcp(snowgo-mysql:3306)/snowgo?charset=utf8mb4&parseTime=true&loc=Local
+  slavesDSN:
+    - root:zx.123@tcp(snowgo-mysql:3306)/snowgo?charset=utf8mb4&parseTime=true&loc=Local
+
+redis:
+  addr: snowgo-redis:6379  # 地址
+  password: ""  # 密码
+  db: 0  # 数据库
+  dialTimeout: 2  # 拨号超时(秒)
+  readTimeout: 2  # 读取超时(秒)
+  writeTimeout: 2  # 写入超时(秒)
+  idleTimeout: 60  # 空闲超时(秒)
+  minIdleConns: 8  # 最小空闲连接数
+  poolSize: 20  # 连接池最大链接数
+
+jwt:
+  issuer: test-snow  # 发布人
+  jwtSecret: iXsXX5Zpi5JxZF*6RTphd67F7Mi%AawK  # jwt加密秘钥
+  accessExpirationTime: 10  # 访问token到期时间，单位min
+  refreshExpirationTime: 30  # 刷新token到期时间，单位min

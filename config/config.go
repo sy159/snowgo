@@ -90,6 +90,7 @@ var configFilePathMap = map[string]string{
 	xenv.ProdConstant: "config.prod",
 	xenv.UatConstant:  "config.uat",
 	xenv.DevConstant:  "config.dev",
+	"container":       "config.container", // 用与docker compose启动
 }
 
 // GetMaxOpenConn 最大打开连接数

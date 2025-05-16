@@ -72,7 +72,7 @@ services:
         max-size: '5m'
         max-file: '10'
     environment:
-      ENV: ${ENV:-dev}
+      ENV: ${ENV:-container}
     privileged: true
     volumes:
       - /etc/localtime:/etc/localtime
@@ -93,7 +93,7 @@ services:
         max-size: '5m'
         max-file: '10'
     environment:
-      ENV: ${ENV:-dev}
+      ENV: ${ENV:-container}
     privileged: true
     volumes:
       - /etc/localtime:/etc/localtime
@@ -107,6 +107,7 @@ services:
 
 networks:
   snowgo_network:
+    name: snowgo_network
     driver: bridge
     ipam:
       config:
