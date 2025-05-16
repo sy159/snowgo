@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"go.uber.org/zap"
 	"io"
 	"net"
@@ -25,6 +27,60 @@ import (
 	"strings"
 	"time"
 )
+
+var (
+	// 一级敏感字段名
+	sensitiveRoots = []string{"password", "pwd", "token", "secret", "access_token", "refresh_token",
+		"data.access_token", "data.refresh_token"}
+	// 数组内脱敏路径（使用 * 通配符代表任意下标）：data.list.*.operator_id标识data下面的list数组下的每一列数据的operator_id字段
+	arrayFieldMasks = []string{"data.list.*.operator_id"}
+)
+
+func fastMask(raw []byte) []byte {
+	if len(raw) == 0 {
+		return raw
+	}
+	data := raw
+
+	// 1. 脱敏一级字段 & data.下的一级字段
+	for _, key := range sensitiveRoots {
+		// a) 脱敏顶层 key
+		if gjson.GetBytes(data, key).Exists() {
+			data, _ = sjson.SetBytes(data, key, "****")
+		}
+		// b) 脱敏 data.key
+		prefixed := "data." + key
+		if gjson.GetBytes(data, prefixed).Exists() {
+			data, _ = sjson.SetBytes(data, prefixed, "****")
+		}
+	}
+
+	// 2. 脱敏数组内的字段，路径格式：prefix.*.field
+	for _, path := range arrayFieldMasks {
+		// 拆分出 prefix 和 field
+		if !strings.Contains(path, "*.") {
+			continue
+		}
+		parts := strings.SplitN(path, "*.", 2)
+		prefix := strings.TrimSuffix(parts[0], ".") // data.list
+		field := parts[1]                           // operator_id
+
+		// 获取数组
+		arr := gjson.GetBytes(data, prefix)
+		if !arr.Exists() || !arr.IsArray() {
+			continue
+		}
+		// 遍历索引，逐个脱敏
+		for idx := range arr.Array() {
+			fullPath := fmt.Sprintf("%s.%d.%s", prefix, idx, field)
+			if gjson.GetBytes(data, fullPath).Exists() {
+				data, _ = sjson.SetBytes(data, fullPath, "****")
+			}
+		}
+	}
+
+	return data
+}
 
 // 自定义一个结构体，实现 gin.ResponseWriter interface
 type responseWriter struct {
@@ -89,6 +145,10 @@ func AccessLogger() gin.HandlerFunc {
 
 		// 记录访问日志
 		if config.ServerConf.EnableAccessLog {
+			// 快速脱敏
+			maskedReq := fastMask(reqBody)
+			maskedRes := fastMask(writer.body.Bytes())
+
 			xlogger.Access(bizMsg,
 				zap.Int("status", c.Writer.Status()),
 				zap.Int("biz_code", bizCode),
@@ -96,10 +156,10 @@ func AccessLogger() gin.HandlerFunc {
 				zap.String("method", method),
 				zap.String("path", path),
 				zap.String("query", query),
-				zap.String("request_body", string(reqBody)),
+				zap.String("request_body", string(maskedReq)),
 				zap.String("ip", c.ClientIP()),
 				zap.Duration("cost", cost),
-				zap.String("res", writer.body.String()),
+				zap.String("res", string(maskedRes)),
 				zap.String("trace_id", traceId),
 				zap.String("user_agent", c.Request.UserAgent()),
 				zap.String("errors", c.Errors.ByType(gin.ErrorTypePrivate).String()),
