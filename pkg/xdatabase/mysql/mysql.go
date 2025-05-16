@@ -1,8 +1,9 @@
 package mysql
 
 import (
-	"errors"
+	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -158,4 +159,21 @@ func CloseAllMysql(db *gorm.DB, dbMap map[string]*gorm.DB) {
 			visited[v] = true
 		}
 	}
+}
+
+// CheckDBAlive 检查数据库连接是否存活
+func CheckDBAlive(ctx context.Context, db *gorm.DB) (bool, error) {
+	if db == nil {
+		return false, errors.New("db is nil")
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+	// 尝试执行简单的查询来检查连接是否存活
+	err = sqlDB.PingContext(ctx)
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+	return true, nil
 }

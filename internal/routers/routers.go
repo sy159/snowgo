@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-contrib/pprof"
 	"snowgo/config"
+	"snowgo/internal/api"
 	"snowgo/internal/routers/middleware"
 	"snowgo/pkg/xenv"
 	e "snowgo/pkg/xerror"
@@ -45,6 +46,10 @@ func loadRouter(router *gin.Engine) {
 		pprofGroup := router.Group("", middleware.IPWhiteList(iPWhitelist))
 		pprof.Register(pprofGroup)
 	}
+
+	// 注册健康检查
+	router.GET("/healthz", api.Liveness)
+	router.GET("/readyz", api.Readiness)
 
 	// 创建根路由组，并添加前缀
 	apiGroup := router.Group(fmt.Sprintf("/api/%s", config.ServerConf.Version))

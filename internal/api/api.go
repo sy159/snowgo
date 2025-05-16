@@ -1,7 +1,9 @@
 package api
 
 import (
+	"context"
 	"snowgo/pkg/xauth"
+	"snowgo/pkg/xdatabase/mysql"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
 	str "snowgo/pkg/xstr_tool"
@@ -50,4 +52,25 @@ func Index(c *gin.Context) {
 	//xresponse.Success(c, gin.H{"name": "test", "age": 12})
 	//xresponse.Fail(c, 1001, "")
 	//xresponse.FailByError(c, e.OK)
+}
+
+// Liveness 存活检查
+func Liveness(c *gin.Context) {
+	c.JSON(200, gin.H{"status": "ok"})
+}
+
+// Readiness 就绪检查
+func Readiness(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+
+	// db检查
+	if _, err := mysql.CheckDBAlive(ctx, mysql.DB); err != nil {
+		c.JSON(503, gin.H{
+			"status": "not ready",
+			"error":  err.Error(),
+		})
+		return
+	}
+	c.JSON(200, gin.H{"status": "ready"})
 }
