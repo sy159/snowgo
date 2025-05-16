@@ -64,7 +64,7 @@ services:
       retries: 3
 
   snowgo-service:
-    image: ${SERVICE_IMAGE_NAME:-snowgo}:${SERVICE_IMAGE_VERSION:-v1.0}
+    image: ${SERVICE_IMAGE_NAME:-snowgo}:${SERVICE_IMAGE_VERSION:-v1.0.0}
     container_name: snowgo-service
     restart: always
     logging:
@@ -85,7 +85,7 @@ services:
       - snowgo-redis
 
   snowgo-service2:
-    image: ${SERVICE_IMAGE_NAME:-snowgo}:${SERVICE_IMAGE_VERSION:-v1.0}
+    image: ${SERVICE_IMAGE_NAME:-snowgo}:${SERVICE_IMAGE_VERSION:-v1.0.0}
     container_name: snowgo-service2
     restart: always
     logging:

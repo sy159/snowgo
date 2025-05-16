@@ -152,18 +152,18 @@ go run main.go
 ##### 2.2 🐳 Docker 运行
 生成项目服务docker镜像
 ```shell
-docker build -t snowgo:v1.0 .
+docker build -t snowgo:v1.0.0 .
 ```
 启动项目
 ```shell
-docker run --name snowgo-service --restart always -d -p 8000:8000 -e ENV=dev -v ./config:/snowgo-service/config -v ./logs:/snowgo-service/logs snow:v1.0
+docker run --name snowgo-service --restart always -d -p 8000:8000 -e ENV=dev -v ./config:/snowgo-service/config -v ./logs:/snowgo-service/logs snow:v1.0.0
 ```
 
 ------------
 ##### 2.3 🛠 Docker Compose 部署
 生成项目服务docker镜像
 ```shell
-docker build -t snowgo:v1.0 .
+docker build -t snowgo:v1.0.0 .
 ```
 配置.env相关信息(服务端口、使用镜像等)
 ```shell

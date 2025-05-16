@@ -7,13 +7,13 @@ init:
 	@go run ./internal/dal/cmd/init/main.go
 
 docker-build: name ?= snowgo
-docker-build: version ?= v1.0
+docker-build: version ?= v1.0.0
 docker-build:
 	echo "docker build  start..."
 	docker build -t $(name):$(version) .
 
 docker-start: name ?= snowgo
-docker-start: version ?= v1.0
+docker-start: version ?= v1.0.0
 docker-start:
 	echo  "docker run ..."
 	docker run --name $(PROJECT_NAME) -d -p $(PORT):$(PORT) $(name):$(version)
