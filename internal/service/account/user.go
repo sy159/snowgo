@@ -203,7 +203,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 	// 获取用户信息
 	oldUser, err := u.userDao.GetUserById(ctx, userParam.ID)
 	if err != nil {
-		xlogger.Infof("获取用户(%d)信息异常: %v", userParam.ID, err)
+		xlogger.Errorf("获取用户(%d)信息异常: %v", userParam.ID, err)
 		return 0, errors.WithMessage(err, "用户信息查询失败")
 	}
 
@@ -299,7 +299,7 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 	}
 	user, err := u.userDao.GetUserById(ctx, userId)
 	if err != nil {
-		xlogger.Infof("获取用户(%d)信息异常: %v", userId, err)
+		xlogger.Errorf("获取用户(%d)信息异常: %v", userId, err)
 		return nil, errors.WithMessage(err, "用户信息查询失败")
 	}
 
@@ -342,7 +342,7 @@ func (u *UserService) GetUserList(ctx context.Context, condition *UserListCondit
 		Limit:    condition.Limit,
 	})
 	if err != nil {
-		xlogger.Infof("获取用户信息列表异常: %v", err)
+		xlogger.Errorf("获取用户信息列表异常: %v", err)
 		return nil, errors.WithMessage(err, "用户信息列表查询失败")
 	}
 	userInfoList := make([]*UserInfo, 0, len(userList))
@@ -375,7 +375,7 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 		// 删除用户
 		err := u.userDao.TransactionDeleteById(ctx, tx, userId)
 		if err != nil {
-			xlogger.Infof("用户删除异常: %v", err)
+			xlogger.Errorf("用户删除异常: %v", err)
 			return errors.WithMessage(err, "用户删除异常")
 		}
 
@@ -426,7 +426,7 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 
 	_, err := u.userDao.GetUserById(ctx, userId)
 	if err != nil {
-		xlogger.Infof("获取用户(%d)信息异常: %v", userId, err)
+		xlogger.Errorf("获取用户(%d)信息异常: %v", userId, err)
 		return errors.WithMessage(err, "用户信息查询失败")
 	}
 
@@ -438,7 +438,7 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 	}
 	err = u.userDao.ResetPwdById(ctx, userId, pwd)
 	if err != nil {
-		xlogger.Infof("修改用户(%d)密码异常: %v", userId, err)
+		xlogger.Errorf("修改用户(%d)密码异常: %v", userId, err)
 		return errors.WithMessage(err, "用户信息查询失败")
 	}
 	return nil
@@ -452,7 +452,7 @@ func (u *UserService) Authenticate(ctx context.Context, username, password strin
 
 	user, err := u.userDao.GetUserByUsername(ctx, username)
 	if err != nil {
-		xlogger.Infof("获取用户(%s)信息异常: %v", username, err)
+		xlogger.Errorf("获取用户(%s)信息异常: %v", username, err)
 		return nil, errors.WithMessage(err, "用户信息查询失败")
 	}
 

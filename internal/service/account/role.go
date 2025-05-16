@@ -292,7 +292,6 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 		return err
 	}
 
-	xlogger.Infof("删除角色: %d", id)
 	if id <= 0 {
 		return errors.New("角色ID无效")
 	}
