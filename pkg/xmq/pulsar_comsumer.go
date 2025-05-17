@@ -22,7 +22,7 @@ var (
 		runNum:          1,
 		ackWithResponse: true,
 	}
-	consumerLogger = xlogger.NewLogger("pulsar-consumer", xlogger.WithFileMaxAgeDays(7))
+	consumerLogger = xlogger.NewLogger("./logs", "pulsar-consumer", xlogger.WithFileMaxAgeDays(7))
 )
 
 type consumerOptions struct {

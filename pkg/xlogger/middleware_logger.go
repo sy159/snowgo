@@ -5,6 +5,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -41,8 +42,10 @@ func WithFileMaxAgeDays(days uint) LogOptions {
 }
 
 // NewLogger 创建JSON格式的日志记录器
-func NewLogger(name string, opts ...LogOptions) *MiddlewareLogger {
-
+func NewLogger(basePath, name string, opts ...LogOptions) *MiddlewareLogger {
+	if len(basePath) == 0 {
+		basePath = defaultBasePath
+	}
 	logOpts := defaultLog
 	for _, opt := range opts {
 		opt(&logOpts)
@@ -57,7 +60,7 @@ func NewLogger(name string, opts ...LogOptions) *MiddlewareLogger {
 		return level == zapcore.InfoLevel
 	})
 
-	infoWriter := getTimeWriter(fmt.Sprintf("./logs/%s/%s.log", name, name), logOpts.fileMaxAgeDays)
+	infoWriter := getTimeWriter(filepath.Join(basePath, fmt.Sprintf("%s/%s.log", name, name)), logOpts.fileMaxAgeDays)
 
 	if logOpts.enableConsoleOutput {
 		infoWriter = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), infoWriter)

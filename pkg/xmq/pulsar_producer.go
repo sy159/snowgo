@@ -21,7 +21,7 @@ var (
 		batchingMaxMessages:     5,               // 合并发送时生效，单批次最大消息数
 		batchingMaxSize:         2 * 1024 * 1024, // 合并发送时生效，单批次最大消息字节
 	}
-	producerLogger = xlogger.NewLogger("pulsar-producer", xlogger.WithFileMaxAgeDays(7))
+	producerLogger = xlogger.NewLogger("./logs", "pulsar-producer", xlogger.WithFileMaxAgeDays(7))
 )
 
 type ProducerOptions func(*producerOptions)
