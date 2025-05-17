@@ -11,6 +11,7 @@ import (
 	"gorm.io/plugin/dbresolver"
 	"log"
 	"os"
+	"runtime"
 	"snowgo/config"
 	"snowgo/pkg/xcolor"
 	. "snowgo/pkg/xlogger"
@@ -59,11 +60,39 @@ func NewMysql(cfg config.MysqlConfig) (*gorm.DB, error) {
 	return connectMysql(cfg)
 }
 
+// 设置数据库连接池相关参数的默认值
+func processConfig(cfg config.MysqlConfig) config.MysqlConfig {
+	processCfg := cfg
+	if processCfg.MaxOpenConns <= 0 {
+		processCfg.MaxOpenConns = 100
+	}
+	if processCfg.MaxIdleConns <= 0 {
+		processCfg.MaxIdleConns = runtime.NumCPU()*2 + 1
+	}
+	// 保证 idle <= open
+	if processCfg.MaxIdleConns > processCfg.MaxOpenConns {
+		processCfg.MaxIdleConns = processCfg.MaxOpenConns
+	}
+	if processCfg.ConnMaxLifeTime <= 0 {
+		processCfg.ConnMaxLifeTime = 180 // 单位分钟
+	}
+	if processCfg.ConnMaxIdleTime <= 0 {
+		processCfg.ConnMaxIdleTime = 30 // 单位分钟
+	}
+
+	if processCfg.SlowThresholdTime <= 0 {
+		processCfg.SlowThresholdTime = 2000 // 单位毫秒
+	}
+	return processCfg
+}
+
 // 连接mysql
 func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 	if mysqlConfig.DSN == "" {
 		return nil, errors.New("mysql init failed, dsn is empty")
 	}
+
+	mysqlConfig = processConfig(mysqlConfig) // 处理配置
 
 	// 连接额外配置信息
 	gormConfig := &gorm.Config{
@@ -108,16 +137,23 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 		return nil, err
 	}
 	// 设置空闲连接池中连接的最大数量
-	sqlDB.SetMaxIdleConns(mysqlConfig.GetMaxIdleConn())
+	sqlDB.SetMaxIdleConns(mysqlConfig.MaxIdleConns)
 	// 设置打开数据库连接的最大数量 默认值为0表示不限制，可以避免并发太高导致连接mysql出现too many connections的错误。
-	sqlDB.SetMaxOpenConns(mysqlConfig.GetMaxOpenConn())
+	sqlDB.SetMaxOpenConns(mysqlConfig.MaxOpenConns)
 	// 设置了连接可复用的最大时间。单位min
-	sqlDB.SetConnMaxLifetime(time.Duration(mysqlConfig.GetConnMaxLifeTime()) * time.Minute)
-	sqlDB.SetConnMaxIdleTime(time.Duration(mysqlConfig.GetConnMaxIdleTime()) * time.Minute)
+	sqlDB.SetConnMaxLifetime(time.Duration(mysqlConfig.ConnMaxLifeTime) * time.Minute)
+	sqlDB.SetConnMaxIdleTime(time.Duration(mysqlConfig.ConnMaxIdleTime) * time.Minute)
 
 	// 未开启读写分离配置
 	if !mysqlConfig.SeparationRW {
 		return db, nil
+	} else {
+		if len(mysqlConfig.MainsDSN) == 0 {
+			return nil, errors.New("读写分离需要配置主库地址")
+		}
+		if len(mysqlConfig.SlavesDSN) == 0 {
+			mysqlConfig.SlavesDSN = mysqlConfig.MainsDSN
+		}
 	}
 
 	// 读写分离配置
@@ -139,10 +175,10 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 		Sources:  sources,
 		Replicas: replicas,
 		Policy:   dbresolver.RandomPolicy{},
-	}).SetMaxOpenConns(mysqlConfig.GetMaxOpenConn()).
-		SetMaxIdleConns(mysqlConfig.GetMaxIdleConn()).
-		SetConnMaxIdleTime(time.Duration(mysqlConfig.GetConnMaxIdleTime()) * time.Minute).
-		SetConnMaxLifetime(time.Duration(mysqlConfig.GetConnMaxLifeTime()) * time.Minute))
+	}).SetMaxOpenConns(mysqlConfig.MaxOpenConns).
+		SetMaxIdleConns(mysqlConfig.MaxIdleConns).
+		SetConnMaxIdleTime(time.Duration(mysqlConfig.ConnMaxIdleTime) * time.Minute).
+		SetConnMaxLifetime(time.Duration(mysqlConfig.ConnMaxLifeTime) * time.Minute))
 	if err != nil {
 		return nil, err
 	}

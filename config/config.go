@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"runtime"
 	"sync/atomic"
 
 	"github.com/spf13/viper"
@@ -168,7 +169,7 @@ func initViper(configName, configPath string) *viper.Viper {
 // GetMaxOpenConn 最大打开连接数
 func (m MysqlConfig) GetMaxOpenConn() int {
 	if m.MaxOpenConns <= 0 {
-		return 5
+		return 100
 	}
 	return m.MaxOpenConns
 }
@@ -176,7 +177,7 @@ func (m MysqlConfig) GetMaxOpenConn() int {
 // GetMaxIdleConn 最大空闲连接数
 func (m MysqlConfig) GetMaxIdleConn() int {
 	if m.MaxIdleConns <= 0 {
-		return 2
+		return runtime.NumCPU()*2 + 1
 	}
 	return m.MaxIdleConns
 }
