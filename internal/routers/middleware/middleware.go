@@ -10,6 +10,7 @@ import (
 	"github.com/tidwall/sjson"
 	"go.uber.org/zap"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -89,17 +90,49 @@ type responseWriter struct {
 }
 
 // Write 复制一份出来
-func (w responseWriter) Write(b []byte) (int, error) {
+func (w *responseWriter) Write(b []byte) (int, error) {
 	//向一个bytes.buffer中写一份数据来为获取body使用
 	w.body.Write(b)
 	return w.ResponseWriter.Write(b)
 }
 
+// 扩展二进制类型判断
+func isBinaryResponse(header http.Header) bool {
+	ct := header.Get("Content-Type")
+	cd := header.Get("Content-Disposition")
+
+	binaryTypes := []string{
+		"application/octet-stream",
+		"application/pdf",
+		"image/",
+		"video/",
+		"audio/",
+		"application/zip",
+	}
+
+	if strings.Contains(cd, "attachment") {
+		return true
+	}
+
+	for _, t := range binaryTypes {
+		if strings.HasPrefix(ct, t) {
+			return true
+		}
+	}
+	return false
+}
+
 // AccessLogger 控制台输出访问日志，如果app配置了记录访问日志，会记录下访问日志
 func AccessLogger() gin.HandlerFunc {
+	cfg := config.Get()
+	var allowedCT = map[string]bool{
+		"application/json":                  true,
+		"application/x-www-form-urlencoded": true,
+		"text/plain":                        true,
+		"text/xml":                          true,
+	}
 	return func(c *gin.Context) {
 		startTime := time.Now()
-		cfg := config.Get()
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
 		method := c.Request.Method
@@ -123,10 +156,16 @@ func AccessLogger() gin.HandlerFunc {
 
 		// 开启访问日志
 		if cfg.Application.EnableAccessLog {
-			// 读取请求体（body只能读一次）
-			reqBody, _ = c.GetRawData()
-			if len(reqBody) > 0 {
-				c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBody)) // 重置 Body 供后续处理使用
+			ct := c.ContentType()
+			mimeType, _, _ := mime.ParseMediaType(ct)
+			if !allowedCT[mimeType] {
+				reqBody = []byte(fmt.Sprintf("{\"msg\": \"[skip request type: %s]\"}", mimeType))
+			} else {
+				// 读取请求体（body只能读一次）
+				reqBody, _ = c.GetRawData()
+				if len(reqBody) > 0 {
+					c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBody)) // 重置 Body 供后续处理使用
+				}
 			}
 
 			// 替换 Writer 以捕获响应
@@ -139,6 +178,7 @@ func AccessLogger() gin.HandlerFunc {
 
 		c.Next()
 
+		endTime := time.Now()
 		cost := time.Since(startTime)
 		bizCode := c.GetInt(xresponse.BizCode)  // 业务返回code
 		bizMsg := c.GetString(xresponse.BizMsg) // 业务返回msg
@@ -147,7 +187,17 @@ func AccessLogger() gin.HandlerFunc {
 		if cfg.Application.EnableAccessLog {
 			// 快速脱敏
 			maskedReq := fastMask(reqBody)
-			maskedRes := fastMask(writer.body.Bytes())
+			var maskedRes []byte
+			if writer != nil {
+				ct := c.Writer.Header().Get("Content-Type")
+				mimeType, _, _ := mime.ParseMediaType(ct)
+				if !allowedCT[mimeType] {
+					maskedRes = []byte(fmt.Sprintf("{\"msg\": \"[skip response type: %s]\"}", mimeType))
+				} else {
+					// 普通文本/JSON
+					maskedRes = fastMask(writer.body.Bytes())
+				}
+			}
 
 			xlogger.Access(bizMsg,
 				zap.Int("status", c.Writer.Status()),
@@ -163,13 +213,16 @@ func AccessLogger() gin.HandlerFunc {
 				zap.String("trace_id", traceId),
 				zap.String("user_agent", c.Request.UserAgent()),
 				zap.String("errors", c.Errors.ByType(gin.ErrorTypePrivate).String()),
+				zap.String("start_time", startTime.Format("2006-01-02 15:04:05.000")),
+				zap.String("end_time", endTime.Format("2006-01-02 15:04:05.000")),
 			)
-		} else {
+		}
+		if !cfg.Application.EnableAccessLog || cfg.Log.Writer == xlogger.MultiWriter {
 			// 控制台输出访问日志
 			fmt.Printf("%s %s %20s | status %3s | biz code %6s | %8v | %5s  %#v | %12s | %s\n",
 				xcolor.GreenFont(fmt.Sprintf("[%s:%s]", cfg.Application.Server.Name, cfg.Application.Server.Version)),
 				xcolor.YellowFont("[access] |"),
-				time.Now().Format("2006-01-02 15:04:05.000"),
+				startTime.Format("2006-01-02 15:04:05.000"),
 				xcolor.StatusCodeColor(c.Writer.Status()),
 				xcolor.BizCodeColor(bizCode),
 				cost,
@@ -217,7 +270,7 @@ func Recovery() gin.HandlerFunc {
 					zap.String("path", c.Request.URL.Path),
 					zap.String("query", c.Request.URL.RawQuery),
 					zap.String("ip", c.ClientIP()),
-					zap.String("trace_id", c.GetString("trace_id")),
+					zap.String("trace_id", c.GetString(xauth.XTraceId)),
 					zap.String("user_agent", c.Request.UserAgent()),
 					zap.ByteString("request", httpRequest),
 				}
