@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"io"
 	"os"
+	"path/filepath"
 	"snowgo/config"
 	"snowgo/pkg/xcolor"
 	"strings"
@@ -19,6 +20,12 @@ const (
 	logTmFmtWithS  = "2006-01-02 15:04:05"
 	logTmFmtWithM  = "2006-01-02 15:04"
 	logTmFmtWithH  = "2006-01-02 15"
+)
+
+var (
+	defaultBasePath = "./logs"
+	FileWriter      = "file"
+	MultiWriter     = "multi"
 )
 
 //var Logger *zap.Logger // 也直接zap.L或者zap.S调用获取实例
@@ -38,8 +45,11 @@ func (p *prefixWriter) Write(b []byte) (int, error) {
 	return p.w.Write([]byte(strings.Join(lines, "\n")))
 }
 
-// InitLogger 初始化Logger,设置zap全局logger
-func InitLogger() {
+// Init 初始化Logger,设置zap全局logger
+func Init(basePath string) {
+	if len(basePath) == 0 {
+		basePath = defaultBasePath
+	}
 	cfg := config.Get()
 	logEncoder := cfg.Log.LogEncoder
 	accountEncoderConf := cfg.Log.AccountEncoder
@@ -85,22 +95,22 @@ func InitLogger() {
 	accessWriter := stdoutWithPrefix
 	errorWriter := stdoutWithPrefix
 	// console控制台输出，file输出到文件 multi控制台跟日志文件同时输出
-	if writer == "file" {
-		debugWriter = getTimeWriter("./logs/debug/debug.log", logMaxAge)
-		infoWriter = getTimeWriter("./logs/info/info.log", logMaxAge)
-		accessWriter = getTimeWriter("./logs/access/access.log", accountMaxAge)
-		errorWriter = getTimeWriter("./logs/xerror/xerror.log", logMaxAge)
+	if writer == FileWriter {
+		debugWriter = getTimeWriter(filepath.Join(basePath, "debug/debug.log"), logMaxAge)
+		infoWriter = getTimeWriter(filepath.Join(basePath, "info/info.log"), logMaxAge)
+		accessWriter = getTimeWriter(filepath.Join(basePath, "access/access.log"), accountMaxAge)
+		errorWriter = getTimeWriter(filepath.Join(basePath, "error/error.log"), logMaxAge)
 
 		// 日志大小分割
 		//debugWriter := getSizeWriter("./logs/debug/debug.log")
 		//infoWriter := getSizeWriter("./logs/info/info.log")
 		//accessWriter := getSizeWriter("./logs/access/access.log")
-		//errorWriter := getSizeWriter("./logs/xerror/xerror.log")
-	} else if writer == "multi" {
-		debugWriter = getTimeWriter("./logs/debug/debug.log", logMaxAge)
-		infoWriter = getTimeWriter("./logs/info/info.log", logMaxAge)
-		accessWriter = getTimeWriter("./logs/access/access.log", accountMaxAge)
-		errorWriter = getTimeWriter("./logs/xerror/xerror.log", logMaxAge)
+		//errorWriter := getSizeWriter("./logs/error/error.log")
+	} else if writer == MultiWriter {
+		debugWriter = getTimeWriter(filepath.Join(basePath, "debug/debug.log"), logMaxAge)
+		infoWriter = getTimeWriter(filepath.Join(basePath, "info/info.log"), logMaxAge)
+		accessWriter = getTimeWriter(filepath.Join(basePath, "access/access.log"), accountMaxAge)
+		errorWriter = getTimeWriter(filepath.Join(basePath, "xerror/xerror.log"), logMaxAge)
 
 		// 日志大小分割
 		//debugWriter := getSizeWriter("./logs/debug/debug.log")

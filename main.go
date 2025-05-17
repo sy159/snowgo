@@ -16,7 +16,7 @@ func init() {
 	config.Init("./config")
 
 	// 初始化zap log全局配置
-	xlogger.InitLogger()
+	xlogger.Init("./logs")
 }
 
 func main() {

@@ -17,7 +17,8 @@ var (
 		xenv.DevConstant:  "config.dev",
 		"container":       "config.container",
 	}
-	initFlag uint32
+	initFlag          uint32
+	defaultConfigPath = "./config"
 )
 
 // Config 全局配置结构体
@@ -140,7 +141,7 @@ func Init(configPath string) {
 // initViper 初始化Viper实例
 func initViper(configName, configPath string) *viper.Viper {
 	if len(configPath) == 0 {
-		configPath = "./config"
+		configPath = defaultConfigPath
 	}
 	v := viper.New()
 	v.SetConfigName(configName)
