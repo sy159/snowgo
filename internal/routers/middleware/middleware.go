@@ -98,17 +98,17 @@ func (w responseWriter) Write(b []byte) (int, error) {
 // AccessLogger 控制台输出访问日志，如果app配置了记录访问日志，会记录下访问日志
 func AccessLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		startTime := time.Now()
+		cfg := config.Get()
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
 		method := c.Request.Method
 		traceId := uuid.New().String()
+
 		// 将请求 ID 存储到 Gin 上下文中
 		c.Set(xauth.XTraceId, traceId)
 		c.Set(xauth.XIp, c.ClientIP())
 		c.Set(xauth.XUserAgent, c.Request.UserAgent())
-
 		// trace_id放入header中
 		c.Writer.Header().Set(xauth.XTraceId, traceId)
 
@@ -118,23 +118,23 @@ func AccessLogger() gin.HandlerFunc {
 			return
 		}
 
-		// 处理resp，记录resp的
-		writer := &responseWriter{
-			c.Writer,
-			bytes.NewBuffer([]byte{}),
-		}
-		if config.ServerConf.EnableAccessLog {
+		var reqBody []byte
+		var writer *responseWriter
+
+		// 开启访问日志
+		if cfg.Application.EnableAccessLog {
+			// 读取请求体（body只能读一次）
+			reqBody, _ = c.GetRawData()
+			if len(reqBody) > 0 {
+				c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBody)) // 重置 Body 供后续处理使用
+			}
+
+			// 替换 Writer 以捕获响应
 			writer = &responseWriter{
-				c.Writer,
-				bytes.NewBuffer([]byte{}),
+				ResponseWriter: c.Writer,
+				body:           bytes.NewBuffer(nil),
 			}
 			c.Writer = writer
-		}
-
-		reqBody, _ := c.GetRawData()
-		// 把读取的body内容重新写入
-		if len(reqBody) > 0 {
-			c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBody))
 		}
 
 		c.Next()
@@ -144,7 +144,7 @@ func AccessLogger() gin.HandlerFunc {
 		bizMsg := c.GetString(xresponse.BizMsg) // 业务返回msg
 
 		// 记录访问日志
-		if config.ServerConf.EnableAccessLog {
+		if cfg.Application.EnableAccessLog {
 			// 快速脱敏
 			maskedReq := fastMask(reqBody)
 			maskedRes := fastMask(writer.body.Bytes())
@@ -167,7 +167,7 @@ func AccessLogger() gin.HandlerFunc {
 		} else {
 			// 控制台输出访问日志
 			fmt.Printf("%s %s %20s | status %3s | biz code %6s | %8v | %5s  %#v | %12s | %s\n",
-				xcolor.GreenFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
+				xcolor.GreenFont(fmt.Sprintf("[%s:%s]", cfg.Application.Server.Name, cfg.Application.Server.Version)),
 				xcolor.YellowFont("[access] |"),
 				time.Now().Format("2006-01-02 15:04:05.000"),
 				xcolor.StatusCodeColor(c.Writer.Status()),
@@ -273,7 +273,8 @@ func Cors() gin.HandlerFunc {
 
 // InjectContainerMiddleware 注入container
 func InjectContainerMiddleware() gin.HandlerFunc {
-	container := di.NewContainer(config.JwtConf, redis.RDB, mysql.DB, mysql.DbMap)
+	cfg := config.Get()
+	container := di.NewContainer(cfg.Jwt, redis.RDB, mysql.DB, mysql.DbMap)
 	return func(c *gin.Context) {
 		c.Set(constants.CONTAINER, container)
 		c.Next()

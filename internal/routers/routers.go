@@ -40,7 +40,8 @@ func loadRouter(router *gin.Engine) {
 	})
 
 	// 注册pprof路由(白名单访问)
-	if config.ServerConf.EnablePprof {
+	cfg := config.Get()
+	if cfg.Application.EnablePprof {
 		// 只允许内网或指定网段访问
 		iPWhitelist := []string{"127.0.0.1/32", "192.168.0.0/16"}
 		pprofGroup := router.Group("", middleware.IPWhiteList(iPWhitelist))
@@ -52,7 +53,7 @@ func loadRouter(router *gin.Engine) {
 	router.GET("/readyz", api.Readiness)
 
 	// 创建根路由组，并添加前缀
-	apiGroup := router.Group(fmt.Sprintf("/api/%s", config.ServerConf.Version))
+	apiGroup := router.Group(fmt.Sprintf("/api/%s", cfg.Application.Server.Version))
 	// api路由进行依赖注入
 	apiGroup.Use(middleware.InjectContainerMiddleware())
 

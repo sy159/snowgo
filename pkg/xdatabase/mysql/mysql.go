@@ -14,25 +14,38 @@ import (
 	"snowgo/config"
 	"snowgo/pkg/xcolor"
 	. "snowgo/pkg/xlogger"
+	"strings"
 	"time"
 )
 
 var DB *gorm.DB
 var DbMap = map[string]*gorm.DB{}
 
+func ensureTimeout(dsn string) string {
+	if strings.Contains(dsn, "timeout=") {
+		return dsn // 已设置timeout跳过
+	}
+	// 自动追加参数
+	if strings.Contains(dsn, "?") {
+		return dsn + "&timeout=3s"
+	}
+	return dsn + "?timeout=3s"
+}
+
 // InitMysql 初始化mysql连接,设置全局mysql db
 func InitMysql() {
-	if len(config.MysqlConf.DSN) == 0 && len(config.MysqlConf.MainsDSN) == 0 && len(config.MysqlConf.SlavesDSN) == 0 {
+	cfg := config.Get()
+	if len(cfg.Mysql.DSN) == 0 && len(cfg.Mysql.MainsDSN) == 0 && len(cfg.Mysql.SlavesDSN) == 0 {
 		Panic("Please initialize mysql configuration first")
 	}
-	db, err := connectMysql(config.MysqlConf)
+	db, err := connectMysql(cfg.Mysql)
 	if err != nil {
 		Panicf("mysql init failed, err is %s", err.Error())
 	}
 	DB = db
 
 	DbMap["default"] = db
-	for k, v := range config.OtherMapConf.DbMap {
+	for k, v := range cfg.OtherDB.DBMap {
 		otherDb, err := connectMysql(v)
 		if err != nil {
 			Panicf("mysql %s init failed, err is %s", k, err.Error())
@@ -63,11 +76,12 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 
 	// 打印SQL设置
 	if mysqlConfig.PrintSqlLog {
+		cfg := config.Get()
 		loggerNew := logger.New(
 			log.New(
 				os.Stdout,
 				fmt.Sprintf("\r\n%s %s",
-					xcolor.GreenFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
+					xcolor.GreenFont(fmt.Sprintf("[%s:%s]", cfg.Application.Server.Name, cfg.Application.Server.Version)),
 					xcolor.YellowFont("[mysql] | "),
 				),
 				log.LstdFlags,
@@ -82,7 +96,8 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 	}
 
 	// 建立连接
-	db, err = gorm.Open(mysql.Open(mysqlConfig.DSN), gormConfig)
+	dsn := ensureTimeout(mysqlConfig.DSN) // 处理链接超时
+	db, err = gorm.Open(mysql.Open(dsn), gormConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -110,12 +125,12 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 	var replicas []gorm.Dialector
 	if len(mysqlConfig.MainsDSN) > 0 {
 		for _, uri := range mysqlConfig.MainsDSN {
-			sources = append(sources, mysql.Open(uri))
+			sources = append(sources, mysql.Open(ensureTimeout(uri)))
 		}
 	}
 	if len(mysqlConfig.SlavesDSN) > 0 {
 		for _, uri := range mysqlConfig.SlavesDSN {
-			replicas = append(replicas, mysql.Open(uri))
+			replicas = append(replicas, mysql.Open(ensureTimeout(uri)))
 		}
 	}
 	// 使用插件

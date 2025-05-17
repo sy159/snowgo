@@ -13,10 +13,11 @@ var RDB *redis.Client
 
 // InitRedis 初始化redis连接,设置全局Redis
 func InitRedis() {
-	if config.RedisConf == (config.RedisConfig{}) {
+	cfg := config.Get()
+	if cfg.Redis == (config.RedisConfig{}) {
 		xlogger.Panic("Please initialize redis configuration first")
 	}
-	RDB = NewRedis(config.RedisConf)
+	RDB = NewRedis(cfg.Redis)
 }
 
 // NewRedis 创建一个新的 redis 实例（不影响全局 RDB）

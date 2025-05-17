@@ -19,16 +19,15 @@ import (
 
 func init() {
 	// 初始化配置文件
-	config.InitConf(
-		config.WithMysqlConf(), // 加载mysql配置
-	)
+	config.Init("./config")
 }
 
 var modelPkg = "snowgo/internal/dal/model"
 
 // generate code
 func main() {
-	dbDSN := config.MysqlConf.DSN
+	cfg := config.Get()
+	dbDSN := cfg.Mysql.DSN
 	//dbDSN := "root:zx.123@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local"
 	db, err := gorm.Open(mysql.Open(dbDSN))
 	if err != nil {

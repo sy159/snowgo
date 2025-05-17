@@ -21,12 +21,13 @@ var (
 func StartHttpServer() {
 	// 初始化路由
 	router := routers.InitRouter()
+	cfg := config.Get()
 	HttpServer = &http.Server{
-		Addr:           fmt.Sprintf("%s:%d", config.ServerConf.Addr, config.ServerConf.Port),
+		Addr:           fmt.Sprintf("%s:%d", cfg.Application.Server.Addr, cfg.Application.Server.Port),
 		Handler:        router,
-		ReadTimeout:    time.Duration(config.ServerConf.ReadTimeout) * time.Second,
-		WriteTimeout:   time.Duration(config.ServerConf.WriteTimeout) * time.Second,
-		MaxHeaderBytes: config.ServerConf.MaxHeaderMB << 20,
+		ReadTimeout:    time.Duration(cfg.Application.Server.ReadTimeout) * time.Second,
+		WriteTimeout:   time.Duration(cfg.Application.Server.WriteTimeout) * time.Second,
+		MaxHeaderBytes: cfg.Application.Server.MaxHeaderMB << 20,
 	}
 
 	go func() {
@@ -40,12 +41,12 @@ func StartHttpServer() {
 `
 		fmt.Printf("%s\n", xcolor.GreenFont(banner))
 		fmt.Printf("%s %s %s is running on %s %s log mode %s \n",
-			xcolor.GreenFont(fmt.Sprintf("[%s:%s]", config.ServerConf.Name, config.ServerConf.Version)),
+			xcolor.GreenFont(fmt.Sprintf("[%s:%s]", cfg.Application.Server.Name, cfg.Application.Server.Version)),
 			xcolor.GreenFont("|"),
 			xcolor.PurpleFont(fmt.Sprintf("http://%s", HttpServer.Addr)),
 			xcolor.RedBackground(xenv.Env()),
 			xcolor.GreenFont("|"),
-			xcolor.BlueFont(config.LogConf.Writer))
+			xcolor.BlueFont(cfg.Log.Writer))
 
 		if err := HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			xlogger.Fatalf("Server Listen: %s\n", err)

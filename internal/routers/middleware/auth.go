@@ -15,11 +15,12 @@ import (
 
 // JWTAuth 基于JWT的认证中间件
 func JWTAuth() func(c *gin.Context) {
+	cfg := config.Get()
 	jwtManager := jwt.NewJwtManager(&jwt.Config{
-		JwtSecret:             config.JwtConf.JwtSecret,
-		Issuer:                config.JwtConf.Issuer,
-		AccessExpirationTime:  config.JwtConf.AccessExpirationTime,
-		RefreshExpirationTime: config.JwtConf.RefreshExpirationTime,
+		JwtSecret:             cfg.Jwt.JwtSecret,
+		Issuer:                cfg.Jwt.Issuer,
+		AccessExpirationTime:  cfg.Jwt.AccessExpirationTime,
+		RefreshExpirationTime: cfg.Jwt.RefreshExpirationTime,
 	})
 	return func(c *gin.Context) {
 		// 客户端携带Token有三种方式 1.放在请求头 2.放在请求体 3.放在URI

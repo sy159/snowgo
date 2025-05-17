@@ -40,11 +40,12 @@ func (p *prefixWriter) Write(b []byte) (int, error) {
 
 // InitLogger 初始化Logger,设置zap全局logger
 func InitLogger() {
-	logEncoder := config.LogConf.LogEncoder
-	accountEncoderConf := config.LogConf.AccountEncoder
-	logMaxAge := config.LogConf.LogFileMaxAgeDay
-	accountMaxAge := config.LogConf.AccountFileMaxAgeDay
-	writer := config.LogConf.Writer
+	cfg := config.Get()
+	logEncoder := cfg.Log.LogEncoder
+	accountEncoderConf := cfg.Log.AccountEncoder
+	logMaxAge := cfg.Log.LogFileMaxAgeDay
+	accountMaxAge := cfg.Log.AccountFileMaxAgeDay
+	writer := cfg.Log.Writer
 
 	// 设置日志输出格式
 	encoder := getNormalEncoder()
@@ -76,8 +77,8 @@ func InitLogger() {
 	// 统一一个服务名前缀
 	stdoutWithPrefix := zapcore.AddSync(&prefixWriter{
 		w: os.Stdout,
-		prefix: xcolor.GreenFont(fmt.Sprintf("[%s:%s] ", config.ServerConf.Name, config.ServerConf.Version)) +
-			xcolor.YellowFont("[logger] | "),
+		prefix: xcolor.GreenFont(fmt.Sprintf("[%s:%s] ", cfg.Application.Server.Name,
+			cfg.Application.Server.Version)) + xcolor.YellowFont("[logger] | "),
 	})
 	debugWriter := stdoutWithPrefix
 	infoWriter := stdoutWithPrefix
