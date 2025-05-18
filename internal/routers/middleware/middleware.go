@@ -96,32 +96,6 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// 扩展二进制类型判断
-func isBinaryResponse(header http.Header) bool {
-	ct := header.Get("Content-Type")
-	cd := header.Get("Content-Disposition")
-
-	binaryTypes := []string{
-		"application/octet-stream",
-		"application/pdf",
-		"image/",
-		"video/",
-		"audio/",
-		"application/zip",
-	}
-
-	if strings.Contains(cd, "attachment") {
-		return true
-	}
-
-	for _, t := range binaryTypes {
-		if strings.HasPrefix(ct, t) {
-			return true
-		}
-	}
-	return false
-}
-
 // AccessLogger 控制台输出访问日志，如果app配置了记录访问日志，会记录下访问日志
 func AccessLogger() gin.HandlerFunc {
 	cfg := config.Get()
