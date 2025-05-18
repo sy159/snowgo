@@ -13,7 +13,7 @@ const TableNameRole = "role"
 // Role 角色表
 type Role struct {
 	ID          int32      `gorm:"column:id;type:int(11);primaryKey;autoIncrement:true" json:"id"`
-	Code        string     `gorm:"column:code;type:varchar(64);not null;uniqueIndex:uk_name,priority:1;comment:角色代码，如 admin、normal" json:"code"` // 角色代码，如 admin、normal
+	Code        string     `gorm:"column:code;type:varchar(64);not null;uniqueIndex:uk_code,priority:1;comment:角色代码，如 admin、normal" json:"code"` // 角色代码，如 admin、normal
 	Name        *string    `gorm:"column:name;type:varchar(128);comment:前端展示用名称" json:"name"`                                                    // 前端展示用名称
 	Description *string    `gorm:"column:description;type:text;comment:角色描述" json:"description"`                                                 // 角色描述
 	CreatedAt   *time.Time `gorm:"column:created_at;type:datetime(6);not null;default:CURRENT_TIMESTAMP(6)" json:"created_at"`

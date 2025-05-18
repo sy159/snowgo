@@ -16,8 +16,8 @@ type OperationLog struct {
 	OperatorID   int32      `gorm:"column:operator_id;type:int(11);not null;index:idx_operator_id,priority:1;comment:操作人 ID" json:"operator_id"`             // 操作人 ID
 	OperatorName string     `gorm:"column:operator_name;type:varchar(64);not null;comment:操作人用户名" json:"operator_name"`                                      // 操作人用户名
 	OperatorType *string    `gorm:"column:operator_type;type:varchar(32);not null;default:User;comment:操作来源类型，如 User/System/Job/Api" json:"operator_type"`   // 操作来源类型，如 User/System/Job/Api
-	Resource     string     `gorm:"column:resource;type:varchar(32);not null;index:idx_resource,priority:1;comment:操作资源类型，如 user/role/menu" json:"resource"` // 操作资源类型，如 user/role/menu
-	ResourceID   int32      `gorm:"column:resource_id;type:int(11);not null;index:idx_resource,priority:2;comment:资源ID，如 user 表的主键 ID" json:"resource_id"`   // 资源ID，如 user 表的主键 ID
+	Resource     string     `gorm:"column:resource;type:varchar(32);not null;index:idx_resource,priority:2;comment:操作资源类型，如 user/role/menu" json:"resource"` // 操作资源类型，如 user/role/menu
+	ResourceID   int32      `gorm:"column:resource_id;type:int(11);not null;index:idx_resource,priority:1;comment:资源ID，如 user 表的主键 ID" json:"resource_id"`   // 资源ID，如 user 表的主键 ID
 	Action       *string    `gorm:"column:action;type:varchar(10);not null;default:Create;comment:操作类型：Create/Update/Delete，默认 Create" json:"action"`        // 操作类型：Create/Update/Delete，默认 Create
 	TraceID      *string    `gorm:"column:trace_id;type:varchar(64);index:idx_trace_id,priority:1;comment:链路id" json:"trace_id"`                             // 链路id
 	BeforeData   *string    `gorm:"column:before_data;type:json;comment:修改前数据快照（仅 update/delete 时填）" json:"before_data"`                                     // 修改前数据快照（仅 update/delete 时填）
