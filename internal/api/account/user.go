@@ -21,16 +21,20 @@ type UserListInfo struct {
 }
 
 type UserInfo struct {
-	ID        int32  `json:"id"`
-	Username  string `json:"username"`
-	Tel       string `json:"tel"`
-	Nickname  string `json:"nickname"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-	RoleId    int32
-	RoleName  string
-	RoleCode  string
+	ID        int32       `json:"id"`
+	Username  string      `json:"username"`
+	Tel       string      `json:"tel"`
+	Nickname  string      `json:"nickname"`
+	Status    string      `json:"status"`
+	CreatedAt string      `json:"created_at"`
+	UpdatedAt string      `json:"updated_at"`
+	RoleList  []*UserRole `json:"role_list"`
+}
+
+type UserRole struct {
+	ID   int32  `json:"id"`
+	Name string `json:"name"`
+	Code string `json:"code"`
 }
 
 type UserList struct {
@@ -45,8 +49,8 @@ func CreateUser(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	xlogger.Infof("create user: (用户名: %s, 电话: %s, 昵称: %s, 角色: %d)",
-		user.Username, user.Tel, user.Nickname, user.RoleId)
+	xlogger.Infof("create user: (用户名: %s, 电话: %s, 昵称: %s, 角色: %v)",
+		user.Username, user.Tel, user.Nickname, user.RoleIds)
 
 	// 可以额外校验
 	if user.Username == "" || user.Tel == "" {
@@ -109,6 +113,15 @@ func GetUserInfo(c *gin.Context) {
 		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
 		return
 	}
+	roleList := make([]*UserRole, 0, len(user.RoleList))
+	for _, role := range user.RoleList {
+		roleList = append(roleList, &UserRole{
+			ID:   role.ID,
+			Name: role.Name,
+			Code: role.Code,
+		})
+	}
+
 	xresponse.Success(c, &UserInfo{
 		ID:        user.ID,
 		Username:  user.Username,
@@ -117,9 +130,7 @@ func GetUserInfo(c *gin.Context) {
 		Status:    user.Status,
 		CreatedAt: user.CreatedAt.Format("2006-01-02 15:04:05.000"),
 		UpdatedAt: user.UpdatedAt.Format("2006-01-02 15:04:05.000"),
-		RoleId:    user.RoleId,
-		RoleName:  user.RoleName,
-		RoleCode:  user.RoleCode,
+		RoleList:  roleList,
 	})
 }
 

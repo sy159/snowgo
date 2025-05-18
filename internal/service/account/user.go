@@ -2,6 +2,7 @@ package account
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
 	"snowgo/internal/constants"
@@ -15,7 +16,6 @@ import (
 	"snowgo/pkg/xcryption"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
-	"strconv"
 	"time"
 )
 
@@ -25,12 +25,14 @@ type UserRepo interface {
 	TransactionCreateUser(ctx context.Context, tx *query.Query, user *model.User) (*model.User, error)
 	TransactionUpdateUser(ctx context.Context, tx *query.Query, userId int32, username, tel, nickname string) error
 	TransactionCreateUserRole(ctx context.Context, tx *query.Query, userRole *model.UserRole) error
+	TransactionCreateUserRoleInBatches(ctx context.Context, tx *query.Query, userRoleList []*model.UserRole) error
 	TransactionDeleteUserRole(ctx context.Context, tx *query.Query, userId int32) error
 	TransactionDeleteById(ctx context.Context, tx *query.Query, userId int32) error
-	GetRoleByUserId(ctx context.Context, userId int32) (*account.UserRoleInfo, error)
-	GetRoleIdByUserId(ctx context.Context, userId int32) (int32, error)
+	GetRoleListByUserId(ctx context.Context, userId int32) ([]*account.UserRoleInfo, error)
+	GetRoleIdsByUserId(ctx context.Context, userId int32) ([]int32, error)
 	IsNameTelDuplicate(ctx context.Context, username, tel string, userId int32) (bool, error)
 	IsExistByRoleId(ctx context.Context, roleId int32) (bool, error)
+	CountRoleByIds(ctx context.Context, roleId []int32) (int64, error)
 	GetUserById(ctx context.Context, userId int32) (*model.User, error)
 	GetUserByUsername(ctx context.Context, username string) (*model.User, error)
 	GetUserList(ctx context.Context, condition *account.UserListCondition) ([]*model.User, int64, error)
@@ -58,12 +60,12 @@ func NewUserService(db *repo.Repository, userDao UserRepo, cache xcache.Cache, r
 }
 
 type UserParam struct {
-	ID       int32  `json:"id"`
-	Username string `json:"username" binding:"required,max=64"`
-	Password string `json:"password"`
-	Tel      string `json:"tel" binding:"required"`
-	Nickname string `json:"nickname"`
-	RoleId   int32  `json:"role_id"`
+	ID       int32   `json:"id"`
+	Username string  `json:"username" binding:"required,max=64"`
+	Password string  `json:"password"`
+	Tel      string  `json:"tel" binding:"required"`
+	Nickname string  `json:"nickname"`
+	RoleIds  []int32 `json:"role_ids"`
 }
 
 type UserInfo struct {
@@ -72,11 +74,15 @@ type UserInfo struct {
 	Tel       string
 	Nickname  string
 	Status    string
-	RoleId    int32
-	RoleName  string
-	RoleCode  string
+	RoleList  []*UserRole
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+type UserRole struct {
+	ID   int32
+	Name string
+	Code string
 }
 
 type UserList struct {
@@ -113,13 +119,14 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 	}
 
 	// 检查设置的角色id是否存在
-	if userParam.RoleId > 0 {
-		isExist, err := u.userDao.IsExistByRoleId(ctx, userParam.RoleId)
+	if len(userParam.RoleIds) > 0 {
+		//isExist, err := u.userDao.IsExistByRoleId(ctx, userParam.RoleIds)
+		roleLen, err := u.userDao.CountRoleByIds(ctx, userParam.RoleIds)
 		if err != nil {
-			xlogger.Errorf("查询角色id存在异常: %v", err)
-			return 0, errors.WithMessage(err, "查询角色id存在异常")
+			xlogger.Errorf("查询角色数量存在异常: %v", err)
+			return 0, errors.WithMessage(err, "查询角色数量存在异常")
 		}
-		if !isExist {
+		if roleLen != int64(len(userParam.RoleIds)) {
 			return 0, errors.New("设置的角色不存在")
 		}
 	}
@@ -148,11 +155,15 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		}
 
 		// 创建用户-role关联, 设置roleId才去创建
-		if userParam.RoleId > 0 {
-			err = u.userDao.TransactionCreateUserRole(ctx, tx, &model.UserRole{
-				UserID: userObj.ID,
-				RoleID: userParam.RoleId,
-			})
+		if len(userParam.RoleIds) > 0 {
+			userRoles := make([]*model.UserRole, 0, len(userParam.RoleIds))
+			for _, roleId := range userParam.RoleIds {
+				userRoles = append(userRoles, &model.UserRole{
+					UserID: userObj.ID,
+					RoleID: roleId,
+				})
+			}
+			err = u.userDao.TransactionCreateUserRoleInBatches(ctx, tx, userRoles)
 			if err != nil {
 				xlogger.Errorf("用户与角色关联关系创建失败: %+v err: %v", userParam, err)
 				return errors.WithMessage(err, "用户与角色关联关系创建失败")
@@ -218,13 +229,14 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 	}
 
 	// 检查设置的角色id是否存在
-	if userParam.RoleId > 0 {
-		isExist, err := u.userDao.IsExistByRoleId(ctx, userParam.RoleId)
+	if len(userParam.RoleIds) > 0 {
+		//isExist, err := u.userDao.IsExistByRoleId(ctx, userParam.RoleIds)
+		roleLen, err := u.userDao.CountRoleByIds(ctx, userParam.RoleIds)
 		if err != nil {
-			xlogger.Errorf("查询角色id存在异常: %v", err)
-			return 0, errors.WithMessage(err, "查询角色id存在异常")
+			xlogger.Errorf("查询角色数量存在异常: %v", err)
+			return 0, errors.WithMessage(err, "查询角色数量存在异常")
 		}
-		if !isExist {
+		if roleLen != int64(len(userParam.RoleIds)) {
 			return 0, errors.New("设置的角色不存在")
 		}
 	}
@@ -245,11 +257,15 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		}
 
 		// 创建用户-role关联, 设置roleId才去创建
-		if userParam.RoleId > 0 {
-			err = u.userDao.TransactionCreateUserRole(ctx, tx, &model.UserRole{
-				UserID: userParam.ID,
-				RoleID: userParam.RoleId,
-			})
+		if len(userParam.RoleIds) > 0 {
+			userRoles := make([]*model.UserRole, 0, len(userParam.RoleIds))
+			for _, roleId := range userParam.RoleIds {
+				userRoles = append(userRoles, &model.UserRole{
+					UserID: userParam.ID,
+					RoleID: roleId,
+				})
+			}
+			err = u.userDao.TransactionCreateUserRoleInBatches(ctx, tx, userRoles)
 			if err != nil {
 				xlogger.Errorf("用户与角色关联关系创建失败: %+v err: %v", userParam, err)
 				return errors.WithMessage(err, "用户与角色关联关系创建失败")
@@ -304,17 +320,17 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 	}
 
 	// 查询角色信息
-	role, err := u.userDao.GetRoleByUserId(ctx, userId)
+	roleList, err := u.userDao.GetRoleListByUserId(ctx, userId)
 	if err != nil {
 		return nil, errors.WithMessage(err, "用户角色信息查询失败")
 	}
-	var roleId int32
-	roleCode := ""
-	roleName := ""
-	if role != nil {
-		roleId = role.RoleId
-		roleCode = role.RoleCode
-		roleName = role.RoleName
+	roles := make([]*UserRole, 0, len(roleList))
+	for _, role := range roleList {
+		roles = append(roles, &UserRole{
+			ID:   role.RoleId,
+			Code: role.RoleCode,
+			Name: role.RoleName,
+		})
 	}
 	return &UserInfo{
 		ID:        user.ID,
@@ -322,9 +338,7 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 		Tel:       user.Tel,
 		Nickname:  *user.Nickname,
 		Status:    *user.Status,
-		RoleId:    roleId,
-		RoleCode:  roleCode,
-		RoleName:  roleName,
+		RoleList:  roles,
 		CreatedAt: *user.CreatedAt,
 		UpdatedAt: *user.UpdatedAt,
 	}, nil
@@ -472,31 +486,37 @@ func (u *UserService) Authenticate(ctx context.Context, username, password strin
 	}, nil
 }
 
-// GetRoleIdByUserId 根据userId拿该用户角色
-func (u *UserService) GetRoleIdByUserId(ctx context.Context, userId int32) (int32, error) {
+// GetRoleIdsByUserId 根据userId拿该用户角色
+func (u *UserService) GetRoleIdsByUserId(ctx context.Context, userId int32) ([]int32, error) {
+	var roleIds []int32
 	if userId <= 0 {
-		return 0, errors.New(e.UserNotFound.GetErrMsg())
+		return roleIds, errors.New(e.UserNotFound.GetErrMsg())
 	}
 
 	// 读缓存 user->roleId
 	cacheKey := fmt.Sprintf("%s%d", constants.CacheUserRolePrefix, userId)
 	if data, err := u.cache.Get(ctx, cacheKey); err == nil && data != "" {
-		if roleId, strErr := strconv.Atoi(data); strErr == nil {
-			return int32(roleId), nil
+		if strErr := json.Unmarshal([]byte(data), &roleIds); strErr == nil {
+			return roleIds, nil
 		}
 	}
 
 	//  缓存未命中或解析失败：查库拿 RoleId
-	roleId, err := u.userDao.GetRoleIdByUserId(ctx, userId)
+	roleIds, err := u.userDao.GetRoleIdsByUserId(ctx, userId)
 	if err != nil {
 		xlogger.Errorf("查询用户角色id失败 uid=%d: %v", userId, err)
-		return 0, errors.WithMessage(err, "查询用户角色id失败")
+		return roleIds, errors.WithMessage(err, "查询用户角色id失败")
 	}
 
-	// 写缓存（即便 roleId=0 也写，防止下次打表）
-	_ = u.cache.Set(ctx, cacheKey, strconv.Itoa(int(roleId)), constants.CacheUserRoleExpirationDay*24*time.Hour)
+	// 写缓存
+	roleIdsBytes, err := json.Marshal(&roleIds)
+	if err != nil {
+		xlogger.Errorf("缓存用户角色id失败 uid=%d, roleIds: %v, %v", userId, roleIds, err)
+		return roleIds, errors.WithMessage(err, "缓存用户角色id失败")
+	}
+	_ = u.cache.Set(ctx, cacheKey, string(roleIdsBytes), constants.CacheUserRoleExpirationDay*24*time.Hour)
 
-	return roleId, nil
+	return roleIds, nil
 }
 
 // GetPermsListById 根据userId拿该用户所有接口权限标识
@@ -506,22 +526,26 @@ func (u *UserService) GetPermsListById(ctx context.Context, userId int32) ([]str
 	}
 
 	// 根据userId拿到roleId
-	roleId, err := u.GetRoleIdByUserId(ctx, userId)
+	roleIds, err := u.GetRoleIdsByUserId(ctx, userId)
 	if err != nil {
 		xlogger.Errorf("GetPermsListById 查询用户角色失败 uid=%d: %v", userId, err)
 		return nil, err
 	}
 
 	// 如果没分配角色，直接返回空 perms
-	if roleId <= 0 {
+	if len(roleIds) <= 0 {
 		return []string{}, nil
 	}
 
 	// 根据roleId拿到接口的perms列表
-	permsList, err := u.roleService.GetRolePermsListByRuleID(ctx, roleId)
-	if err != nil {
-		xlogger.Errorf("GetPermsListById 获取角色权限失败 rid=%d: %v", roleId, err)
-		return nil, err
+	permsList := make([]string, 0, 10)
+	for _, roleId := range roleIds {
+		perms, err := u.roleService.GetRolePermsListByRuleID(ctx, roleId)
+		if err != nil {
+			xlogger.Errorf("GetPermsListById 获取角色权限失败 rid=%v: %v", roleIds, err)
+			return nil, err
+		}
+		permsList = append(permsList, perms...)
 	}
 	return permsList, nil
 }

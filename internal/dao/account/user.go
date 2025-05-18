@@ -78,6 +78,15 @@ func (u *UserDao) TransactionCreateUserRole(ctx context.Context, tx *query.Query
 	return nil
 }
 
+// TransactionCreateUserRoleInBatches 创建用户-rule关联
+func (u *UserDao) TransactionCreateUserRoleInBatches(ctx context.Context, tx *query.Query, userRoleList []*model.UserRole) error {
+	err := tx.WithContext(ctx).UserRole.CreateInBatches(userRoleList, 100)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
+}
+
 // TransactionDeleteUserRole 删除用户与角色关联关系
 func (u *UserDao) TransactionDeleteUserRole(ctx context.Context, tx *query.Query, userId int32) error {
 	_, err := tx.WithContext(ctx).UserRole.Where(tx.UserRole.UserID.Eq(userId)).Delete()
@@ -99,36 +108,35 @@ func (u *UserDao) TransactionDeleteById(ctx context.Context, tx *query.Query, us
 	return nil
 }
 
-func (u *UserDao) GetRoleByUserId(ctx context.Context, userId int32) (*UserRoleInfo, error) {
+func (u *UserDao) GetRoleListByUserId(ctx context.Context, userId int32) ([]*UserRoleInfo, error) {
 	if userId <= 0 {
 		return nil, errors.New("用户id不存在")
 	}
 	m := u.repo.Query().UserRole
 	role := u.repo.Query().Role
 
-	var userRoleInfo *UserRoleInfo
+	var userRoles []*UserRoleInfo
 	err := m.WithContext(ctx).
 		Where(m.UserID.Eq(userId)).
 		LeftJoin(role, m.RoleID.EqCol(role.ID)).
 		Select(m.UserID, m.RoleID, role.Name.As("role_name"), role.Code.As("role_code")).
-		Limit(1).
-		Scan(&userRoleInfo)
-	return userRoleInfo, err
+		Scan(&userRoles)
+	return userRoles, err
 }
 
-// GetRoleIdByUserId 只返回 roleId，如果没找到记录则返回 0
-func (u *UserDao) GetRoleIdByUserId(ctx context.Context, userId int32) (int32, error) {
+// GetRoleIdsByUserId 只返回 roleId，如果没找到记录则返回 0
+func (u *UserDao) GetRoleIdsByUserId(ctx context.Context, userId int32) ([]int32, error) {
+	var roleIds []int32
 	if userId <= 0 {
-		return 0, errors.New("用户 id 不合法")
+		return roleIds, errors.New("用户 id 不合法")
 	}
 
-	var roleId int32
 	m := u.repo.Query().UserRole
-	err := m.WithContext(ctx).Select(m.RoleID).Where(m.UserID.Eq(userId)).Limit(1).Scan(&roleId)
+	err := m.WithContext(ctx).Select(m.RoleID).Where(m.UserID.Eq(userId)).Scan(&roleIds)
 	if err != nil {
-		return 0, errors.WithStack(err)
+		return roleIds, errors.WithStack(err)
 	}
-	return roleId, nil
+	return roleIds, nil
 }
 
 // IsNameTelDuplicate 用户名或者电话是否存在了,如果有用户id应该排除
@@ -165,6 +173,12 @@ func (u *UserDao) IsExistByRoleId(ctx context.Context, roleId int32) (bool, erro
 		return true, errors.WithStack(err)
 	}
 	return true, nil
+}
+
+// CountRoleByIds 根据role ids，获取数量
+func (u *UserDao) CountRoleByIds(ctx context.Context, roleIds []int32) (int64, error) {
+	m := u.repo.Query().Role
+	return m.WithContext(ctx).Select(m.ID).Where(m.ID.In(roleIds...)).Count()
 }
 
 // GetUserById 查询用户by id
