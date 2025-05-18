@@ -31,7 +31,7 @@ CREATE TABLE `role`
     `created_at`  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at`  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_name` (`code`)
+    UNIQUE KEY `uk_code` (`code`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='角色表';
@@ -107,7 +107,7 @@ CREATE TABLE `operation_log`
     PRIMARY KEY (`id`),
     KEY `idx_operator_id` (`operator_id`),
     KEY `idx_trace_id` (`trace_id`),
-    KEY `idx_resource` (`resource`, `resource_id`),
+    KEY `idx_resource` (`resource_id`, `resource`),
     KEY `idx_created_at` (`created_at`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
@@ -116,8 +116,7 @@ CREATE TABLE `operation_log`
 # 插入测试数据
 # 用户数据
 INSERT INTO `user` (`username`, `tel`, `nickname`, `password`, `status`, `is_deleted`)
-VALUES ('admin', '18712345678', '如何好听', '$2a$10$XqU5GKb6wbGXjckKxQtMF.b8nn6MlC17tk2Y.ap//n8swLOQ4fZwO', 'Active',
-        0);
+VALUES ('admin', '18712345678', '如何好听', '$2a$10$XqU5GKb6wbGXjckKxQtMF.b8nn6MlC17tk2Y.ap//n8swLOQ4fZwO', 'Active', 0);
 
 # 菜单数据
 INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `order_num`)
