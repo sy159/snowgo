@@ -73,6 +73,20 @@ type MenuInfo struct {
 	Children  []*MenuInfo `json:"children,omitempty"`
 }
 
+// MenuData menu数据
+type MenuData struct {
+	ID        int32     `json:"id"`
+	ParentID  int32     `json:"parent_id"`
+	MenuType  string    `json:"menu_type"`
+	Name      string    `json:"name"`
+	Path      string    `json:"path"`
+	Icon      string    `json:"icon"`
+	Perms     string    `json:"perms"`
+	OrderNum  int32     `json:"order_num"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // CreateMenu 创建菜单权限
 func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, error) {
 	// 获取登录ctx
@@ -224,7 +238,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		}
 		for _, roleId := range roleIds {
 			// 清除角色对应接口权限缓存
-			cacheKey := fmt.Sprintf("%s%d", constants.CacheRolePermsPrefix, roleId)
+			cacheKey := fmt.Sprintf("%s%d", constants.CacheRoleMenuPrefix, roleId)
 			if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
 				xlogger.Errorf("清除角色对应接口权限缓存失败: %v", err)
 			}
@@ -305,6 +319,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 	return nil
 }
 
+// GetMenuTree 获取菜单树
 func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 	// 尝试缓存
 	if data, err := s.cache.Get(ctx, constants.CacheMenuTree); err == nil && data != "" {

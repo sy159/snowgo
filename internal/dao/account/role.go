@@ -8,6 +8,7 @@ import (
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
+	"time"
 )
 
 type RoleDao struct {
@@ -31,6 +32,20 @@ type RoleListCondition struct {
 type RoleMenuPerm struct {
 	RoleID int32  `gorm:"column:role_id"`
 	Perms  string `gorm:"column:perms"`
+}
+
+type RoleMenuInfo struct {
+	RoleID    int32     `gorm:"column:role_id" json:"role_id"`
+	ID        int32     `json:"id"`
+	ParentID  int32     `json:"parent_id"`
+	MenuType  string    `json:"menu_type"`
+	Name      string    `json:"name"`
+	Path      string    `json:"path"`
+	Icon      string    `json:"icon"`
+	Perms     string    `json:"perms"`
+	OrderNum  int32     `json:"order_num"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func (r *RoleDao) IsCodeExists(ctx context.Context, code string, roleId int32) (bool, error) {
@@ -225,6 +240,22 @@ func (r *RoleDao) GetMenuPermsByRoleId(ctx context.Context, roleId int32) ([]str
 		return nil, errors.WithStack(err)
 	}
 	return menuPermsList, nil
+}
+
+// GetMenuListByRoleId 根据roleId 获取关联的菜单
+func (r *RoleDao) GetMenuListByRoleId(ctx context.Context, roleId int32) ([]*model.Menu, error) {
+	m := r.repo.Query().RoleMenu
+	menu := r.repo.Query().Menu
+	menuList := make([]*model.Menu, 0, 10)
+	err := m.WithContext(ctx).
+		Join(menu, m.MenuID.EqCol(menu.ID)).
+		Where(m.RoleID.Eq(roleId)).
+		Select(menu.ALL).
+		Scan(&menuList)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return menuList, nil
 }
 
 // ListRoleMenuPerms 查询每个角色绑定的接口perms权限名

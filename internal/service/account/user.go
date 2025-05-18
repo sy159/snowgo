@@ -16,6 +16,7 @@ import (
 	"snowgo/pkg/xcryption"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
+	"sort"
 	"time"
 )
 
@@ -79,15 +80,34 @@ type UserInfo struct {
 	UpdatedAt time.Time
 }
 
+type UserPermissionInfo struct {
+	ID          int32             `json:"id"`
+	Username    string            `json:"username"`
+	Tel         string            `json:"tel"`
+	Nickname    string            `json:"nickname"`
+	Status      string            `json:"status"`
+	RoleList    []*UserRole       `json:"role_list"`
+	Menus       []*MenuInfo       `json:"menu_list"`
+	Permissions []*UserPermission `json:"permission_list"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
+}
+
 type UserRole struct {
-	ID   int32
-	Name string
-	Code string
+	ID   int32  `json:"id"`
+	Name string `json:"name"`
+	Code string `json:"code"`
 }
 
 type UserList struct {
 	List  []*UserInfo
 	Total int64
+}
+
+type UserPermission struct {
+	ID    int32  `json:"id"`
+	Name  string `json:"name"`
+	Perms string `json:"perms"`
 }
 
 type UserListCondition struct {
@@ -548,4 +568,109 @@ func (u *UserService) GetPermsListById(ctx context.Context, userId int32) ([]str
 		permsList = append(permsList, perms...)
 	}
 	return permsList, nil
+}
+
+// GetUserPermissionById 根据id获取用户信息
+func (u *UserService) GetUserPermissionById(ctx context.Context, userId int32) (*UserPermissionInfo, error) {
+	if userId <= 0 {
+		return nil, errors.New(e.UserNotFound.GetErrMsg())
+	}
+	// 获取用户信息
+	user, err := u.GetUserById(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	// 获取用户权限信息
+	menuList := make([]*MenuData, 0, 20)             // 菜单信息()
+	permissionList := make([]*UserPermission, 0, 10) // 按钮权限信息
+	menuRoots := make([]*MenuInfo, 0, 10)
+	menuMap := make(map[int32]struct{}, 20)
+	permMap := make(map[int32]struct{}, 10)
+
+	if len(user.RoleList) > 0 {
+		for _, role := range user.RoleList {
+			menus, err := u.roleService.GetRoleMenuListByRuleID(ctx, role.ID)
+			if err != nil {
+				return nil, err
+			}
+			for _, menu := range menus {
+				// 按钮放到perm下面，用与渲染页面按钮
+				if menu.MenuType == constants.MenuTypeBtn && menu.Perms != "" {
+					if _, exists := permMap[menu.ID]; !exists {
+						permissionList = append(permissionList, &UserPermission{
+							ID:    menu.ID,
+							Name:  menu.Name,
+							Perms: menu.Perms,
+						})
+						permMap[menu.ID] = struct{}{}
+					}
+				}
+				// dir跟menu放到菜单信息下面，用与渲染数据
+				if menu.MenuType == constants.MenuTypeMenu || menu.MenuType == constants.MenuTypeDir {
+					if _, exists := menuMap[menu.ID]; !exists {
+						menuMap[menu.ID] = struct{}{}
+						menuList = append(menuList, menu)
+					}
+				}
+			}
+		}
+
+		// 构造 map[id]MenuInfo
+		nodeMap := make(map[int32]*MenuInfo, len(menuList))
+		for _, m := range menuList {
+			nodeMap[m.ID] = &MenuInfo{
+				ID:        m.ID,
+				ParentID:  m.ParentID,
+				MenuType:  m.MenuType,
+				Name:      m.Name,
+				Path:      m.Path,
+				Icon:      m.Icon,
+				Perms:     m.Perms,
+				OrderNum:  m.OrderNum,
+				CreatedAt: m.CreatedAt,
+				UpdatedAt: m.UpdatedAt,
+				Children:  []*MenuInfo{},
+			}
+		}
+
+		for _, node := range nodeMap {
+			if node.ParentID == 0 {
+				menuRoots = append(menuRoots, node)
+			} else if parent, ok := nodeMap[node.ParentID]; ok {
+				parent.Children = append(parent.Children, node)
+			} else {
+				xlogger.Errorf("菜单[%d] 的父节点 [%d] 不存在，挂到根节点", node.ID, node.ParentID)
+				menuRoots = append(menuRoots, node)
+			}
+		}
+
+		// 递归排序
+		var sortNodes func(nodes []*MenuInfo)
+		sortNodes = func(nodes []*MenuInfo) {
+			if len(nodes) == 0 {
+				return
+			}
+			sort.SliceStable(nodes, func(i, j int) bool {
+				return nodes[i].OrderNum < nodes[j].OrderNum
+			})
+			for _, n := range nodes {
+				sortNodes(n.Children)
+			}
+		}
+		sortNodes(menuRoots)
+	}
+
+	return &UserPermissionInfo{
+		ID:          user.ID,
+		Username:    user.Username,
+		Tel:         user.Tel,
+		Nickname:    user.Nickname,
+		Status:      user.Status,
+		RoleList:    user.RoleList,
+		Menus:       menuRoots,
+		Permissions: permissionList,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+	}, nil
 }

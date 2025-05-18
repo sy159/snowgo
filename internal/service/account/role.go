@@ -33,6 +33,7 @@ type RoleRepo interface {
 	CountMenuByIds(ctx context.Context, ids []int32) (int64, error)
 	GetMenuIdsByRoleId(ctx context.Context, roleId int32) ([]int32, error)
 	GetMenuPermsByRoleId(ctx context.Context, roleId int32) ([]string, error)
+	GetMenuListByRoleId(ctx context.Context, roleId int32) ([]*model.Menu, error)
 	ListRoleMenuPerms(ctx context.Context) ([]*account.RoleMenuPerm, error)
 }
 
@@ -276,7 +277,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 	xlogger.Infof("角色更新成功: old=%+v new=%+v", oldRole, ruleObj)
 
 	// 清除角色对应接口权限缓存
-	cacheKey := fmt.Sprintf("%s%d", constants.CacheRolePermsPrefix, param.ID)
+	cacheKey := fmt.Sprintf("%s%d", constants.CacheRoleMenuPrefix, param.ID)
 	if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
 		xlogger.Errorf("清除角色对应接口权限缓存失败: %v", err)
 	}
@@ -348,7 +349,7 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 	xlogger.Infof("角色删除成功: %d", id)
 
 	// 清除角色对应接口权限缓存
-	cacheKey := fmt.Sprintf("%s%d", constants.CacheRolePermsPrefix, id)
+	cacheKey := fmt.Sprintf("%s%d", constants.CacheRoleMenuPrefix, id)
 	if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
 		xlogger.Errorf("清除角色对应接口权限缓存失败: %v", err)
 	}
@@ -415,26 +416,82 @@ func (s *RoleService) ListRoles(ctx context.Context, cond *RoleListCondition) (*
 
 // GetRolePermsListByRuleID 获取角色对应接口权限列表
 func (s *RoleService) GetRolePermsListByRuleID(ctx context.Context, roleId int32) ([]string, error) {
+	//// 尝试从缓存读取
+	//cacheKey := fmt.Sprintf("%s%d", constants.CacheRolePermsPrefix, roleId)
+	//if data, err := s.cache.Get(ctx, cacheKey); err == nil && data != "" {
+	//	var m []string
+	//	if err := json.Unmarshal([]byte(data), &m); err == nil {
+	//		return m, nil
+	//	}
+	//}
+	//
+	//// 获取roleId: perms数组
+	//menuPermsList, err := s.roleDao.GetMenuPermsByRoleId(ctx, roleId)
+	//if err != nil {
+	//	xlogger.Errorf("list role menu perms is err: %v", err)
+	//	return nil, err
+	//}
+	//
+	//// 缓存结果 15天
+	//if b, err := json.Marshal(menuPermsList); err == nil {
+	//	_ = s.cache.Set(ctx, cacheKey, string(b), constants.CacheRolePermsExpirationDay*24*time.Hour)
+	//}
+	//
+	//return menuPermsList, nil
+	if roleId <= 0 {
+		return nil, errors.New("角色ID无效")
+	}
+	menuList, err := s.GetRoleMenuListByRuleID(ctx, roleId)
+	if err != nil {
+		return nil, err
+	}
+	perms := make([]string, 0, len(menuList))
+	for _, menu := range menuList {
+		if menu.MenuType == constants.MenuTypeBtn && menu.Perms != "" {
+			perms = append(perms, menu.Perms)
+		}
+	}
+	return perms, nil
+}
+
+// GetRoleMenuListByRuleID 获取角色对应菜单列表
+func (s *RoleService) GetRoleMenuListByRuleID(ctx context.Context, roleId int32) ([]*MenuData, error) {
 	// 尝试从缓存读取
-	cacheKey := fmt.Sprintf("%s%d", constants.CacheRolePermsPrefix, roleId)
+	cacheKey := fmt.Sprintf("%s%d", constants.CacheRoleMenuPrefix, roleId)
 	if data, err := s.cache.Get(ctx, cacheKey); err == nil && data != "" {
-		var m []string
+		var m []*MenuData
 		if err := json.Unmarshal([]byte(data), &m); err == nil {
 			return m, nil
 		}
 	}
 
 	// 获取roleId: perms数组
-	menuPermsList, err := s.roleDao.GetMenuPermsByRoleId(ctx, roleId)
+	menuList, err := s.roleDao.GetMenuListByRoleId(ctx, roleId)
 	if err != nil {
-		xlogger.Errorf("list role menu perms is err: %v", err)
+		xlogger.Errorf("list role menu is err: %v", err)
 		return nil, err
 	}
 
-	// 缓存结果 15天
-	if b, err := json.Marshal(menuPermsList); err == nil {
-		_ = s.cache.Set(ctx, cacheKey, string(b), constants.CacheRolePermsExpirationDay*24*time.Hour)
+	menus := make([]*MenuData, 0, len(menuList))
+	for _, m := range menuList {
+		menus = append(menus, &MenuData{
+			ID:        m.ID,
+			ParentID:  m.ParentID,
+			MenuType:  m.MenuType,
+			Name:      m.Name,
+			Path:      *m.Path,
+			Icon:      *m.Icon,
+			Perms:     *m.Perms,
+			OrderNum:  m.OrderNum,
+			CreatedAt: *m.CreatedAt,
+			UpdatedAt: *m.UpdatedAt,
+		})
 	}
 
-	return menuPermsList, nil
+	// 缓存结果 15天
+	if b, err := json.Marshal(menus); err == nil {
+		_ = s.cache.Set(ctx, cacheKey, string(b), constants.CacheRoleMenuExpirationDay*24*time.Hour)
+	}
+
+	return menus, nil
 }

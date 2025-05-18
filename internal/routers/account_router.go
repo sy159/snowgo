@@ -19,6 +19,7 @@ func accountRouters(r *gin.RouterGroup) {
 		adminGroup.DELETE("/user", middleware.PermissionAuth("account:user:delete"), DeleteUserById)
 		adminGroup.GET("/user/detail", middleware.PermissionAuth("account:user:detail"), GetUserInfo)
 		adminGroup.POST("/user/pwd", middleware.PermissionAuth("account:user:reset_pwd"), ResetPwdById)
+		adminGroup.GET("/user/permission", GetUserPermission)
 		// 菜单权限
 		adminGroup.GET("/menu", middleware.PermissionAuth("account:menu:list"), GetMenuList)
 		adminGroup.POST("/menu", middleware.PermissionAuth("account:menu:create"), CreateMenu)

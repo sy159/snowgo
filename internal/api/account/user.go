@@ -5,6 +5,7 @@ import (
 	"snowgo/internal/constants"
 	"snowgo/internal/di"
 	"snowgo/internal/service/account"
+	"snowgo/pkg/xauth"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
@@ -222,4 +223,23 @@ func ResetPwdById(c *gin.Context) {
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": param.ID})
+}
+
+// GetUserPermission 用户权限信息
+func GetUserPermission(c *gin.Context) {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(c)
+	if err != nil {
+		xresponse.FailByError(c, e.HttpForbidden)
+		return
+	}
+	xlogger.Infof("get user permission by id: %v", userContext.UserId)
+	container := di.GetContainer(c)
+	user, err := container.UserService.GetUserPermissionById(c, int32(userContext.UserId))
+	if err != nil {
+		xlogger.Errorf("get user permission is err: %+v", err)
+		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
+		return
+	}
+	xresponse.Success(c, user)
 }
