@@ -29,7 +29,7 @@ type UserRepo interface {
 	TransactionCreateUserRoleInBatches(ctx context.Context, tx *query.Query, userRoleList []*model.UserRole) error
 	TransactionDeleteUserRole(ctx context.Context, tx *query.Query, userId int32) error
 	TransactionDeleteById(ctx context.Context, tx *query.Query, userId int32) error
-	GetRoleListByUserId(ctx context.Context, userId int32) ([]*account.UserRoleInfo, error)
+	GetRoleListByUserId(ctx context.Context, userId int32) ([]*model.Role, error)
 	GetRoleIdsByUserId(ctx context.Context, userId int32) ([]int32, error)
 	IsNameTelDuplicate(ctx context.Context, username, tel string, userId int32) (bool, error)
 	IsExistByRoleId(ctx context.Context, roleId int32) (bool, error)
@@ -347,9 +347,9 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 	roles := make([]*UserRole, 0, len(roleList))
 	for _, role := range roleList {
 		roles = append(roles, &UserRole{
-			ID:   role.RoleId,
-			Code: role.RoleCode,
-			Name: role.RoleName,
+			ID:   role.ID,
+			Code: role.Code,
+			Name: *role.Name,
 		})
 	}
 	return &UserInfo{

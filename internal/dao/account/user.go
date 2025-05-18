@@ -31,13 +31,6 @@ type UserListCondition struct {
 	Limit    int32   `json:"limit"`
 }
 
-type UserRoleInfo struct {
-	UserId   int32  `json:"user_id"`
-	RoleId   int32  `json:"role_id"`
-	RoleName string `json:"role_name"`
-	RoleCode string `json:"role_code"`
-}
-
 // CreateUser 创建用户
 func (u *UserDao) CreateUser(ctx context.Context, user *model.User) (*model.User, error) {
 	err := u.repo.Query().WithContext(ctx).User.Create(user)
@@ -108,18 +101,18 @@ func (u *UserDao) TransactionDeleteById(ctx context.Context, tx *query.Query, us
 	return nil
 }
 
-func (u *UserDao) GetRoleListByUserId(ctx context.Context, userId int32) ([]*UserRoleInfo, error) {
+func (u *UserDao) GetRoleListByUserId(ctx context.Context, userId int32) ([]*model.Role, error) {
 	if userId <= 0 {
 		return nil, errors.New("用户id不存在")
 	}
 	m := u.repo.Query().UserRole
 	role := u.repo.Query().Role
 
-	var userRoles []*UserRoleInfo
+	var userRoles []*model.Role
 	err := m.WithContext(ctx).
 		Where(m.UserID.Eq(userId)).
 		LeftJoin(role, m.RoleID.EqCol(role.ID)).
-		Select(m.UserID, m.RoleID, role.Name.As("role_name"), role.Code.As("role_code")).
+		Select(role.ALL).
 		Scan(&userRoles)
 	return userRoles, err
 }
