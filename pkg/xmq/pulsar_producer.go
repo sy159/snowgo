@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"math/rand"
 	"snowgo/pkg/xlogger"
 
 	"time"
@@ -13,13 +14,14 @@ import (
 
 var (
 	defaultProducer = producerOptions{
-		topic:                   "default-topic",
-		disableBlockIfQueueFull: false,           // 设置为false(默认值): 队列满了,会阻塞；true:队列满了,会立即返回错误
-		maxPendingMessages:      10000,           // 待确定消息最大长度
-		disableBatching:         true,            // true: 每一条消息单独发送；false: 合并发送
-		batchingMaxPublishDelay: 2 * time.Second, // 合并发送时生效，单批次最大等待时间
-		batchingMaxMessages:     5,               // 合并发送时生效，单批次最大消息数
-		batchingMaxSize:         2 * 1024 * 1024, // 合并发送时生效，单批次最大消息字节
+		disableBlockIfQueueFull: false,                  // 设置为false(默认值): 队列满了,会阻塞；true:队列满了,会立即返回错误
+		maxPendingMessages:      10000,                  // 待确定消息最大长度
+		disableBatching:         false,                  // true: 每一条消息单独发送；false: 合并发送
+		batchingMaxPublishDelay: 100 * time.Millisecond, // 合并发送时生效，单批次最大等待时间
+		batchingMaxMessages:     1000,                   // 合并发送时生效，单批次最大消息数
+		batchingMaxSize:         2 * 1024 * 1024,        // 合并发送时生效，单批次最大消息字节
+		maxRetries:              3,                      // 消息发送失败重试次数
+		baseBackoffInterval:     100 * time.Millisecond, // 消息发送失败重试间隔时间
 	}
 	producerLogger = xlogger.NewLogger("./logs", "pulsar-producer", xlogger.WithFileMaxAgeDays(7))
 )
@@ -35,20 +37,50 @@ type producerOptions struct {
 	batchingMaxPublishDelay time.Duration // 合并发送时生效，单批次最大等待时间
 	batchingMaxMessages     uint          // 合并发送时生效，单批次最大消息数
 	batchingMaxSize         uint          // 合并发送时生效，单批次最大消息字节
+	maxRetries              int           // 消息发送失败重试次数
+	baseBackoffInterval     time.Duration // 消息发送失败重试间隔时间
+}
+
+type PulsarClient struct {
+	client    pulsar.Client
+	producers []*PulsarProducer
 }
 
 type PulsarProducer struct {
 	options  producerOptions
-	client   pulsar.Client
 	producer pulsar.Producer
 }
 
-func NewPulsarProducer(url, topic string, opts ...ProducerOptions) (*PulsarProducer, error) {
+// NewPulsarClient 创建客户端
+func NewPulsarClient(url string) (*PulsarClient, error) {
+	if url == "" {
+		return nil, errors.New("url is required")
+	}
 	client, err := pulsar.NewClient(pulsar.ClientOptions{
-		URL: url,
+		URL:                     url,
+		ConnectionTimeout:       10 * time.Second, // 连接超时时间
+		OperationTimeout:        30 * time.Second, // 操作超时时间
+		MaxConnectionsPerBroker: 5,
 	})
 	if err != nil {
 		return nil, errors.WithMessage(err, "pulsar client is err")
+	}
+
+	return &PulsarClient{client: client}, nil
+}
+
+// Close 关闭客户端
+func (c *PulsarClient) Close() {
+	for _, p := range c.producers {
+		p.Close()
+	}
+	c.client.Close()
+}
+
+// NewProducer 创建生产者
+func (c *PulsarClient) NewProducer(topic string, opts ...ProducerOptions) (*PulsarProducer, error) {
+	if topic == "" {
+		return nil, errors.New("topic is required")
 	}
 
 	producerOptions := defaultProducer
@@ -58,7 +90,7 @@ func NewPulsarProducer(url, topic string, opts ...ProducerOptions) (*PulsarProdu
 		opt(&producerOptions)
 	}
 
-	producer, err := client.CreateProducer(pulsar.ProducerOptions{
+	producer, err := c.client.CreateProducer(pulsar.ProducerOptions{
 		Topic:                   producerOptions.topic,
 		DisableBlockIfQueueFull: producerOptions.disableBlockIfQueueFull,
 		MaxPendingMessages:      producerOptions.maxPendingMessages,
@@ -68,23 +100,30 @@ func NewPulsarProducer(url, topic string, opts ...ProducerOptions) (*PulsarProdu
 		BatchingMaxSize:         producerOptions.batchingMaxSize,
 	})
 	if err != nil {
-		client.Close()
 		return nil, errors.WithMessage(err, "pulsar create producer is err")
 	}
 
-	return &PulsarProducer{
+	newProducer := &PulsarProducer{
 		options:  producerOptions,
-		client:   client,
 		producer: producer,
-	}, nil
+	}
+	c.producers = append(c.producers, newProducer)
+
+	return newProducer, nil
 }
 
 // WithDeliverAfter 设置消息延迟消费时间
 func WithDeliverAfter(deliverAfter time.Duration) ProducerOptions {
 	return func(options *producerOptions) {
-		if deliverAfter > 0 {
-			options.deliverAfter = deliverAfter
+		if deliverAfter < 0 {
+			deliverAfter = 0
 		}
+		// Pulsar限制deliverAfter不能超过15天
+		maxDelay := 15 * 24 * time.Hour
+		if deliverAfter > maxDelay {
+			deliverAfter = maxDelay
+		}
+		options.deliverAfter = deliverAfter
 	}
 }
 
@@ -98,8 +137,21 @@ func WithMessageBatching(disableBatching bool, maxPublishDelay time.Duration, ma
 	}
 }
 
+func WithMaxRetries(maxRetries int, baseBackoffInterval time.Duration) ProducerOptions {
+	return func(options *producerOptions) {
+		if maxRetries < 0 {
+			maxRetries = 0
+		}
+		if baseBackoffInterval < 0 {
+			baseBackoffInterval = 0
+		}
+		options.maxRetries = maxRetries
+		options.baseBackoffInterval = baseBackoffInterval
+	}
+}
+
 // LogMessage logs the message details.
-func (p *PulsarProducer) LogMessage(messageId pulsar.MessageID, message []byte, properties map[string]string, sendTime time.Time, err error) {
+func (p *PulsarProducer) LogMessage(ctx context.Context, messageId pulsar.MessageID, message []byte, properties map[string]string, sendTime time.Time, err error) {
 	status := "success"
 	errMsg := ""
 	if err != nil {
@@ -110,6 +162,10 @@ func (p *PulsarProducer) LogMessage(messageId pulsar.MessageID, message []byte, 
 	if messageId != nil {
 		messageIdStr = messageId.String()
 	}
+	var traceID string
+	if tid, ok := ctx.Value("trace_id").(string); ok {
+		traceID = tid
+	}
 	producerLogger.Log(
 		"pulsar producer",
 		zap.String("topic", p.producer.Topic()),
@@ -119,6 +175,7 @@ func (p *PulsarProducer) LogMessage(messageId pulsar.MessageID, message []byte, 
 		zap.String("created_at", sendTime.Format("2006-01-02 15:04:05.000")),
 		zap.String("status", status),
 		zap.String("error_msg", errMsg),
+		zap.String("trace_id", traceID),
 	)
 }
 
@@ -133,11 +190,23 @@ func (p *PulsarProducer) SendMessage(ctx context.Context, message []byte, proper
 		msg.DeliverAfter = p.options.deliverAfter
 	}
 
-	sendTime := time.Now()
-	messageId, err := p.producer.Send(ctx, msg)
-	p.LogMessage(messageId, message, properties, sendTime, err)
-	if err != nil {
-		return errors.Wrap(err, "pulsar send message is err")
+	var sendErr error
+	for i := 0; i <= p.options.maxRetries; i++ {
+		sendTime := time.Now()
+		messageId, err := p.producer.Send(ctx, msg)
+		p.LogMessage(ctx, messageId, message, properties, sendTime, err)
+		sendErr = err
+		if err == nil {
+			break
+		}
+		// 失败不在最后一次则等待重试
+		if i < p.options.maxRetries {
+			backoff := p.options.baseBackoffInterval * (1 << i)
+			time.Sleep(backoff + time.Duration(rand.Int63n(int64(backoff))))
+		}
+	}
+	if sendErr != nil {
+		return errors.Wrap(sendErr, "pulsar send message is err")
 	}
 	return nil
 }
@@ -156,7 +225,8 @@ func (p *PulsarProducer) SendAsyncMessage(ctx context.Context, message []byte, p
 	p.producer.SendAsync(ctx, msg, callback)
 }
 
+// Close 关闭producer
 func (p *PulsarProducer) Close() {
+	_ = p.producer.Flush()
 	p.producer.Close()
-	p.client.Close()
 }
