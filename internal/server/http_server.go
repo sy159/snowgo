@@ -49,7 +49,7 @@ func StartHttpServer() {
 			xcolor.BlueFont(cfg.Log.Writer))
 
 		if err := HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			xlogger.Fatalf("Server Listen: %s\n", err)
+			xlogger.Panicf("Server Listen: %s\n", err)
 		}
 	}()
 }
@@ -60,8 +60,9 @@ func StopHttpServer() (err error) {
 	defer cancel()
 	// x秒内优雅关闭服务（将未处理完的请求处理完再关闭服务）
 	if err := HttpServer.Shutdown(ctx); err != nil {
-		xlogger.Fatalf("Server Shutdown: %s", err.Error())
+		xlogger.Panicf("Server Shutdown: %s", err.Error())
 	}
+	xlogger.Info("Server Shutdown...")
 	return
 }
 
