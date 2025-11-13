@@ -2,7 +2,9 @@ package xresponse
 
 import (
 	"net/http"
+	"snowgo/pkg/xauth"
 	e "snowgo/pkg/xerror"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -27,9 +29,11 @@ func Json(c *gin.Context, code int, msg string, data interface{}) {
 	c.Set(BizCode, code)
 	c.Set(BizMsg, msg)
 	c.JSON(http.StatusOK, gin.H{
-		"code": code,
-		"msg":  msg,
-		"data": data,
+		"code":      code,
+		"msg":       msg,
+		"data":      data,
+		"timestamp": time.Now().UnixMilli(),
+		"trace_id":  c.GetString(xauth.XTraceId),
 	})
 }
 
