@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"net/http"
 	"snowgo/config"
+	"snowgo/internal/di"
 	"snowgo/internal/routers"
 	"snowgo/pkg/xcolor"
 	"snowgo/pkg/xenv"
@@ -18,9 +19,9 @@ var (
 )
 
 // StartHttpServer 初始化路由，开启http服务
-func StartHttpServer() {
+func StartHttpServer(container *di.Container) {
 	// 初始化路由
-	router := routers.InitRouter()
+	router := routers.InitRouter(container)
 	cfg := config.Get()
 	HttpServer = &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", cfg.Application.Server.Addr, cfg.Application.Server.Port),
@@ -67,10 +68,10 @@ func StopHttpServer() (err error) {
 }
 
 // RestartHttpServer 重启服务
-func RestartHttpServer() (err error) {
+func RestartHttpServer(container *di.Container) (err error) {
 	err = StopHttpServer()
 	if err == nil {
-		StartHttpServer()
+		StartHttpServer(container)
 	}
 	return
 }

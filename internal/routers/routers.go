@@ -5,6 +5,7 @@ import (
 	"github.com/gin-contrib/pprof"
 	"snowgo/config"
 	"snowgo/internal/api"
+	"snowgo/internal/di"
 	"snowgo/internal/routers/middleware"
 	"snowgo/pkg/xenv"
 	e "snowgo/pkg/xerror"
@@ -27,9 +28,11 @@ func setMode() {
 }
 
 // 中间件注册使用
-func loadMiddleWare(router *gin.Engine) {
+func loadMiddleWare(router *gin.Engine, container *di.Container) {
 	router.Use(middleware.AccessLogger(), middleware.Recovery())
 	router.Use(middleware.Cors())
+	// 依赖注入
+	router.Use(middleware.InjectContainerMiddleware(container))
 }
 
 // 注册所有路由
@@ -54,8 +57,6 @@ func loadRouter(router *gin.Engine) {
 
 	// 创建根路由组，并添加前缀
 	apiGroup := router.Group(fmt.Sprintf("/api/%s", cfg.Application.Server.Version))
-	// api路由进行依赖注入
-	apiGroup.Use(middleware.InjectContainerMiddleware())
 
 	rootRouters(apiGroup) // 根目录下路由
 	options := []option{  // 根据不同分组注册路由
@@ -70,13 +71,13 @@ func loadRouter(router *gin.Engine) {
 }
 
 // InitRouter 初始化路由
-func InitRouter() *gin.Engine {
+func InitRouter(container *di.Container) *gin.Engine {
 	// 设置模式
 	setMode()
 	// 创建引擎
 	router := gin.New()
 	// 中间件注册
-	loadMiddleWare(router)
+	loadMiddleWare(router, container)
 	// 路由注册
 	loadRouter(router)
 	return router

@@ -2,8 +2,7 @@ package api
 
 import (
 	"context"
-	"snowgo/pkg/xauth"
-	"snowgo/pkg/xdatabase/mysql"
+	"snowgo/internal/di"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
 	str "snowgo/pkg/xstr_tool"
@@ -14,9 +13,7 @@ import (
 
 // Index 首页
 func Index(c *gin.Context) {
-	traceId := c.GetString(xauth.XTraceId)
-	timestamp := time.Now().Unix()
-	xlogger.Infof("index traceId: %s time: %s\n", traceId, time.Now().Format("2006-01-02 15:04:05.000"))
+	xlogger.Infof("index traceId: %s time: %s\n", time.Now().Format("2006-01-02 15:04:05.000"))
 
 	// redis测试
 	//container := di.GetContainer(c)
@@ -39,8 +36,6 @@ func Index(c *gin.Context) {
 	//}
 
 	xresponse.Success(c, gin.H{
-		"trace_id":   traceId,
-		"timestamp":  timestamp,
 		"client_ip":  c.ClientIP(),
 		"random_str": str.RandStr(10, str.LowerFlag|str.UpperFlag|str.DigitFlag),
 	})
@@ -65,7 +60,19 @@ func Readiness(c *gin.Context) {
 	defer cancel()
 
 	// db检查
-	if _, err := mysql.CheckDBAlive(ctx, mysql.DB); err != nil {
+	container := di.GetContainer(c)
+	// mysql检查
+	if _, err := container.GetMyDB().CheckDBAlive(ctx); err != nil {
+		xlogger.Errorf("db check err: %v", err.Error())
+		c.JSON(503, gin.H{
+			"status": "not ready",
+			"error":  err.Error(),
+		})
+		return
+	}
+	// redis检查
+	if _, err := container.GetRDB().Ping(ctx).Result(); err != nil {
+		xlogger.Errorf("redis check err: %v", err.Error())
 		c.JSON(503, gin.H{
 			"status": "not ready",
 			"error":  err.Error(),

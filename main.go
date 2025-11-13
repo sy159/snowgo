@@ -4,9 +4,8 @@ import (
 	"os"
 	"os/signal"
 	"snowgo/config"
+	"snowgo/internal/di"
 	"snowgo/internal/server"
-	"snowgo/pkg/xdatabase/mysql"
-	"snowgo/pkg/xdatabase/redis"
 	"snowgo/pkg/xlogger"
 	"syscall"
 )
@@ -20,16 +19,15 @@ func init() {
 }
 
 func main() {
-
-	// 初始化mysql
-	mysql.InitMysql()
-	defer mysql.CloseAllMysql(mysql.DB, mysql.DbMap)
-	// 初始化redis
-	redis.InitRedis()
-	defer redis.CloseRedis(redis.RDB)
+	// 手动注入依赖
+	cfg := config.Get()
+	container, err := di.NewContainer(cfg.Jwt, cfg.Mysql, cfg.OtherDB, cfg.Redis)
+	if err != nil {
+		xlogger.Fatalf("new container failed: %v", err)
+	}
 
 	// 启动服务
-	server.StartHttpServer()
+	server.StartHttpServer(container)
 
 	// 等待中断信号来优雅地关闭服务器，为关闭服务器操作设置一个超时
 	// kill -2 发送 syscall.SIGINT 信号，用户发送INTR字符(Ctrl+C)触发
@@ -43,4 +41,6 @@ func main() {
 
 	// 关闭服务
 	_ = server.StopHttpServer()
+	// 依赖退出
+	container.Close()
 }

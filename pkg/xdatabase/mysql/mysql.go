@@ -14,50 +14,36 @@ import (
 	"runtime"
 	"snowgo/config"
 	"snowgo/pkg/xcolor"
-	. "snowgo/pkg/xlogger"
 	"strings"
 	"time"
 )
 
-var DB *gorm.DB
-var DbMap = map[string]*gorm.DB{}
-
-func ensureTimeout(dsn string) string {
-	if strings.Contains(dsn, "timeout=") {
-		return dsn // 已设置timeout跳过
-	}
-	// 自动追加参数
-	if strings.Contains(dsn, "?") {
-		return dsn + "&timeout=3s"
-	}
-	return dsn + "?timeout=3s"
+type MyDB struct {
+	DB    *gorm.DB
+	DbMap map[string]*gorm.DB
 }
 
-// InitMysql 初始化mysql连接,设置全局mysql db
-func InitMysql() {
-	cfg := config.Get()
-	if len(cfg.Mysql.DSN) == 0 && len(cfg.Mysql.MainsDSN) == 0 && len(cfg.Mysql.SlavesDSN) == 0 {
-		Panic("Please initialize mysql configuration first")
+// NewMysql 创建mysql db
+func NewMysql(cfg config.MysqlConfig, otherCfg config.OtherDBConfig) (*MyDB, error) {
+	if len(cfg.DSN) == 0 && len(cfg.MainsDSN) == 0 && len(cfg.SlavesDSN) == 0 {
+		return nil, errors.New("Please initialize mysql configuration first")
 	}
-	db, err := connectMysql(cfg.Mysql)
+	db, err := connectMysql(cfg)
 	if err != nil {
-		Panicf("mysql init failed, err is %s", err.Error())
+		return nil, errors.WithStack(err)
 	}
-	DB = db
-
-	DbMap["default"] = db
-	for k, v := range cfg.OtherDB.DBMap {
+	myDB := &MyDB{
+		DB:    db,
+		DbMap: map[string]*gorm.DB{"default": db},
+	}
+	for k, v := range otherCfg.DBMap {
 		otherDb, err := connectMysql(v)
 		if err != nil {
-			Panicf("mysql %s init failed, err is %s", k, err.Error())
+			return nil, errors.WithStack(err)
 		}
-		DbMap[k] = otherDb
+		myDB.DbMap[k] = otherDb
 	}
-}
-
-// NewMysql 创建一个新的gorm.DB实例
-func NewMysql(cfg config.MysqlConfig) (*gorm.DB, error) {
-	return connectMysql(cfg)
+	return myDB, nil
 }
 
 // 设置数据库连接池相关参数的默认值
@@ -84,6 +70,17 @@ func processConfig(cfg config.MysqlConfig) config.MysqlConfig {
 		processCfg.SlowThresholdTime = 2000 // 单位毫秒
 	}
 	return processCfg
+}
+
+func ensureTimeout(dsn string) string {
+	if strings.Contains(dsn, "timeout=") {
+		return dsn // 已设置timeout跳过
+	}
+	// 自动追加参数
+	if strings.Contains(dsn, "?") {
+		return dsn + "&timeout=5s"
+	}
+	return dsn + "?timeout=5s"
 }
 
 // 连接mysql
@@ -174,7 +171,7 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 	err = db.Use(dbresolver.Register(dbresolver.Config{
 		Sources:  sources,
 		Replicas: replicas,
-		Policy:   dbresolver.RandomPolicy{},
+		Policy:   dbresolver.RandomPolicy{}, // RoundRobinPolicy 轮询； RandomPolicy 随机； WeightedPolicy 权重
 	}).SetMaxOpenConns(mysqlConfig.MaxOpenConns).
 		SetMaxIdleConns(mysqlConfig.MaxIdleConns).
 		SetConnMaxIdleTime(time.Duration(mysqlConfig.ConnMaxIdleTime) * time.Minute).
@@ -187,7 +184,7 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 }
 
 // CloseMysql 关闭数据库连接
-func CloseMysql(db *gorm.DB) {
+func closeMysql(db *gorm.DB) {
 	sqlDB, err := db.DB()
 	if err != nil {
 		return
@@ -196,35 +193,49 @@ func CloseMysql(db *gorm.DB) {
 }
 
 // CloseAllMysql 关闭所有数据库连接
-func CloseAllMysql(db *gorm.DB, dbMap map[string]*gorm.DB) {
+func (m *MyDB) CloseAllMysql() {
 	visited := make(map[*gorm.DB]bool, 4)
 
-	if _, ok := visited[db]; !ok {
-		CloseMysql(db)
-		visited[db] = true
+	if _, ok := visited[m.DB]; !ok {
+		closeMysql(m.DB)
+		visited[m.DB] = true
 	}
 
-	for _, v := range dbMap {
+	for _, v := range m.DbMap {
 		if _, ok := visited[v]; !ok {
-			CloseMysql(v)
+			closeMysql(v)
 			visited[v] = true
 		}
 	}
 }
 
 // CheckDBAlive 检查数据库连接是否存活
-func CheckDBAlive(ctx context.Context, db *gorm.DB) (bool, error) {
-	if db == nil {
-		return false, errors.New("db is nil")
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return false, errors.WithStack(err)
-	}
-	// 尝试执行简单的查询来检查连接是否存活
-	err = sqlDB.PingContext(ctx)
-	if err != nil {
-		return false, errors.WithStack(err)
+func (m *MyDB) CheckDBAlive(ctx context.Context) (bool, error) {
+	for _, db := range m.DbMap {
+		if db == nil {
+			return false, errors.New("db is nil")
+		}
+		sqlDB, err := db.DB()
+		if err != nil {
+			return false, errors.WithStack(err)
+		}
+		// 尝试执行简单的查询来检查连接是否存活
+		err = sqlDB.PingContext(ctx)
+		if err != nil {
+			return false, errors.WithStack(err)
+		}
 	}
 	return true, nil
+}
+
+// GetDB 返回指定名字的 gorm.DB（name = "default" 若不传）
+func (m *MyDB) GetDB(name string) (*gorm.DB, error) {
+	if name == "" {
+		name = "default"
+	}
+	db, ok := m.DbMap[name]
+	if !ok || db == nil {
+		return nil, fmt.Errorf("db %s not found", name)
+	}
+	return db, nil
 }
