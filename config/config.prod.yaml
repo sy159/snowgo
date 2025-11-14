@@ -1,5 +1,5 @@
 application:
-  enableAccessLog: true  # 是否打开访问记录，文件地址在logger配置
+  enableAccessLog: true  # 是否记录访问日志文件
   enablePprof: false  # 是否打开pprof
   server:
     name: snowgo正式环境 # 服务名
@@ -11,10 +11,10 @@ application:
     maxHeaderMB: 4 # 单位M
 
 log:
-  writer: file  # 日志输出的位置：console控制台输出，file输出到文件，multi控制台跟日志文件同时输出
-  accountEncoder: json  # 访问文件解析格式：normal正常格式输出；json输出为json
+  output: file  # 日志输出的位置：console控制台输出，file输出到文件，multi控制台跟日志文件同时输出
+  accessEncoder: json  # 访问文件解析格式：normal正常格式输出；json输出为json
   logEncoder: normal  # log文件解析格式：normal正常格式输出；json输出为json
-  accountFileMaxAgeDay: 30 # 访问文件最多保留多少天
+  accessFileMaxAgeDay: 30 # 访问文件最多保留多少天
   logFileMaxAgeDay: 30 # 日志文件最多保留多少天
 
 mysql:

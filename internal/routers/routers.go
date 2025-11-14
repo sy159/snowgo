@@ -30,7 +30,7 @@ func setMode() {
 // 中间件注册使用
 func loadMiddleWare(router *gin.Engine, container *di.Container) {
 	router.Use(middleware.AccessLogger(), middleware.Recovery())
-	router.Use(middleware.Cors())
+	//router.Use(middleware.Cors())
 	// 依赖注入
 	router.Use(middleware.InjectContainerMiddleware(container))
 }

@@ -189,7 +189,7 @@ func AccessLogger() gin.HandlerFunc {
 				zap.String("end_time", endTime.Format("2006-01-02 15:04:05.000")),
 			)
 		}
-		if !cfg.Application.EnableAccessLog || cfg.Log.Writer == xlogger.MultiWriter {
+		if !cfg.Application.EnableAccessLog || cfg.Log.Output == xlogger.MultiWriter {
 			// 控制台输出访问日志
 			fmt.Printf("%s %s %20s | status %3s | biz code %6s | %8v | %5s  %#v | %12s | %s\n",
 				xcolor.GreenFont(fmt.Sprintf("[%s:%s]", cfg.Application.Server.Name, cfg.Application.Server.Version)),

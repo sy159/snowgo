@@ -127,7 +127,7 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 		return nil, errors.WithMessage(err, "mysql init err")
 	}
 	container.db.MyDB = myDB
-	container.closeMgr.Register(myDB) // 自动注册关闭
+	container.closeMgr.Register(myDB) // 自动注册关闭 清理资源
 
 	// redis db
 	rdb, err := xredis.NewRedis(*opt.redisCfg)
@@ -135,7 +135,7 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 		return nil, errors.WithMessage(err, "redis init err")
 	}
 	container.db.RDB = rdb
-	container.closeMgr.Register(rdb)
+	container.closeMgr.Register(rdb) // 自动注册关闭 清理资源
 
 	if opt.jwtCfg != nil {
 		jwtManager, err := BuildJwtManager(*opt.jwtCfg)
@@ -175,11 +175,13 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 	roleService := accountService.NewRoleService(repository, roleDao, redisCache, operationLogService)
 	userService := accountService.NewUserService(repository, userDao, redisCache, roleService, operationLogService)
 
+	// account
 	container.AccountContainer = AccountContainer{
 		UserService: userService,
 		MenuService: menuService,
 		RoleService: roleService,
 	}
+	// system
 	container.SystemContainer = SystemContainer{
 		OperationLogService: operationLogService,
 	}
@@ -236,6 +238,7 @@ func GetContainer(c *gin.Context) *Container {
 	return container
 }
 
+// GetContainerSafe 未获取到不会报错，用于work使用
 func GetContainerSafe(c *gin.Context) (*Container, bool) {
 	val, exists := c.Get(constants.CONTAINER)
 	if !exists {

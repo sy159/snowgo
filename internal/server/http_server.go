@@ -47,7 +47,7 @@ func StartHttpServer(container *di.Container) {
 			xcolor.PurpleFont(fmt.Sprintf("http://%s", HttpServer.Addr)),
 			xcolor.RedBackground(xenv.Env()),
 			xcolor.GreenFont("|"),
-			xcolor.BlueFont(cfg.Log.Writer))
+			xcolor.BlueFont(cfg.Log.Output))
 
 		if err := HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			xlogger.Panicf("Server Listen: %s\n", err)
