@@ -21,10 +21,15 @@ func init() {
 func main() {
 	// 手动注入依赖
 	cfg := config.Get()
-	container, err := di.NewContainer(cfg.Jwt, cfg.Mysql, cfg.OtherDB, cfg.Redis)
+	container, err := di.NewContainer(
+		di.WithJWT(cfg.Jwt),
+		di.WithMySQL(cfg.Mysql, cfg.OtherDB),
+		di.WithRedis(cfg.Redis),
+	)
 	if err != nil {
 		xlogger.Fatalf("new container failed: %v", err)
 	}
+	defer container.Close()
 
 	// 启动服务
 	server.StartHttpServer(container)
@@ -41,6 +46,4 @@ func main() {
 
 	// 关闭服务
 	_ = server.StopHttpServer()
-	// 依赖退出
-	container.Close()
 }

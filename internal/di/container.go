@@ -17,7 +17,8 @@ import (
 	"snowgo/pkg/xdatabase/mysql"
 	xredis "snowgo/pkg/xdatabase/redis"
 	"snowgo/pkg/xlock"
-	"snowgo/pkg/xlogger"
+	"sync"
+	"time"
 )
 
 // Container 统一管理依赖
@@ -34,6 +35,11 @@ type Container struct {
 	// 这里只提供对api使用的service，不提供dao操作
 	AccountContainer
 	SystemContainer
+
+	// 关闭控制
+	once         sync.Once
+	closeTimeout time.Duration
+	closed       bool
 }
 
 type AccountContainer struct {
@@ -47,12 +53,12 @@ type SystemContainer struct {
 }
 
 // BuildJwtManager 构建jwt操作
-func BuildJwtManager(config config.JwtConfig) *jwt.Manager {
+func BuildJwtManager(config config.JwtConfig) (*jwt.Manager, error) {
 	if len(config.JwtSecret) == 0 ||
 		len(config.Issuer) == 0 ||
 		config.AccessExpirationTime == 0 ||
 		config.RefreshExpirationTime == 0 {
-		xlogger.Panic("Please initialize jwt config first, jwt config is empty")
+		return nil, errors.New("Please initialize jwt config first, jwt config is empty")
 	}
 	jwtManager := jwt.NewJwtManager(&jwt.Config{
 		JwtSecret:             config.JwtSecret,
@@ -60,51 +66,91 @@ func BuildJwtManager(config config.JwtConfig) *jwt.Manager {
 		AccessExpirationTime:  config.AccessExpirationTime,
 		RefreshExpirationTime: config.RefreshExpirationTime,
 	})
-	return jwtManager
+	return jwtManager, nil
 }
 
 // BuildRepository 构建db操作
-func BuildRepository(db *gorm.DB, dbMap map[string]*gorm.DB) *repo.Repository {
+func BuildRepository(db *gorm.DB, dbMap map[string]*gorm.DB) (*repo.Repository, error) {
 	if db == nil || db.Error != nil {
-		xlogger.Panic("Please initialize mysql first")
+		return nil, errors.New("Please initialize mysql first")
 	}
-	return repo.NewRepository(db, dbMap)
+	return repo.NewRepository(db, dbMap), nil
 }
 
 // BuildRedisCache 构建缓存操作
-func BuildRedisCache(rdb *redis.Client) xcache.Cache {
+func BuildRedisCache(rdb *redis.Client) (xcache.Cache, error) {
 	if rdb == nil {
-		xlogger.Panic("Please initialize redis first, redis cache is empty")
+		return nil, errors.New("Please initialize redis first")
 	}
-	return xcache.NewRedisCache(rdb)
+	return xcache.NewRedisCache(rdb), nil
 }
 
 // BuildLock 构建锁
-func BuildLock(rdb *redis.Client) xlock.Lock {
+func BuildLock(rdb *redis.Client) (xlock.Lock, error) {
 	if rdb == nil {
-		xlogger.Panic("Please initialize redis first, redis cache is empty")
+		return nil, errors.New("Please initialize redis first")
 	}
-	return xlock.NewRedisLock(rdb)
+	return xlock.NewRedisLock(rdb), nil
 }
 
 // NewContainer 构造所有依赖，注意参数传递的顺序
-func NewContainer(jwtConfig config.JwtConfig, mysqlConfig config.MysqlConfig, otherDBConfig config.OtherDBConfig,
-	redisConfig config.RedisConfig) (*Container, error) {
-	jwtManager := BuildJwtManager(jwtConfig)
-	myDB, err := mysql.NewMysql(mysqlConfig, otherDBConfig)
+func NewContainer(opts ...Option) (*Container, error) {
+	opt := defaultOpts()
+	for _, fn := range opts {
+		fn(opt)
+	}
+
+	// require mysql/redis per your requirement
+	if opt.mysqlCfg == nil {
+		return nil, errors.New("mysql config required")
+	}
+	if opt.redisCfg == nil {
+		return nil, errors.New("redis config required")
+	}
+
+	container := &Container{
+		closeTimeout: opt.closeTimeout,
+	}
+
+	// mysql db
+	myDB, err := mysql.NewMysql(*opt.mysqlCfg, *opt.otherDBCfg)
 	if err != nil {
 		return nil, errors.WithMessage(err, "mysql init err")
 	}
-	rdb, err := xredis.NewRedis(redisConfig)
+	container.db.MyDB = myDB
+
+	// redis db
+	rdb, err := xredis.NewRedis(*opt.redisCfg)
 	if err != nil {
 		return nil, errors.WithMessage(err, "redis init err")
 	}
+	container.db.RDB = rdb
 
-	lock := BuildLock(rdb)
+	if opt.jwtCfg != nil {
+		jwtManager, err := BuildJwtManager(*opt.jwtCfg)
+		if err != nil {
+			return nil, errors.WithMessage(err, "jwt init err")
+		}
+		container.JwtManager = jwtManager
+	}
 
 	// 构造db、redis操作
-	repository := BuildRepository(myDB.DB, myDB.DbMap)
-	redisCache := BuildRedisCache(rdb)
+	repository, err := BuildRepository(myDB.DB, myDB.DbMap)
+	if err != nil {
+		return nil, errors.WithMessage(err, "repo init err")
+	}
+
+	redisCache, err := BuildRedisCache(rdb)
+	if err != nil {
+		return nil, errors.WithMessage(err, "redis cache init err")
+	}
+	container.Cache = redisCache
+
+	lock, err := BuildLock(rdb)
+	if err != nil {
+		return nil, errors.WithMessage(err, "lock init err")
+	}
+	container.Lock = lock
 
 	// 构造Dao
 	userDao := accountDao.NewUserDao(repository)
@@ -118,39 +164,37 @@ func NewContainer(jwtConfig config.JwtConfig, mysqlConfig config.MysqlConfig, ot
 	roleService := accountService.NewRoleService(repository, roleDao, redisCache, operationLogService)
 	userService := accountService.NewUserService(repository, userDao, redisCache, roleService, operationLogService)
 
-	return &Container{
-		db: struct {
-			MyDB *mysql.MyDB
-			RDB  *redis.Client
-		}{
-			MyDB: myDB,
-			RDB:  rdb,
-		},
-		Cache:      redisCache,
-		JwtManager: jwtManager,
-		Lock:       lock,
-		AccountContainer: AccountContainer{
-			UserService: userService,
-			MenuService: menuService,
-			RoleService: roleService,
-		},
-		SystemContainer: SystemContainer{
-			OperationLogService: operationLogService,
-		},
-	}, nil
+	container.AccountContainer = AccountContainer{
+		UserService: userService,
+		MenuService: menuService,
+		RoleService: roleService,
+	}
+	container.SystemContainer = SystemContainer{
+		OperationLogService: operationLogService,
+	}
+	return container, nil
 }
 
 // GetContainer 获取注入的cache、service等
 func GetContainer(c *gin.Context) *Container {
 	val, exists := c.Get(constants.CONTAINER)
 	if !exists {
-		xlogger.Panic("Container not found in context")
+		panic("Container not found in context")
 	}
 	container, ok := val.(*Container)
 	if !ok {
-		xlogger.Panic("Invalid container type")
+		panic("Invalid container type")
 	}
 	return container
+}
+
+func GetContainerSafe(c *gin.Context) (*Container, bool) {
+	val, exists := c.Get(constants.CONTAINER)
+	if !exists {
+		return nil, false
+	}
+	container, ok := val.(*Container)
+	return container, ok
 }
 
 func (c *Container) Close() {
