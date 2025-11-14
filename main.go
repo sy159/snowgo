@@ -29,7 +29,6 @@ func main() {
 	if err != nil {
 		xlogger.Fatalf("new container failed: %v", err)
 	}
-	defer container.Close()
 
 	// 启动服务
 	server.StartHttpServer(container)
@@ -46,4 +45,9 @@ func main() {
 
 	// 关闭服务
 	_ = server.StopHttpServer()
+
+	// 注入关闭
+	if err := container.Close(); err != nil {
+		xlogger.Errorf("container close error: %v", err)
+	}
 }

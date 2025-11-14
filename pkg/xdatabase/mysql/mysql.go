@@ -184,29 +184,30 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 }
 
 // CloseMysql 关闭数据库连接
-func closeMysql(db *gorm.DB) {
+func closeMysql(db *gorm.DB) error {
 	sqlDB, err := db.DB()
 	if err != nil {
-		return
+		return err
 	}
-	_ = sqlDB.Close()
+	return sqlDB.Close()
 }
 
-// CloseAllMysql 关闭所有数据库连接
-func (m *MyDB) CloseAllMysql() {
+// Close 关闭所有数据库连接
+func (m *MyDB) Close() error {
 	visited := make(map[*gorm.DB]bool, 4)
-
+	var closeErr error
 	if _, ok := visited[m.DB]; !ok {
-		closeMysql(m.DB)
+		closeErr = closeMysql(m.DB)
 		visited[m.DB] = true
 	}
 
 	for _, v := range m.DbMap {
 		if _, ok := visited[v]; !ok {
-			closeMysql(v)
+			closeErr = closeMysql(v)
 			visited[v] = true
 		}
 	}
+	return closeErr
 }
 
 // CheckDBAlive 检查数据库连接是否存活

@@ -1,7 +1,9 @@
 package di
 
 import (
+	"errors"
 	"snowgo/config"
+	"sync"
 	"time"
 )
 
@@ -38,4 +40,49 @@ func WithRedis(redisCfg config.RedisConfig) Option {
 
 func WithCloseTimeout(d time.Duration) Option {
 	return func(o *containerOptions) { o.closeTimeout = d }
+}
+
+// ContainerCloser 接口
+type ContainerCloser interface {
+	Close() error
+}
+
+// CloseManager 管理所有closable资源
+type CloseManager struct {
+	mu      sync.Mutex
+	closers []ContainerCloser
+}
+
+func NewCloseManager() *CloseManager {
+	return &CloseManager{}
+}
+
+func (m *CloseManager) Register(c ContainerCloser) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.closers = append(m.closers, c)
+}
+
+func (m *CloseManager) CloseAll() error {
+	m.mu.Lock()
+	closers := make([]ContainerCloser, len(m.closers))
+	copy(closers, m.closers)
+	m.mu.Unlock()
+
+	// 按 LIFO 顺序关闭（后注册先关闭）
+	var errs []error
+	for i := len(closers) - 1; i >= 0; i-- {
+		c := closers[i]
+		if c == nil {
+			continue
+		}
+		if err := c.Close(); err != nil {
+			// 记录日志并收集错误
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
 }

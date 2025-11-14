@@ -1,6 +1,7 @@
 package di
 
 import (
+	"context"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/pkg/errors"
@@ -37,6 +38,7 @@ type Container struct {
 	SystemContainer
 
 	// 关闭控制
+	closeMgr     *CloseManager
 	once         sync.Once
 	closeTimeout time.Duration
 	closed       bool
@@ -71,7 +73,7 @@ func BuildJwtManager(config config.JwtConfig) (*jwt.Manager, error) {
 
 // BuildRepository 构建db操作
 func BuildRepository(db *gorm.DB, dbMap map[string]*gorm.DB) (*repo.Repository, error) {
-	if db == nil || db.Error != nil {
+	if db == nil {
 		return nil, errors.New("Please initialize mysql first")
 	}
 	return repo.NewRepository(db, dbMap), nil
@@ -94,7 +96,7 @@ func BuildLock(rdb *redis.Client) (xlock.Lock, error) {
 }
 
 // NewContainer 构造所有依赖，注意参数传递的顺序
-func NewContainer(opts ...Option) (*Container, error) {
+func NewContainer(opts ...Option) (container *Container, err error) {
 	opt := defaultOpts()
 	for _, fn := range opts {
 		fn(opt)
@@ -108,9 +110,16 @@ func NewContainer(opts ...Option) (*Container, error) {
 		return nil, errors.New("redis config required")
 	}
 
-	container := &Container{
+	container = &Container{
+		closeMgr:     NewCloseManager(),
 		closeTimeout: opt.closeTimeout,
 	}
+	defer func() {
+		// 当init 失败，释放资源
+		if err != nil && container != nil && container.closeMgr != nil {
+			_ = container.closeMgr.CloseAll()
+		}
+	}()
 
 	// mysql db
 	myDB, err := mysql.NewMysql(*opt.mysqlCfg, *opt.otherDBCfg)
@@ -118,6 +127,7 @@ func NewContainer(opts ...Option) (*Container, error) {
 		return nil, errors.WithMessage(err, "mysql init err")
 	}
 	container.db.MyDB = myDB
+	container.closeMgr.Register(myDB) // 自动注册关闭
 
 	// redis db
 	rdb, err := xredis.NewRedis(*opt.redisCfg)
@@ -125,6 +135,7 @@ func NewContainer(opts ...Option) (*Container, error) {
 		return nil, errors.WithMessage(err, "redis init err")
 	}
 	container.db.RDB = rdb
+	container.closeMgr.Register(rdb)
 
 	if opt.jwtCfg != nil {
 		jwtManager, err := BuildJwtManager(*opt.jwtCfg)
@@ -175,6 +186,43 @@ func NewContainer(opts ...Option) (*Container, error) {
 	return container, nil
 }
 
+func (c *Container) CloseWithContext(ctx context.Context) error {
+	var retErr error
+	c.once.Do(func() {
+		// 使用 c.closeTimeout优先（若 ctx 没超时）
+		timeout := c.closeTimeout
+		if timeout <= 0 {
+			timeout = 5 * time.Second
+		}
+		timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		// 在一个 goroutine 中运行 CloseAll，这样可以 select 超时
+		done := make(chan struct{})
+		var closeErr error
+		go func() {
+			if c.closeMgr != nil {
+				closeErr = c.closeMgr.CloseAll()
+			}
+			close(done)
+		}()
+
+		select {
+		case <-timeoutCtx.Done():
+			retErr = timeoutCtx.Err()
+		case <-done:
+			retErr = closeErr
+		}
+		c.closed = true
+	})
+	return retErr
+}
+
+// Close 关闭
+func (c *Container) Close() error {
+	return c.CloseWithContext(context.Background())
+}
+
 // GetContainer 获取注入的cache、service等
 func GetContainer(c *gin.Context) *Container {
 	val, exists := c.Get(constants.CONTAINER)
@@ -195,16 +243,6 @@ func GetContainerSafe(c *gin.Context) (*Container, bool) {
 	}
 	container, ok := val.(*Container)
 	return container, ok
-}
-
-func (c *Container) Close() {
-	if c.db.RDB != nil {
-		_ = c.db.RDB.Close()
-	}
-	if c.db.MyDB != nil {
-		c.db.MyDB.CloseAllMysql()
-	}
-	// 如果有其他需要关闭的资源，逐一关闭
 }
 
 // GetMyDB 获取注入的mysql client
