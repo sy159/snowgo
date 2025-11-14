@@ -108,7 +108,10 @@ func AccessLogger() gin.HandlerFunc {
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
 		method := c.Request.Method
-		traceId := uuid.New().String()
+		traceId := c.GetHeader(xauth.XTraceId)
+		if traceId == "" {
+			traceId = uuid.New().String()
+		}
 
 		// 将请求 ID 存储到 Gin 上下文中
 		c.Set(xauth.XTraceId, traceId)

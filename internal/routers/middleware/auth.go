@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"github.com/pkg/errors"
-	"snowgo/config"
 	"snowgo/internal/di"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xauth/jwt"
@@ -15,13 +14,6 @@ import (
 
 // JWTAuth 基于JWT的认证中间件
 func JWTAuth() func(c *gin.Context) {
-	cfg := config.Get()
-	jwtManager := jwt.NewJwtManager(&jwt.Config{
-		JwtSecret:             cfg.Jwt.JwtSecret,
-		Issuer:                cfg.Jwt.Issuer,
-		AccessExpirationTime:  cfg.Jwt.AccessExpirationTime,
-		RefreshExpirationTime: cfg.Jwt.RefreshExpirationTime,
-	})
 	return func(c *gin.Context) {
 		// 客户端携带Token有三种方式 1.放在请求头 2.放在请求体 3.放在URI
 		// 假设Token放在Header的Authorization中，并使用Bearer开头
@@ -33,12 +25,14 @@ func JWTAuth() func(c *gin.Context) {
 		}
 		// 按空格分割
 		parts := strings.SplitN(authHeader, " ", 2)
-		if !(len(parts) == 2 && parts[0] == "Bearer") {
+		if !(len(parts) == 2 && strings.EqualFold(parts[0], "Bearer")) {
 			xresponse.FailByError(c, e.TokenIncorrectFormat)
 			c.Abort()
 			return
 		}
 		// parts[1]是获取到的tokenString，我们使用之前定义好的解析JWT的函数来解析它
+		container := di.GetContainer(c)
+		jwtManager := container.JwtManager
 		mc, err := jwtManager.ParseToken(parts[1])
 		if err != nil {
 			xresponse.Fail(c, e.TokenInvalid.GetErrCode(), err.Error())
@@ -75,7 +69,13 @@ func PermissionAuth(requiredPerm string) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		userId := uidIfc.(int64)
+
+		userId, ok := uidIfc.(int64)
+		if !ok {
+			xresponse.FailByError(c, e.HttpUnauthorized)
+			c.Abort()
+			return
+		}
 
 		container := di.GetContainer(c)
 		// 拿该用户的perms列表
