@@ -1,7 +1,6 @@
 package routers
 
 import (
-	"fmt"
 	"github.com/gin-contrib/pprof"
 	"snowgo/config"
 	"snowgo/internal/api"
@@ -56,7 +55,7 @@ func loadRouter(router *gin.Engine) {
 	router.GET("/readyz", api.Readiness)
 
 	// 创建根路由组，并添加前缀
-	apiGroup := router.Group(fmt.Sprintf("/api/%s", cfg.Application.Server.Version))
+	apiGroup := router.Group("/api")
 
 	rootRouters(apiGroup) // 根目录下路由
 	options := []option{  // 根据不同分组注册路由
