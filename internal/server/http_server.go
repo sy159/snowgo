@@ -41,7 +41,7 @@ func StartHttpServer(container *di.Container) {
 |_______/    |__| \__|  \______/      \__/  \__/     \______|  \______/  
 `
 		fmt.Printf("%s\n", xcolor.GreenFont(banner))
-		fmt.Printf("%s %s %s is running on %s %s log mode %s \n",
+		fmt.Printf("%s %s %s is running on %s %s log output %s \n",
 			xcolor.GreenFont(fmt.Sprintf("[%s:%s]", cfg.Application.Server.Name, cfg.Application.Server.Version)),
 			xcolor.GreenFont("|"),
 			xcolor.PurpleFont(fmt.Sprintf("http://%s", HttpServer.Addr)),

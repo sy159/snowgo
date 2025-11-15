@@ -30,7 +30,7 @@ func Login(c *gin.Context) {
 	// 生成 JWT
 	container := di.GetContainer(c)
 	jwtMgr := container.JwtManager
-	accessToken, refreshToken, err := jwtMgr.GenerateTokens(int64(user.ID), user.Username)
+	token, err := jwtMgr.GenerateTokens(int64(user.ID), user.Username)
 	if err != nil {
 		xlogger.Errorf("jwt generate tokens err: %v", err)
 		xresponse.FailByError(c, e.TokenError)
@@ -38,14 +38,16 @@ func Login(c *gin.Context) {
 	}
 
 	// 保存 refresh token 的 jti，设置过期时间（防止重放攻击、每个refresh token只能使用一次）
-	if claims, err := jwtMgr.ParseToken(refreshToken); err == nil {
+	if claims, err := jwtMgr.ParseToken(token.RefreshToken); err == nil {
 		jtiKey := constants.CacheRefreshJtiPrefix + claims.ID
 		_ = container.Cache.Set(c, jtiKey, "1", claims.ExpiresAt.Time.Sub(claims.IssuedAt.Time))
 	}
 
 	xresponse.Success(c, gin.H{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
+		"access_token":             token.AccessToken,
+		"refresh_token":            token.RefreshToken,
+		"access_expire_timestamp":  token.AccessExpire.Unix(),
+		"refresh_expire_timestamp": token.RefreshExpire.Unix(),
 	})
 }
 
@@ -77,7 +79,7 @@ func RefreshToken(c *gin.Context) {
 	}
 
 	// 生成新的token
-	newAccessToken, newRefreshToken, err := jwtMgr.RefreshTokens(req.RefreshToken)
+	token, err := jwtMgr.RefreshTokens(req.RefreshToken)
 	if err != nil {
 		xlogger.Errorf("refresh access token err: %s", err.Error())
 		xresponse.FailByError(c, e.TokenError)
@@ -85,13 +87,15 @@ func RefreshToken(c *gin.Context) {
 	}
 
 	// 保存 refresh token 的 jti，设置过期时间（防止重放攻击、每个refresh token只能使用一次）
-	if newClaims, err := jwtMgr.ParseToken(newRefreshToken); err == nil {
+	if newClaims, err := jwtMgr.ParseToken(token.RefreshToken); err == nil {
 		jtiKey = constants.CacheRefreshJtiPrefix + newClaims.ID
 		_ = container.Cache.Set(c, jtiKey, "1", newClaims.ExpiresAt.Time.Sub(newClaims.IssuedAt.Time))
 	}
 
 	xresponse.Success(c, gin.H{
-		"access_token":  newAccessToken,
-		"refresh_token": newRefreshToken,
+		"access_token":             token.AccessToken,
+		"refresh_token":            token.RefreshToken,
+		"access_expire_timestamp":  token.AccessExpire.Unix(),
+		"refresh_expire_timestamp": token.RefreshExpire.Unix(),
 	})
 }

@@ -62,13 +62,13 @@ func BuildJwtManager(config config.JwtConfig) (*jwt.Manager, error) {
 		config.RefreshExpirationTime == 0 {
 		return nil, errors.New("Please initialize jwt config first, jwt config is empty")
 	}
-	jwtManager := jwt.NewJwtManager(&jwt.Config{
+	jwtManager, err := jwt.NewJwtManager(&jwt.Config{
 		JwtSecret:             config.JwtSecret,
 		Issuer:                config.Issuer,
 		AccessExpirationTime:  config.AccessExpirationTime,
 		RefreshExpirationTime: config.RefreshExpirationTime,
 	})
-	return jwtManager, nil
+	return jwtManager, err
 }
 
 // BuildRepository 构建db操作

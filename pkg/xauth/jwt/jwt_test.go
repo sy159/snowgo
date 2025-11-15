@@ -11,7 +11,7 @@ import (
 func TestJwt(t *testing.T) {
 	var userId int64 = 1
 	username := "test"
-	jwtManager := jwt.NewJwtManager(&jwt.Config{
+	jwtManager, _ := jwt.NewJwtManager(&jwt.Config{
 		JwtSecret:             "Tphdi%Aapi5iXsX67F7MX5ZRJxZF*6wK",
 		Issuer:                "test-snow",
 		AccessExpirationTime:  10,
@@ -19,13 +19,13 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("jwt token", func(t *testing.T) {
-		accessToken, refreshToken, err := jwtManager.GenerateTokens(userId, username)
+		token, err := jwtManager.GenerateTokens(userId, username)
 		if err != nil {
 			t.Fatalf("get refresh token is err: %v", err)
 		}
-		fmt.Printf("refresh token is: %v\naccess token is: %v\n", refreshToken, accessToken)
+		fmt.Printf("refresh token is: %v\naccess token is: %v\n", token.RefreshToken, token.AccessToken)
 
-		parseToken, err := jwtManager.ParseToken(accessToken)
+		parseToken, err := jwtManager.ParseToken(token.AccessToken)
 		if err != nil {
 			t.Fatalf("get token info is err: %v", err)
 		}
@@ -38,17 +38,17 @@ func TestJwt(t *testing.T) {
 		err = parseToken.ValidAccessToken()
 		fmt.Println(err)
 
-		newRefreshToken, accessToken, err := jwtManager.RefreshTokens(refreshToken)
-		fmt.Printf("new refresh token is: %v\naccess token is: %v\nrefresh token is err: %v\n", newRefreshToken, accessToken, err)
+		newToken, err := jwtManager.RefreshTokens(token.RefreshToken)
+		fmt.Printf("new refresh token is: %v\naccess token is: %v\nrefresh token is err: %v\n", newToken.RefreshToken, newToken.AccessToken, err)
 	})
 
 	t.Run("jwt auth", func(t *testing.T) {
-		accessToken, refreshToken, err := jwtManager.GenerateTokens(userId, username)
+		token, err := jwtManager.GenerateTokens(userId, username)
 		if err != nil {
 			t.Fatalf("get refresh token is err: %v", err)
 		}
-		fmt.Printf("refresh token is: %v\naccess token is: %v\n", refreshToken, accessToken)
-		authHeader := fmt.Sprintf("Bearer %v", accessToken)
+		fmt.Printf("refresh token is: %v\naccess token is: %v\n", token.RefreshToken, token.AccessToken)
+		authHeader := fmt.Sprintf("Bearer %v", token.AccessToken)
 		if authHeader == "" {
 			t.Fatalf("header is empty")
 		}
@@ -73,14 +73,14 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("token expired", func(t *testing.T) {
-		expiredManager := jwt.NewJwtManager(&jwt.Config{
+		expiredManager, _ := jwt.NewJwtManager(&jwt.Config{
 			JwtSecret:             "Tphdi%Aapi5iXsX67F7MX5ZRJxZF*6wK",
 			Issuer:                "test-snow",
-			AccessExpirationTime:  -1, // 已经过期
-			RefreshExpirationTime: -1,
+			AccessExpirationTime:  0, // 已经过期
+			RefreshExpirationTime: 0,
 		})
 
-		accessToken, err := expiredManager.GenerateAccessToken(userId, username)
+		accessToken, _, err := expiredManager.GenerateAccessToken(userId, username)
 		if err != nil {
 			t.Fatalf("generate expired token error: %v\n", err)
 		}
@@ -100,7 +100,7 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("invalid token type", func(t *testing.T) {
-		refreshToken, err := jwtManager.GenerateRefreshToken(userId, username)
+		refreshToken, _, err := jwtManager.GenerateRefreshToken(userId, username)
 		if err != nil {
 			t.Fatalf("generate refresh token error: %v", err)
 		}
@@ -114,15 +114,15 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("refresh token with access token", func(t *testing.T) {
-		refreshToken, err := jwtManager.GenerateRefreshToken(userId, username)
+		refreshToken, _, err := jwtManager.GenerateRefreshToken(userId, username)
 		if err != nil {
 			t.Fatalf("generate access token error: %v", err)
 		}
-		accessToken, newRefreshToken, err := jwtManager.RefreshTokens(refreshToken)
+		token, err := jwtManager.RefreshTokens(refreshToken)
 		if err != nil {
 			t.Fatalf("generate refresh token error: %v", err)
 		}
-		fmt.Println(accessToken, newRefreshToken)
+		fmt.Println(token.AccessToken, token.RefreshToken)
 	})
 
 }
