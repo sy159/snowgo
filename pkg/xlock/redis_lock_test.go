@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"go.uber.org/zap"
+	"snowgo/config"
 	"snowgo/pkg/xlock"
+	"snowgo/pkg/xlogger"
 	"testing"
 	"time"
 )
@@ -17,8 +20,11 @@ func TestRedisLock(t *testing.T) {
 		PoolSize: 5,
 	})
 	defer rdb.Close()
+	// 初始化配置文件
+	config.Init("../../config")
+	xlogger.Init("./logs")
 
-	lock := xlock.NewRedisLock(rdb)
+	lock := xlock.NewRedisLock(rdb, zap.S())
 
 	t.Run("Test LockWithTries", func(t *testing.T) {
 		ctx := context.TODO()

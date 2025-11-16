@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"snowgo/config"
 	"snowgo/internal/constants"
@@ -88,11 +89,11 @@ func BuildRedisCache(rdb *redis.Client) (xcache.Cache, error) {
 }
 
 // BuildLock 构建锁
-func BuildLock(rdb *redis.Client) (xlock.Lock, error) {
+func BuildLock(rdb *redis.Client, logger xlock.Logger) (xlock.Lock, error) {
 	if rdb == nil {
 		return nil, errors.New("Please initialize redis first")
 	}
-	return xlock.NewRedisLock(rdb), nil
+	return xlock.NewRedisLock(rdb, logger), nil
 }
 
 // NewContainer 构造所有依赖，注意参数传递的顺序
@@ -157,7 +158,7 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 	}
 	container.Cache = redisCache
 
-	lock, err := BuildLock(rdb)
+	lock, err := BuildLock(rdb, zap.S())
 	if err != nil {
 		return nil, errors.WithMessage(err, "lock init err")
 	}
