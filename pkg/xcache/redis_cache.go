@@ -58,7 +58,7 @@ func (r *RedisCache) DecrBy(ctx context.Context, key string, decrement int64) (i
 	if err != nil {
 		return 0, errors.WithStack(err)
 	}
-	return result, err
+	return result, nil
 }
 
 func (r *RedisCache) HSet(ctx context.Context, key string, field string, value string) error {
