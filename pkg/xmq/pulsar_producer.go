@@ -204,8 +204,16 @@ func (p *PulsarProducer) SendMessage(ctx context.Context, message []byte, proper
 		}
 		// 失败不在最后一次则等待重试
 		if i < p.options.maxRetries {
+			// 指数退避
 			backoff := p.options.baseBackoffInterval * (1 << i)
-			time.Sleep(backoff + time.Duration(rand.Int63n(int64(backoff))))
+			// cap上限，避免等待过长
+			maxBackoff := time.Second
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+			// jitter：在 backoff/2 .. backoff 范围内随机
+			jitter := time.Duration(rand.Int63n(int64(backoff / 2)))
+			time.Sleep(backoff/2 + jitter)
 		}
 	}
 	if sendErr != nil {
