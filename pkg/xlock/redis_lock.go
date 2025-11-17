@@ -2,7 +2,6 @@ package xlock
 
 import (
 	"context"
-	"fmt"
 	v8 "github.com/go-redis/redis/v8"
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis/v8"
@@ -10,20 +9,6 @@ import (
 	"math/rand"
 	"time"
 )
-
-type Logger interface {
-	Infof(format string, args ...interface{})
-	Errorf(format string, args ...interface{})
-}
-
-type defaultLogger struct{}
-
-func (l *defaultLogger) Infof(format string, args ...interface{}) {
-	fmt.Printf("[lock][INFO] "+format+"\n", args...)
-}
-func (l *defaultLogger) Errorf(format string, args ...interface{}) {
-	fmt.Printf("[lock][ERROR] "+format+"\n", args...)
-}
 
 type RedisLock struct {
 	rl     *redsync.Redsync

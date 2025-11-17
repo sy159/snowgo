@@ -1,6 +1,23 @@
 package xlock
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
+
+type Logger interface {
+	Infof(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
+}
+
+type defaultLogger struct{}
+
+func (l *defaultLogger) Infof(format string, args ...interface{}) {
+	fmt.Printf("[lock][INFO] "+format+"\n", args...)
+}
+func (l *defaultLogger) Errorf(format string, args ...interface{}) {
+	fmt.Printf("[lock][ERROR] "+format+"\n", args...)
+}
 
 type Lock interface {
 	// LockWithTries 重试到x次加锁
