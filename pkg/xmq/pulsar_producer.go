@@ -12,6 +12,8 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 )
 
+var _ Producer = (*PulsarProducer)(nil)
+
 var (
 	defaultProducer = producerOptions{
 		disableBlockIfQueueFull: false,                  // 设置为false(默认值): 队列满了,会阻塞；true:队列满了,会立即返回错误
@@ -24,6 +26,7 @@ var (
 		baseBackoffInterval:     100 * time.Millisecond, // 消息发送失败重试间隔时间
 	}
 	producerLogger = xlogger.NewLogger("./logs", "pulsar-producer", xlogger.WithFileMaxAgeDays(7))
+	// 确保 PulsarProducer 实现 Producer 接口
 )
 
 type ProducerOptions func(*producerOptions)
@@ -72,7 +75,7 @@ func NewPulsarClient(url string) (*PulsarClient, error) {
 // Close 关闭客户端
 func (c *PulsarClient) Close() {
 	for _, p := range c.producers {
-		p.Close()
+		_ = p.Close()
 	}
 	c.client.Close()
 }
@@ -212,7 +215,7 @@ func (p *PulsarProducer) SendMessage(ctx context.Context, message []byte, proper
 }
 
 // SendAsyncMessage 异步回调发送消息到mq
-func (p *PulsarProducer) SendAsyncMessage(ctx context.Context, message []byte, properties map[string]string, callback func(pulsar.MessageID, *pulsar.ProducerMessage, error)) {
+func (p *PulsarProducer) SendAsyncMessage(ctx context.Context, message []byte, properties map[string]string, callback func(messageID any, msg interface{}, err error)) {
 	msg := &pulsar.ProducerMessage{
 		Payload:    message,
 		Properties: properties,
@@ -222,11 +225,22 @@ func (p *PulsarProducer) SendAsyncMessage(ctx context.Context, message []byte, p
 		msg.DeliverAfter = p.options.deliverAfter
 	}
 
-	p.producer.SendAsync(ctx, msg, callback)
+	//p.producer.SendAsync(ctx, msg, callback)
+	// 用匿名函数包装 Pulsar 原生回调
+	p.producer.SendAsync(ctx, msg, func(msgID pulsar.MessageID, pm *pulsar.ProducerMessage, err error) {
+		// 日志记录
+		p.LogMessage(ctx, msgID, pm.Payload, pm.Properties, time.Now(), err)
+
+		// 调用接口回调，转换类型为 any/interface{}
+		if callback != nil {
+			callback(msgID, pm, err)
+		}
+	})
 }
 
 // Close 关闭producer
-func (p *PulsarProducer) Close() {
-	_ = p.producer.Flush()
+func (p *PulsarProducer) Close() error {
+	err := p.producer.Flush()
 	p.producer.Close()
+	return err
 }

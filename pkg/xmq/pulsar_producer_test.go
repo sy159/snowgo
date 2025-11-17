@@ -3,6 +3,7 @@ package xmq
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"go.uber.org/zap"
 	"sync"
 	"testing"
@@ -33,8 +34,12 @@ func TestDefaultQueue(t *testing.T) {
 	})
 
 	t.Run("AsyncSend", func(t *testing.T) {
-		callback := func(id pulsar.MessageID, msg *pulsar.ProducerMessage, err error) {
-			assert.NoError(t, err, "Failed to send message asynchronously")
+		callback := func(id any, msg interface{}, err error) {
+			assert.NoError(t, err, "Failed to send delayed message asynchronously")
+			// 可选类型断言
+			if mid, ok := id.(pulsar.MessageID); ok {
+				fmt.Println("MessageID:", mid.String())
+			}
 		}
 		p.SendAsyncMessage(context.Background(), messageBytes, nil, callback)
 		// Add a short sleep to wait for the async callback to complete
@@ -63,8 +68,12 @@ func TestDelayedQueue(t *testing.T) {
 	})
 
 	t.Run("AsyncSend", func(t *testing.T) {
-		callback := func(id pulsar.MessageID, msg *pulsar.ProducerMessage, err error) {
+		callback := func(id any, msg interface{}, err error) {
 			assert.NoError(t, err, "Failed to send delayed message asynchronously")
+			// 可选类型断言
+			if mid, ok := id.(pulsar.MessageID); ok {
+				fmt.Println("MessageID:", mid.String())
+			}
 		}
 		p.SendAsyncMessage(context.Background(), messageBytes, nil, callback)
 		// Add a short sleep to wait for the async callback to complete
@@ -103,14 +112,31 @@ func TestBatchingQueue(t *testing.T) {
 	t.Run("AsyncSend", func(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(testCount)
-		callback := func(id pulsar.MessageID, msg *pulsar.ProducerMessage, err error) {
+		callback := func(id any, msg interface{}, err error) {
 			defer wg.Done()
+			var msgIDStr string
+			if mid, ok := id.(pulsar.MessageID); ok {
+				msgIDStr = mid.String()
+			} else {
+				msgIDStr = fmt.Sprintf("%v", id) // fallback
+			}
+
+			// 类型断言 msg
+			var payloadStr string
+			var properties map[string]string
+			if pm, ok := msg.(*pulsar.ProducerMessage); ok {
+				payloadStr = string(pm.Payload)
+				properties = pm.Properties
+			} else {
+				payloadStr = fmt.Sprintf("%v", msg)
+				properties = nil
+			}
 			producerLogger.Log(
 				"pulsar producer",
 				zap.String("topic", p.producer.Topic()),
-				zap.String("message_id", id.String()),
-				zap.String("message", string(msg.Payload)),
-				zap.Any("properties", msg.Properties),
+				zap.String("message_id", msgIDStr),
+				zap.String("message", payloadStr),
+				zap.Any("properties", properties),
 				zap.String("status", "success"),
 				zap.String("error_msg", ""),
 			)
