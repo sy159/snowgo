@@ -2,166 +2,398 @@ package xrequests_test
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
+	"snowgo/pkg/xrequests"
 	"testing"
 	"time"
-
-	"snowgo/pkg/xrequests"
 )
 
-// TestBasicResponse 验证基本 GET 请求和 Response 方法
-func TestBasicResponse(t *testing.T) {
-	payload := `{"foo":"bar"}`
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusTeapot)
+// -------------------- Mock Servers --------------------
+
+// 用于单元测试的 Mock Server
+func mockServerForTest() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		r.Body.Close()
+
+		resp := map[string]interface{}{
+			"method": r.Method,
+			"query":  r.URL.RawQuery,
+			"body":   string(body),
+			"header": r.Header,
+		}
+		b, _ := json.Marshal(resp)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(payload))
+		w.Write(b)
 	}))
-	defer srv.Close()
+}
 
-	res, err := xrequests.Get(srv.URL)
+// 用于 Benchmark 的简单 Mock Server
+func mockServerForBench() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`ok`))
+	}))
+}
+
+func TestPostJSONWithAllOptions(t *testing.T) {
+	// -------------------- Mock Server --------------------
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 模拟处理慢一点，方便验证 Timeout
+		time.Sleep(time.Millisecond * 50)
+
+		// 返回请求信息，用于校验
+		body, _ := io.ReadAll(r.Body)
+		r.Body.Close()
+
+		respData := map[string]interface{}{
+			"method": r.Method,
+			"query":  r.URL.RawQuery,
+			"body":   string(body),
+			"header": r.Header,
+		}
+		respBytes, _ := json.Marshal(respData)
+
+		// 设置响应头
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Resp-Test", "resp-value")
+		w.WriteHeader(201)
+		w.Write(respBytes)
+	}))
+	defer server.Close()
+
+	// -------------------- 请求参数 --------------------
+	jsonData := map[string]interface{}{
+		"name":  "Alice",
+		"email": "alice@example.com",
+	}
+	customHeader := map[string]string{
+		"X-Test": "abc",
+	}
+	queryParams := map[string]string{
+		"q": "golang",
+	}
+
+	// 设置超时时间足够大，不触发
+	timeout := time.Second * 1
+
+	// -------------------- 发起请求 --------------------
+	resp, err := xrequests.Post(
+		server.URL,
+		xrequests.WithJSON(jsonData),
+		xrequests.WithHeader(customHeader),
+		xrequests.WithQuery(queryParams),
+		xrequests.WithTimeout(timeout),
+	)
 	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
+		t.Fatal(err)
 	}
 
-	// StatusCode
-	if res.StatusCode != http.StatusTeapot {
-		t.Errorf("Expected status %d, got %d", http.StatusTeapot, res.StatusCode)
+	// -------------------- 校验 Response --------------------
+	// 1. StatusCode
+	if resp.StatusCode != 201 {
+		t.Fatalf("expected status 201, got %d", resp.StatusCode)
 	}
 
-	// Text
-	text, err := res.Text()
-	if err != nil {
-		t.Fatalf("Text() error: %v", err)
+	// 2. Header
+	if resp.GetHeader("Content-Type") != "application/json" {
+		t.Fatalf("expected Content-Type application/json, got %s", resp.GetHeader("Content-Type"))
 	}
-	if text != payload {
-		t.Errorf("Expected Text() '%s', got '%s'", payload, text)
-	}
-
-	// Json into struct
-	var obj struct {
-		Foo string `json:"foo"`
-	}
-	if err := res.Json(&obj); err != nil {
-		t.Fatalf("Json() error: %v", err)
-	}
-	if obj.Foo != "bar" {
-		t.Errorf("Expected Json.Foo 'bar', got '%s'", obj.Foo)
+	if resp.GetHeader("X-Resp-Test") != "resp-value" {
+		t.Fatalf("expected X-Resp-Test resp-value, got %s", resp.GetHeader("X-Resp-Test"))
 	}
 
-	// Map
-	m, err := res.Map()
-	if err != nil {
-		t.Fatalf("Map() error: %v", err)
+	// 3. Body 解析
+	var bodyMap map[string]interface{}
+	if err := resp.Json(&bodyMap); err != nil {
+		t.Fatalf("failed to parse response body: %v", err)
 	}
-	if m["foo"] != "bar" {
-		t.Errorf("Expected Map[foo]='bar', got '%v'", m["foo"])
+
+	// 4. 校验请求方法
+	if bodyMap["method"] != "POST" {
+		t.Fatalf("expected method POST, got %v", bodyMap["method"])
+	}
+
+	// 5. 校验 Query 参数
+	if bodyMap["query"] != "q=golang" {
+		t.Fatalf("expected query q=golang, got %v", bodyMap["query"])
+	}
+
+	// 6. 校验请求 Header
+	headerMap := bodyMap["header"].(map[string]interface{})
+	vals := headerMap["X-Test"].([]interface{})
+	if len(vals) == 0 || vals[0].(string) != "abc" {
+		t.Fatalf("expected X-Test=abc, got %v", vals)
+	}
+
+	// 7. 校验请求 Body (JSON)
+	if bodyMap["body"] == nil || bodyMap["body"] == "" {
+		t.Fatalf("expected body not empty")
+	}
+	var bodySent map[string]interface{}
+	if err := json.Unmarshal([]byte(bodyMap["body"].(string)), &bodySent); err != nil {
+		t.Fatalf("failed to unmarshal body JSON: %v", err)
+	}
+	if bodySent["name"] != "Alice" || bodySent["email"] != "alice@example.com" {
+		t.Fatalf("body content mismatch, got %v", bodySent)
+	}
+
+	// 8. 校验 Response 原始对象
+	raw := resp.RawResponse()
+	if raw == nil {
+		t.Fatal("RawResponse is nil")
+	}
+	if raw.StatusCode != 201 {
+		t.Fatalf("RawResponse.StatusCode expected 201, got %d", raw.StatusCode)
 	}
 }
 
-// TestOptions 分别测试各种 Option 行为
-func TestOptions(t *testing.T) {
-	// WithHeader
-	srvHdr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("X-Test-Hdr") != "val" {
-			t.Errorf("WithHeader failed, got '%s'", r.Header.Get("X-Test-Hdr"))
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srvHdr.Close()
-	_, err := xrequests.Get(srvHdr.URL, xrequests.WithHeader(map[string]string{"X-Test-Hdr": "val"}))
+// -------------------- Option Tests --------------------
+func TestWithHeader(t *testing.T) {
+	server := mockServerForTest()
+	defer server.Close()
+
+	custom := map[string]string{"X-Test": "abc"}
+	resp, err := xrequests.Get(server.URL, xrequests.WithHeader(custom))
 	if err != nil {
-		t.Fatalf("WithHeader error: %v", err)
+		t.Fatal(err)
 	}
 
-	// WithBody + WithQuery + POST wrapper
-	srvBody := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("q") != "1" {
-			t.Errorf("WithQuery failed, got '%s'", r.URL.RawQuery)
-		}
-		b, _ := io.ReadAll(r.Body)
-		if string(b) != "hello" {
-			t.Errorf("WithBody failed, got '%s'", string(b))
-		}
-		w.WriteHeader(http.StatusCreated)
-	}))
-	defer srvBody.Close()
-	resp, err := xrequests.Post(srvBody.URL, "", xrequests.WithBody("hello"), xrequests.WithQuery(map[string]string{"q": "1"}))
-	if err != nil {
-		t.Fatalf("WithBody/WithQuery error: %v", err)
-	}
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("Expected 201, got %d", resp.StatusCode)
-	}
-
-	// WithCtx 超时
-	srvCtx := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(5 * time.Millisecond)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srvCtx.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
-	defer cancel()
-	_, err = xrequests.Get(srvCtx.URL, xrequests.WithCtx(ctx))
-	if err == nil {
-		t.Error("Expected timeout error, got nil")
-	}
-
-	// WithMaxRetries 网络错误重试
-	count := 0
-	rt := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-		count++
-		if count <= 2 {
-			return nil, errors.New("neterr")
-		}
-		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"ok":true}`))}, nil
-	})
-	client := &http.Client{Transport: rt}
-	res, err := xrequests.Get("http://test", xrequests.WithClient(client), xrequests.WithMaxRetries(2))
-	if err != nil {
-		t.Fatalf("WithMaxRetries error: %v", err)
-	}
-	if count != 3 {
-		t.Errorf("Expected 3 attempts, got %d", count)
-	}
 	var m map[string]interface{}
-	if err := res.Json(&m); err != nil {
-		t.Fatalf("Json after retry error: %v", err)
+	if err := resp.Json(&m); err != nil {
+		t.Fatal(err)
+	}
+
+	headerMap := m["header"].(map[string]interface{})
+	vals := headerMap["X-Test"].([]interface{})
+	if len(vals) == 0 || vals[0].(string) != "abc" {
+		t.Fatalf("expected X-Test=abc, got %v", vals)
 	}
 }
 
-// TestWrappers 测试 Post/Delete/Put 封装
-func TestWrappers(t *testing.T) {
-	handler := func(code int) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(code) }
+func TestWithJSON(t *testing.T) {
+	server := mockServerForTest()
+	defer server.Close()
+
+	data := map[string]string{"hello": "world"}
+	resp, err := xrequests.Post(server.URL, xrequests.WithJSON(data))
+	if err != nil {
+		t.Fatal(err)
 	}
-	// POST
-	srvP := httptest.NewServer(handler(http.StatusAccepted))
-	defer srvP.Close()
-	if res, err := xrequests.Post(srvP.URL, `{"x":1}`); err != nil || res.StatusCode != http.StatusAccepted {
-		t.Errorf("Post wrapper failed: %v, %d", err, res.StatusCode)
+
+	var m map[string]interface{}
+	if err := resp.Json(&m); err != nil {
+		t.Fatal(err)
 	}
-	// DELETE
-	srvD := httptest.NewServer(handler(http.StatusNoContent))
-	defer srvD.Close()
-	if res, err := xrequests.Delete(srvD.URL, ``); err != nil || res.StatusCode != http.StatusNoContent {
-		t.Errorf("Delete wrapper failed: %v, %d", err, res.StatusCode)
-	}
-	// PUT
-	srvU := httptest.NewServer(handler(http.StatusResetContent))
-	defer srvU.Close()
-	if res, err := xrequests.Put(srvU.URL, ``); err != nil || res.StatusCode != http.StatusResetContent {
-		t.Errorf("Put wrapper failed: %v, %d", err, res.StatusCode)
+	if m["body"] == nil || m["body"] == "" {
+		t.Fatal("body should contain JSON")
 	}
 }
 
-// roundTripperFunc 用于模拟 Transport
-type roundTripperFunc func(req *http.Request) (*http.Response, error)
+func TestWithBodyString(t *testing.T) {
+	server := mockServerForTest()
+	defer server.Close()
 
-func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req)
+	resp, err := xrequests.Post(server.URL, xrequests.WithBodyString("testbody"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var m map[string]interface{}
+	if err := resp.Json(&m); err != nil {
+		t.Fatal(err)
+	}
+	if m["body"] != "testbody" {
+		t.Fatalf("expected body=testbody, got %v", m["body"])
+	}
+}
+
+func TestWithQuery(t *testing.T) {
+	server := mockServerForTest()
+	defer server.Close()
+
+	resp, err := xrequests.Get(server.URL, xrequests.WithQuery(map[string]string{"q": "123"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var m map[string]interface{}
+	if err := resp.Json(&m); err != nil {
+		t.Fatal(err)
+	}
+	if m["query"] != "q=123" {
+		t.Fatalf("expected query=q=123, got %v", m["query"])
+	}
+}
+
+func TestWithTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(time.Millisecond * 200)
+		w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	start := time.Now()
+	_, err := xrequests.Get(server.URL, xrequests.WithTimeout(time.Millisecond*50))
+	if err == nil {
+		t.Fatal("expected timeout error")
+	}
+	if time.Since(start) > time.Millisecond*100 {
+		t.Fatal("timeout did not trigger in time")
+	}
+}
+
+func TestWithMaxRetries(t *testing.T) {
+	count := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count++
+		if count == 1 {
+			hj, ok := w.(http.Hijacker)
+			if !ok {
+				t.Fatal("Server does not support hijacking")
+			}
+			conn, _, err := hj.Hijack()
+			if err != nil {
+				t.Fatal(err)
+			}
+			conn.Close()
+			return
+		}
+		w.Write([]byte(`{"ok":1}`))
+	}))
+	defer server.Close()
+
+	resp, err := xrequests.Get(server.URL, xrequests.WithMaxRetries(3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	if count < 2 {
+		t.Fatal("retry did not happen")
+	}
+}
+
+func TestWithClientAndCtx(t *testing.T) {
+	server := mockServerForTest()
+	defer server.Close()
+
+	client := &http.Client{Timeout: time.Second}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+
+	resp, err := xrequests.Get(server.URL,
+		xrequests.WithClient(client),
+		xrequests.WithCtx(ctx),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestWithRequest(t *testing.T) {
+	server := mockServerForTest()
+	defer server.Close()
+
+	req, _ := http.NewRequest("GET", server.URL, nil)
+	resp, err := xrequests.Get(server.URL, xrequests.WithRequest(req))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+// -------------------- HTTP Methods --------------------
+
+func TestHTTPMethods(t *testing.T) {
+	server := mockServerForTest()
+	defer server.Close()
+
+	methods := []struct {
+		name   string
+		method func(string, ...xrequests.Option) (*xrequests.Response, error)
+	}{
+		{"GET", xrequests.Get},
+		{"POST", xrequests.Post},
+		{"PUT", xrequests.Put},
+		{"DELETE", xrequests.Delete},
+	}
+
+	for _, m := range methods {
+		t.Run(m.name, func(t *testing.T) {
+			resp, err := m.method(server.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.StatusCode != 200 {
+				t.Fatalf("%s expected 200, got %d", m.name, resp.StatusCode)
+			}
+		})
+	}
+}
+
+// -------------------- Benchmarks --------------------
+
+func BenchmarkGet(b *testing.B) {
+	server := mockServerForBench()
+	defer server.Close()
+
+	for i := 0; i < b.N; i++ {
+		_, err := xrequests.Get(server.URL)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGetParallel(b *testing.B) {
+	server := mockServerForBench()
+	defer server.Close()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, err := xrequests.Get(server.URL)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+func BenchmarkPostJSON(b *testing.B) {
+	server := mockServerForBench()
+	defer server.Close()
+
+	data := map[string]string{"hello": "world"}
+
+	for i := 0; i < b.N; i++ {
+		_, err := xrequests.Post(server.URL, xrequests.WithJSON(data))
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkPostJSONParallel(b *testing.B) {
+	server := mockServerForBench()
+	defer server.Close()
+
+	data := map[string]string{"hello": "world"}
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, err := xrequests.Post(server.URL, xrequests.WithJSON(data))
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }
