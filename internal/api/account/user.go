@@ -1,7 +1,9 @@
 package account
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
+	"regexp"
 	"snowgo/internal/constants"
 	"snowgo/internal/di"
 	"snowgo/internal/service/account"
@@ -43,6 +45,23 @@ type UserList struct {
 	Total int64           `json:"total"`
 }
 
+var passwordRegex = regexp.MustCompile(
+	`^(?=.{6,32}$)(?:(?=.*\d)(?=.*[A-Za-z])|(?=.*\d)(?=.*[!@#$%^&*?_~-])|(?=.*[A-Za-z])(?=.*[!@#$%^&*?_~-]))[A-Za-z\d!@#$%^&*?_~-]+$`,
+)
+
+func ValidatePassword(pw string) error {
+	if len(pw) == 0 {
+		return errors.New("password is empty")
+	}
+	if len(pw) < 6 || len(pw) > 32 {
+		return errors.New("password length must be between 6 and 32 characters")
+	}
+	if !passwordRegex.MatchString(pw) {
+		return errors.New("password must contain at least two types among: digits, letters, special symbols !@#$%^&*?_~")
+	}
+	return nil
+}
+
 // CreateUser 创建用户
 func CreateUser(c *gin.Context) {
 	var user account.UserParam
@@ -56,6 +75,10 @@ func CreateUser(c *gin.Context) {
 	// 可以额外校验
 	if user.Username == "" || user.Tel == "" {
 		xresponse.FailByError(c, e.UserNameTelEmptyError)
+		return
+	}
+	if err := ValidatePassword(user.Password); err != nil {
+		xresponse.FailByError(c, e.PwdError)
 		return
 	}
 
@@ -210,6 +233,12 @@ func ResetPwdById(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
+	// 额外校验
+	if err := ValidatePassword(param.Password); err != nil {
+		xresponse.FailByError(c, e.PwdError)
+		return
+	}
+
 	xlogger.Infof("reset user pwd by id: %+v", param.ID)
 	if param.ID < 1 {
 		xresponse.FailByError(c, e.UserNotFound)
