@@ -25,7 +25,7 @@ var (
 		maxRetries:              3,                      // 消息发送失败重试次数
 		baseBackoffInterval:     100 * time.Millisecond, // 消息发送失败重试间隔时间
 	}
-	producerLogger = xlogger.NewLogger("./logs", "pulsar-producer", xlogger.WithFileMaxAgeDays(7))
+	producerLogger = xlogger.NewLogger("./logs", "pulsar-producer", xlogger.WithFileMaxAgeDays(30))
 	// 确保 PulsarProducer 实现 Producer 接口
 )
 
@@ -248,7 +248,8 @@ func (p *PulsarProducer) SendAsyncMessage(ctx context.Context, message []byte, p
 
 // Close 关闭producer
 func (p *PulsarProducer) Close() error {
-	err := p.producer.Flush()
+	ctx := context.Background()
+	err := p.producer.FlushWithCtx(ctx)
 	p.producer.Close()
 	return err
 }

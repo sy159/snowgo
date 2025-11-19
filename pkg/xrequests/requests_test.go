@@ -17,7 +17,7 @@ import (
 func mockServerForTest() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		r.Body.Close()
+		_ = r.Body.Close()
 
 		resp := map[string]interface{}{
 			"method": r.Method,
@@ -27,14 +27,14 @@ func mockServerForTest() *httptest.Server {
 		}
 		b, _ := json.Marshal(resp)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(b)
+		_, _ = w.Write(b)
 	}))
 }
 
 // 用于 Benchmark 的简单 Mock Server
 func mockServerForBench() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`ok`))
+		_, _ = w.Write([]byte(`ok`))
 	}))
 }
 
@@ -46,7 +46,7 @@ func TestPostJSONWithAllOptions(t *testing.T) {
 
 		// 返回请求信息，用于校验
 		body, _ := io.ReadAll(r.Body)
-		r.Body.Close()
+		_ = r.Body.Close()
 
 		respData := map[string]interface{}{
 			"method": r.Method,
@@ -60,7 +60,7 @@ func TestPostJSONWithAllOptions(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Resp-Test", "resp-value")
 		w.WriteHeader(201)
-		w.Write(respBytes)
+		_, _ = w.Write(respBytes)
 	}))
 	defer server.Close()
 
@@ -231,7 +231,7 @@ func TestWithQuery(t *testing.T) {
 func TestWithTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(time.Millisecond * 200)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	}))
 	defer server.Close()
 
@@ -258,10 +258,10 @@ func TestWithMaxRetries(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			conn.Close()
+			_ = conn.Close()
 			return
 		}
-		w.Write([]byte(`{"ok":1}`))
+		_, _ = w.Write([]byte(`{"ok":1}`))
 	}))
 	defer server.Close()
 
