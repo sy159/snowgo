@@ -16,7 +16,7 @@ import (
 	"net/http/httputil"
 	"os"
 	"snowgo/config"
-	"snowgo/internal/constants"
+	"snowgo/internal/constant"
 	"snowgo/internal/di"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcolor"
@@ -302,7 +302,7 @@ func Cors() gin.HandlerFunc {
 // InjectContainerMiddleware 注入container
 func InjectContainerMiddleware(container *di.Container) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set(constants.CONTAINER, container)
+		c.Set(constant.CONTAINER, container)
 		c.Next()
 	}
 }

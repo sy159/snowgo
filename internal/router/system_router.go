@@ -1,10 +1,10 @@
-package routers
+package router
 
 import (
 	"github.com/gin-gonic/gin"
 	. "snowgo/internal/api/system"
-	"snowgo/internal/constants"
-	"snowgo/internal/routers/middleware"
+	"snowgo/internal/constant"
+	"snowgo/internal/router/middleware"
 )
 
 // 系统相关路由
@@ -14,6 +14,6 @@ func systemRouters(r *gin.RouterGroup) {
 	logGroup := systemGroup.Group("/log")
 	{
 		// 操作日志
-		logGroup.GET("/operation", middleware.PermissionAuth(constants.PermSystemOperationLogList), GetOperationLogList)
+		logGroup.GET("/operation", middleware.PermissionAuth(constant.PermSystemOperationLogList), GetOperationLogList)
 	}
 }

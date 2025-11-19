@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"snowgo/config"
-	"snowgo/internal/constants"
+	"snowgo/internal/constant"
 	"snowgo/internal/dal/repo"
 	accountDao "snowgo/internal/dao/account"
 	"snowgo/internal/dao/log"
@@ -228,7 +228,7 @@ func (c *Container) Close() error {
 
 // GetContainer 获取注入的cache、service等
 func GetContainer(c *gin.Context) *Container {
-	val, exists := c.Get(constants.CONTAINER)
+	val, exists := c.Get(constant.CONTAINER)
 	if !exists {
 		panic("Container not found in context")
 	}
@@ -241,7 +241,7 @@ func GetContainer(c *gin.Context) *Container {
 
 // GetContainerSafe 未获取到不会报错，用于work使用
 func GetContainerSafe(c *gin.Context) (*Container, bool) {
-	val, exists := c.Get(constants.CONTAINER)
+	val, exists := c.Get(constant.CONTAINER)
 	if !exists {
 		return nil, false
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"snowgo/internal/constants"
+	"snowgo/internal/constant"
 	"snowgo/internal/dal/query"
 	"snowgo/internal/service/log"
 	"snowgo/pkg/xauth"
@@ -149,11 +149,11 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
 			OperatorID:   int32(userContext.UserId),
 			OperatorName: userContext.Username,
-			OperatorType: constants.OperatorUser,
-			Resource:     constants.ResourceRole,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceRole,
 			ResourceID:   roleObj.ID,
 			TraceID:      userContext.TraceId,
-			Action:       constants.ActionCreate,
+			Action:       constant.ActionCreate,
 			BeforeData:   "",
 			AfterData:    param,
 			Description: fmt.Sprintf("用户(%d-%s)创建了角色(%d-%s)",
@@ -252,11 +252,11 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
 			OperatorID:   int32(userContext.UserId),
 			OperatorName: userContext.Username,
-			OperatorType: constants.OperatorUser,
-			Resource:     constants.ResourceRole,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceRole,
 			ResourceID:   param.ID,
 			TraceID:      userContext.TraceId,
-			Action:       constants.ActionUpdate,
+			Action:       constant.ActionUpdate,
 			BeforeData:   oldRole,
 			AfterData:    param,
 			Description: fmt.Sprintf("用户(%d-%s)修改了角色(%d-%s)信息",
@@ -277,7 +277,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 	xlogger.Infof("角色更新成功: old=%+v new=%+v", oldRole, ruleObj)
 
 	// 清除角色对应接口权限缓存
-	cacheKey := fmt.Sprintf("%s%d", constants.CacheRoleMenuPrefix, param.ID)
+	cacheKey := fmt.Sprintf("%s%d", constant.CacheRoleMenuPrefix, param.ID)
 	if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
 		xlogger.Errorf("清除角色对应接口权限缓存失败: %v", err)
 	}
@@ -325,11 +325,11 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
 			OperatorID:   int32(userContext.UserId),
 			OperatorName: userContext.Username,
-			OperatorType: constants.OperatorUser,
-			Resource:     constants.ResourceRole,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceRole,
 			ResourceID:   id,
 			TraceID:      userContext.TraceId,
-			Action:       constants.ActionDelete,
+			Action:       constant.ActionDelete,
 			BeforeData:   "",
 			AfterData:    "",
 			Description: fmt.Sprintf("用户(%d-%s)删除了角色(%d)",
@@ -349,7 +349,7 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 	xlogger.Infof("角色删除成功: %d", id)
 
 	// 清除角色对应接口权限缓存
-	cacheKey := fmt.Sprintf("%s%d", constants.CacheRoleMenuPrefix, id)
+	cacheKey := fmt.Sprintf("%s%d", constant.CacheRoleMenuPrefix, id)
 	if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
 		xlogger.Errorf("清除角色对应接口权限缓存失败: %v", err)
 	}
@@ -417,7 +417,7 @@ func (s *RoleService) ListRoles(ctx context.Context, cond *RoleListCondition) (*
 // GetRolePermsListByRuleID 获取角色对应接口权限列表
 func (s *RoleService) GetRolePermsListByRuleID(ctx context.Context, roleId int32) ([]string, error) {
 	//// 尝试从缓存读取
-	//cacheKey := fmt.Sprintf("%s%d", constants.CacheRolePermsPrefix, roleId)
+	//cacheKey := fmt.Sprintf("%s%d", constant.CacheRolePermsPrefix, roleId)
 	//if data, err := s.cache.Get(ctx, cacheKey); err == nil && data != "" {
 	//	var m []string
 	//	if err := json.Unmarshal([]byte(data), &m); err == nil {
@@ -434,7 +434,7 @@ func (s *RoleService) GetRolePermsListByRuleID(ctx context.Context, roleId int32
 	//
 	//// 缓存结果 15天
 	//if b, err := json.Marshal(menuPermsList); err == nil {
-	//	_ = s.cache.Set(ctx, cacheKey, string(b), constants.CacheRolePermsExpirationDay*24*time.Hour)
+	//	_ = s.cache.Set(ctx, cacheKey, string(b), constant.CacheRolePermsExpirationDay*24*time.Hour)
 	//}
 	//
 	//return menuPermsList, nil
@@ -447,7 +447,7 @@ func (s *RoleService) GetRolePermsListByRuleID(ctx context.Context, roleId int32
 	}
 	perms := make([]string, 0, len(menuList))
 	for _, menu := range menuList {
-		if menu.MenuType == constants.MenuTypeBtn && menu.Perms != "" {
+		if menu.MenuType == constant.MenuTypeBtn && menu.Perms != "" {
 			perms = append(perms, menu.Perms)
 		}
 	}
@@ -457,7 +457,7 @@ func (s *RoleService) GetRolePermsListByRuleID(ctx context.Context, roleId int32
 // GetRoleMenuListByRuleID 获取角色对应菜单列表
 func (s *RoleService) GetRoleMenuListByRuleID(ctx context.Context, roleId int32) ([]*MenuData, error) {
 	// 尝试从缓存读取
-	cacheKey := fmt.Sprintf("%s%d", constants.CacheRoleMenuPrefix, roleId)
+	cacheKey := fmt.Sprintf("%s%d", constant.CacheRoleMenuPrefix, roleId)
 	if data, err := s.cache.Get(ctx, cacheKey); err == nil && data != "" {
 		var m []*MenuData
 		if err := json.Unmarshal([]byte(data), &m); err == nil {
@@ -490,7 +490,7 @@ func (s *RoleService) GetRoleMenuListByRuleID(ctx context.Context, roleId int32)
 
 	// 缓存结果 15天
 	if b, err := json.Marshal(menus); err == nil {
-		_ = s.cache.Set(ctx, cacheKey, string(b), constants.CacheRoleMenuExpirationDay*24*time.Hour)
+		_ = s.cache.Set(ctx, cacheKey, string(b), constant.CacheRoleMenuExpirationDay*24*time.Hour)
 	}
 
 	return menus, nil

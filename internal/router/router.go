@@ -1,11 +1,11 @@
-package routers
+package router
 
 import (
 	"github.com/gin-contrib/pprof"
 	"snowgo/config"
 	"snowgo/internal/api"
 	"snowgo/internal/di"
-	"snowgo/internal/routers/middleware"
+	"snowgo/internal/router/middleware"
 	"snowgo/pkg/xenv"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xresponse"

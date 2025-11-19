@@ -2,7 +2,7 @@ package system
 
 import (
 	"github.com/gin-gonic/gin"
-	"snowgo/internal/constants"
+	"snowgo/internal/constant"
 	"snowgo/internal/di"
 	"snowgo/internal/service/log"
 	e "snowgo/pkg/xerror"
@@ -48,7 +48,7 @@ func GetOperationLogList(c *gin.Context) {
 		xresponse.FailByError(c, e.LimitErrorRequests)
 		return
 	} else if logListReq.Limit == 0 {
-		logListReq.Limit = constants.DefaultLimit
+		logListReq.Limit = constant.DefaultLimit
 	}
 
 	container := di.GetSystemContainer(c)

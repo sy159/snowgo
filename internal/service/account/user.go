@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
-	"snowgo/internal/constants"
+	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
@@ -157,7 +157,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		xlogger.Errorf("密码加密异常: %v", err)
 		return 0, errors.WithMessage(err, "密码加密异常")
 	}
-	activeStatus := constants.UserStatusActive
+	activeStatus := constant.UserStatusActive
 	var userObj *model.User
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 创建用户
@@ -194,11 +194,11 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		err = u.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
 			OperatorID:   int32(userContext.UserId),
 			OperatorName: userContext.Username,
-			OperatorType: constants.OperatorUser,
-			Resource:     constants.ResourceUser,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceUser,
 			ResourceID:   userObj.ID,
 			TraceID:      userContext.TraceId,
-			Action:       constants.ActionCreate,
+			Action:       constant.ActionCreate,
 			BeforeData:   "",
 			AfterData:    userParam,
 			Description: fmt.Sprintf("用户(%d-%s)创建了用户(%d-%s)",
@@ -296,11 +296,11 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		err = u.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
 			OperatorID:   int32(userContext.UserId),
 			OperatorName: userContext.Username,
-			OperatorType: constants.OperatorUser,
-			Resource:     constants.ResourceUser,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceUser,
 			ResourceID:   userParam.ID,
 			TraceID:      userContext.TraceId,
-			Action:       constants.ActionUpdate,
+			Action:       constant.ActionUpdate,
 			BeforeData:   oldUser,
 			AfterData:    userParam,
 			Description: fmt.Sprintf("用户(%d-%s)修改了用户(%d-%s)信息",
@@ -321,7 +321,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 	xlogger.Infof("用户更新成功: old=%+v new=%+v", oldUser, userParam)
 
 	// 清除用户对应角色缓存
-	cacheKey := fmt.Sprintf("%s%d", constants.CacheUserRolePrefix, userParam.ID)
+	cacheKey := fmt.Sprintf("%s%d", constant.CacheUserRolePrefix, userParam.ID)
 	if _, err := u.cache.Delete(ctx, cacheKey); err != nil {
 		xlogger.Errorf("清除用户对应角色缓存失败: %v", err)
 	}
@@ -424,11 +424,11 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 		err = u.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
 			OperatorID:   int32(userContext.UserId),
 			OperatorName: userContext.Username,
-			OperatorType: constants.OperatorUser,
-			Resource:     constants.ResourceUser,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceUser,
 			ResourceID:   userId,
 			TraceID:      userContext.TraceId,
-			Action:       constants.ActionDelete,
+			Action:       constant.ActionDelete,
 			BeforeData:   "",
 			AfterData:    "",
 			Description: fmt.Sprintf("用户(%d-%s)删除了用户(%d)",
@@ -445,7 +445,7 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 	xlogger.Infof("用户删除成功: %d", userId)
 
 	// 清除用户对应角色缓存
-	cacheKey := fmt.Sprintf("%s%d", constants.CacheUserRolePrefix, userId)
+	cacheKey := fmt.Sprintf("%s%d", constant.CacheUserRolePrefix, userId)
 	if _, err := u.cache.Delete(ctx, cacheKey); err != nil {
 		xlogger.Errorf("清除用户对应角色缓存失败: %v", err)
 	}
@@ -514,7 +514,7 @@ func (u *UserService) GetRoleIdsByUserId(ctx context.Context, userId int32) ([]i
 	}
 
 	// 读缓存 user->roleId
-	cacheKey := fmt.Sprintf("%s%d", constants.CacheUserRolePrefix, userId)
+	cacheKey := fmt.Sprintf("%s%d", constant.CacheUserRolePrefix, userId)
 	if data, err := u.cache.Get(ctx, cacheKey); err == nil && data != "" {
 		if strErr := json.Unmarshal([]byte(data), &roleIds); strErr == nil {
 			return roleIds, nil
@@ -534,7 +534,7 @@ func (u *UserService) GetRoleIdsByUserId(ctx context.Context, userId int32) ([]i
 		xlogger.Errorf("缓存用户角色id失败 uid=%d, roleIds: %v, %v", userId, roleIds, err)
 		return roleIds, errors.WithMessage(err, "缓存用户角色id失败")
 	}
-	_ = u.cache.Set(ctx, cacheKey, string(roleIdsBytes), constants.CacheUserRoleExpirationDay*24*time.Hour)
+	_ = u.cache.Set(ctx, cacheKey, string(roleIdsBytes), constant.CacheUserRoleExpirationDay*24*time.Hour)
 
 	return roleIds, nil
 }
@@ -596,7 +596,7 @@ func (u *UserService) GetUserPermissionById(ctx context.Context, userId int32) (
 			}
 			for _, menu := range menus {
 				// 按钮放到perm下面，用与渲染页面按钮
-				if menu.MenuType == constants.MenuTypeBtn && menu.Perms != "" {
+				if menu.MenuType == constant.MenuTypeBtn && menu.Perms != "" {
 					if _, exists := permMap[menu.ID]; !exists {
 						permissionList = append(permissionList, &UserPermission{
 							ID:    menu.ID,
@@ -607,7 +607,7 @@ func (u *UserService) GetUserPermissionById(ctx context.Context, userId int32) (
 					}
 				}
 				// dir跟menu放到菜单信息下面，用与渲染数据
-				if menu.MenuType == constants.MenuTypeMenu || menu.MenuType == constants.MenuTypeDir {
+				if menu.MenuType == constant.MenuTypeMenu || menu.MenuType == constant.MenuTypeDir {
 					if _, exists := menuMap[menu.ID]; !exists {
 						menuMap[menu.ID] = struct{}{}
 						menuList = append(menuList, menu)

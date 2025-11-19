@@ -2,7 +2,7 @@ package account
 
 import (
 	"github.com/gin-gonic/gin"
-	"snowgo/internal/constants"
+	"snowgo/internal/constant"
 	"snowgo/internal/di"
 	"snowgo/internal/service/account"
 	e "snowgo/pkg/xerror"
@@ -81,7 +81,7 @@ func GetRoleList(c *gin.Context) {
 		xresponse.FailByError(c, e.LimitErrorRequests)
 		return
 	} else if cond.Limit == 0 {
-		cond.Limit = constants.DefaultLimit
+		cond.Limit = constant.DefaultLimit
 	}
 
 	container := di.GetAccountContainer(c)

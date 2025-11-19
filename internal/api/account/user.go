@@ -4,7 +4,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	"regexp"
-	"snowgo/internal/constants"
+	"snowgo/internal/constant"
 	"snowgo/internal/di"
 	"snowgo/internal/service/account"
 	"snowgo/pkg/xauth"
@@ -192,7 +192,7 @@ func GetUserList(c *gin.Context) {
 		xresponse.FailByError(c, e.LimitErrorRequests)
 		return
 	} else if userListReq.Limit == 0 {
-		userListReq.Limit = constants.DefaultLimit
+		userListReq.Limit = constant.DefaultLimit
 	}
 
 	container := di.GetContainer(c)

@@ -2,7 +2,7 @@ package account
 
 import (
 	"github.com/gin-gonic/gin"
-	"snowgo/internal/constants"
+	"snowgo/internal/constant"
 	"snowgo/internal/di"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
@@ -39,7 +39,7 @@ func Login(c *gin.Context) {
 
 	// 保存 refresh token 的 jti，设置过期时间（防止重放攻击、每个refresh token只能使用一次）
 	if claims, err := jwtMgr.ParseToken(token.RefreshToken); err == nil {
-		jtiKey := constants.CacheRefreshJtiPrefix + claims.ID
+		jtiKey := constant.CacheRefreshJtiPrefix + claims.ID
 		_ = container.Cache.Set(c, jtiKey, "1", claims.ExpiresAt.Time.Sub(claims.IssuedAt.Time))
 	}
 
@@ -71,7 +71,7 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
-	jtiKey := constants.CacheRefreshJtiPrefix + claims.ID
+	jtiKey := constant.CacheRefreshJtiPrefix + claims.ID
 	if del, _ := container.Cache.Delete(c, jtiKey); del == 0 {
 		xlogger.Errorf("refresh token reuse attempt: userID=%d, jti=%s", claims.UserId, claims.ID)
 		xresponse.FailByError(c, e.TokenUseDError)
@@ -88,7 +88,7 @@ func RefreshToken(c *gin.Context) {
 
 	// 保存 refresh token 的 jti，设置过期时间（防止重放攻击、每个refresh token只能使用一次）
 	if newClaims, err := jwtMgr.ParseToken(token.RefreshToken); err == nil {
-		jtiKey = constants.CacheRefreshJtiPrefix + newClaims.ID
+		jtiKey = constant.CacheRefreshJtiPrefix + newClaims.ID
 		_ = container.Cache.Set(c, jtiKey, "1", newClaims.ExpiresAt.Time.Sub(newClaims.IssuedAt.Time))
 	}
 

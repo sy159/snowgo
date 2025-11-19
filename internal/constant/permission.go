@@ -1,4 +1,4 @@
-package constants
+package constant
 
 const (
 	// PermAccountUserList 账号管理 - 用户管理

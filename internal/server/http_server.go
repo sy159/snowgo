@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"snowgo/config"
 	"snowgo/internal/di"
-	"snowgo/internal/routers"
+	"snowgo/internal/router"
 	"snowgo/pkg/xcolor"
 	"snowgo/pkg/xenv"
 	"snowgo/pkg/xlogger"
@@ -21,11 +21,11 @@ var (
 // StartHttpServer 初始化路由，开启http服务
 func StartHttpServer(container *di.Container) {
 	// 初始化路由
-	router := routers.InitRouter(container)
+	r := router.InitRouter(container)
 	cfg := config.Get()
 	HttpServer = &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", cfg.Application.Server.Addr, cfg.Application.Server.Port),
-		Handler:        router,
+		Handler:        r,
 		ReadTimeout:    time.Duration(cfg.Application.Server.ReadTimeout) * time.Second,
 		WriteTimeout:   time.Duration(cfg.Application.Server.WriteTimeout) * time.Second,
 		MaxHeaderBytes: cfg.Application.Server.MaxHeaderMB << 20,

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
-	"snowgo/internal/constants"
+	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
@@ -125,11 +125,11 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
 			OperatorID:   int32(userContext.UserId),
 			OperatorName: userContext.Username,
-			OperatorType: constants.OperatorUser,
-			Resource:     constants.ResourceMenu,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceMenu,
 			ResourceID:   menuObj.ID,
 			TraceID:      userContext.TraceId,
-			Action:       constants.ActionCreate,
+			Action:       constant.ActionCreate,
 			BeforeData:   "",
 			AfterData:    menuObj,
 			Description: fmt.Sprintf("用户(%d-%s)创建了%s类型的菜单(%d-%s)",
@@ -150,7 +150,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 	xlogger.Infof("菜单创建成功: %+v", menuObj)
 
 	// 清理菜单树缓存
-	if _, err := s.cache.Delete(ctx, constants.CacheMenuTree); err != nil {
+	if _, err := s.cache.Delete(ctx, constant.CacheMenuTree); err != nil {
 		xlogger.Errorf("清理菜单树缓存失败: %v", err)
 	}
 	return menuObj.ID, nil
@@ -206,11 +206,11 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
 			OperatorID:   int32(userContext.UserId),
 			OperatorName: userContext.Username,
-			OperatorType: constants.OperatorUser,
-			Resource:     constants.ResourceMenu,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceMenu,
 			ResourceID:   p.ID,
 			TraceID:      userContext.TraceId,
-			Action:       constants.ActionUpdate,
+			Action:       constant.ActionUpdate,
 			BeforeData:   oldMenu,
 			AfterData:    menuObj,
 			Description: fmt.Sprintf("用户(%d-%s)修改了%s类型的菜单(%d-%s)信息",
@@ -238,7 +238,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		}
 		for _, roleId := range roleIds {
 			// 清除角色对应接口权限缓存
-			cacheKey := fmt.Sprintf("%s%d", constants.CacheRoleMenuPrefix, roleId)
+			cacheKey := fmt.Sprintf("%s%d", constant.CacheRoleMenuPrefix, roleId)
 			if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
 				xlogger.Errorf("清除角色对应接口权限缓存失败: %v", err)
 			}
@@ -246,7 +246,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 	}
 
 	// 清理菜单树缓存
-	if _, err := s.cache.Delete(ctx, constants.CacheMenuTree); err != nil {
+	if _, err := s.cache.Delete(ctx, constant.CacheMenuTree); err != nil {
 		xlogger.Errorf("清理菜单树缓存失败: %v", err)
 	}
 	return nil
@@ -291,11 +291,11 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
 			OperatorID:   int32(userContext.UserId),
 			OperatorName: userContext.Username,
-			OperatorType: constants.OperatorUser,
-			Resource:     constants.ResourceMenu,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceMenu,
 			ResourceID:   id,
 			TraceID:      userContext.TraceId,
-			Action:       constants.ActionDelete,
+			Action:       constant.ActionDelete,
 			BeforeData:   "",
 			AfterData:    "",
 			Description: fmt.Sprintf("用户(%d-%s)删除了菜单(%d)",
@@ -313,7 +313,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 	xlogger.Infof("菜单删除成功: %d", id)
 
 	// 清理菜单树缓存
-	if _, err := s.cache.Delete(ctx, constants.CacheMenuTree); err != nil {
+	if _, err := s.cache.Delete(ctx, constant.CacheMenuTree); err != nil {
 		xlogger.Errorf("清理菜单树缓存失败: %v", err)
 	}
 	return nil
@@ -322,7 +322,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 // GetMenuTree 获取菜单树
 func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 	// 尝试缓存
-	if data, err := s.cache.Get(ctx, constants.CacheMenuTree); err == nil && data != "" {
+	if data, err := s.cache.Get(ctx, constant.CacheMenuTree); err == nil && data != "" {
 		var tree []*MenuInfo
 		if err := json.Unmarshal([]byte(data), &tree); err == nil {
 			xlogger.Infof("缓存获取菜单树")
@@ -384,7 +384,7 @@ func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 
 	// 缓存结果 15天
 	if bs, err := json.Marshal(roots); err == nil {
-		if err := s.cache.Set(ctx, constants.CacheMenuTree, string(bs), constants.CacheMenuTreeExpirationDay*24*time.Hour); err != nil {
+		if err := s.cache.Set(ctx, constant.CacheMenuTree, string(bs), constant.CacheMenuTreeExpirationDay*24*time.Hour); err != nil {
 			xlogger.Errorf("缓存菜单树失败: %v", err)
 		}
 	}
