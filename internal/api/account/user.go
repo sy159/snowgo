@@ -92,8 +92,6 @@ func CreateUser(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	xlogger.Infof("create user: (用户名: %s, 电话: %s, 昵称: %s, 角色: %v)",
-		user.Username, user.Tel, user.Nickname, user.RoleIds)
 
 	// 可以额外校验
 	if user.Username == "" || user.Tel == "" {
@@ -126,7 +124,6 @@ func UpdateUser(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	xlogger.Infof("update user: %+v", user)
 
 	container := di.GetContainer(c)
 	userId, err := container.UserService.UpdateUser(c, &user)
@@ -152,7 +149,6 @@ func GetUserInfo(c *gin.Context) {
 		return
 	}
 
-	xlogger.Infof("get user info by id: %v", param.ID)
 	container := di.GetContainer(c)
 	user, err := container.UserService.GetUserById(c, param.ID)
 	if err != nil {
@@ -188,7 +184,6 @@ func GetUserList(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	xlogger.Infof("get user list: %+v", userListReq)
 	if userListReq.Offset < 0 {
 		xresponse.FailByError(c, e.OffsetErrorRequests)
 		return
@@ -232,7 +227,6 @@ func DeleteUserById(c *gin.Context) {
 		xresponse.FailByError(c, e.HttpBadRequest)
 		return
 	}
-	xlogger.Infof("delete user info by id: %+v", user.ID)
 	if user.ID < 1 {
 		xresponse.FailByError(c, e.UserNotFound)
 		return
@@ -285,7 +279,6 @@ func GetUserPermission(c *gin.Context) {
 		xresponse.FailByError(c, e.HttpForbidden)
 		return
 	}
-	xlogger.Infof("get user permission by id: %v", userContext.UserId)
 	container := di.GetContainer(c)
 	user, err := container.UserService.GetUserPermissionById(c, int32(userContext.UserId))
 	if err != nil {

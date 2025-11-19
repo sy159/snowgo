@@ -31,7 +31,6 @@ func CreateMenu(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	xlogger.Infof("create menu: %+v", menuParam)
 
 	container := di.GetAccountContainer(c)
 	menuId, err := container.MenuService.CreateMenu(c, &menuParam)
@@ -50,7 +49,6 @@ func UpdateMenu(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	xlogger.Infof("update menu: %+v", menuParam)
 
 	container := di.GetAccountContainer(c)
 	err := container.MenuService.UpdateMenu(c, &menuParam)
@@ -64,8 +62,6 @@ func UpdateMenu(c *gin.Context) {
 
 // GetMenuList 菜单信息列表
 func GetMenuList(c *gin.Context) {
-	xlogger.Infof("get all menu")
-
 	container := di.GetAccountContainer(c)
 	res, err := container.MenuService.GetMenuTree(c)
 	if err != nil {
@@ -83,7 +79,6 @@ func DeleteMenuById(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	xlogger.Infof("delete menu by id: %+v", menuParam.ID)
 	if menuParam.ID < 1 {
 		xresponse.FailByError(c, e.MenuNotFound)
 		return

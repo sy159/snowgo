@@ -17,7 +17,6 @@ func CreateRole(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	xlogger.Infof("create role: %+v", param)
 
 	container := di.GetAccountContainer(c)
 	roleID, err := container.RoleService.CreateRole(c, &param)
@@ -36,7 +35,6 @@ func UpdateRole(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	xlogger.Infof("update role: %+v", param)
 
 	container := di.GetAccountContainer(c)
 	err := container.RoleService.UpdateRole(c, &param)
@@ -57,7 +55,6 @@ func DeleteRole(c *gin.Context) {
 		xresponse.FailByError(c, e.HttpBadRequest)
 		return
 	}
-	xlogger.Infof("delete role: %+v", param.ID)
 
 	container := di.GetAccountContainer(c)
 	err := container.RoleService.DeleteRole(c, param.ID)
@@ -76,7 +73,6 @@ func GetRoleList(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	xlogger.Infof("get role list: %+v", cond)
 	if cond.Offset < 0 {
 		xresponse.FailByError(c, e.OffsetErrorRequests)
 		return
@@ -107,7 +103,6 @@ func GetRoleById(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	xlogger.Infof("get role by id: %+v", param.ID)
 
 	container := di.GetAccountContainer(c)
 	role, err := container.RoleService.GetRoleById(c, param.ID)
