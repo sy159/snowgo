@@ -12,6 +12,7 @@ const (
 	XUserAgent = "X-User-Agent"
 	XUserId    = "X-User-Id"
 	XUserName  = "X-User-Name"
+	XSessionId = "X-Session-Id"
 )
 
 type Context struct {
@@ -26,6 +27,7 @@ type UserContext struct {
 	UserAgent string
 	UserId    int64
 	Username  string
+	SessionId string
 }
 
 func GetContext(ctx context.Context) *Context {
@@ -49,11 +51,13 @@ func GetUserContext(ctx context.Context) (*UserContext, error) {
 	iP, _ := ctx.Value(XIp).(string)
 	userAgent, _ := ctx.Value(XUserAgent).(string)
 	username, _ := ctx.Value(XUserName).(string)
+	sessionId, _ := ctx.Value(XSessionId).(string)
 	return &UserContext{
 		TraceId:   traceId,
 		IP:        iP,
 		UserAgent: userAgent,
 		UserId:    userId,
 		Username:  username,
+		SessionId: sessionId,
 	}, nil
 }

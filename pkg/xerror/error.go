@@ -44,7 +44,7 @@ var (
 	TokenTypeError       = NewCode(10204, "token类型必须为access")
 	TokenExpired         = NewCode(10205, "token已过期")
 	TokenError           = NewCode(10206, "token异常")
-	TokenUseDError       = NewCode(10207, "token已被使用")
+	TokenUseDError       = NewCode(10207, "token已被删除")
 	LoginLocked          = NewCode(10208, "登录失败次数过多，请稍后再试")
 )
 

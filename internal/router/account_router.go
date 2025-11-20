@@ -38,5 +38,6 @@ func accountRouters(r *gin.RouterGroup) {
 	{
 		authGroup.POST("/login", Login)
 		authGroup.POST("/refresh-token", RefreshToken)
+		authGroup.POST("/logout", middleware.JWTAuth(), Logout)
 	}
 }
