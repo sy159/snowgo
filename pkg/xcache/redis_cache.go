@@ -121,6 +121,43 @@ func (r *RedisCache) HIncrBy(ctx context.Context, key string, field string, incr
 	return result, nil
 }
 
+func (r *RedisCache) ZAdd(ctx context.Context, key string, score float64, member string) error {
+	z := &redis.Z{
+		Score:  score,
+		Member: member,
+	}
+	if err := r.client.ZAdd(ctx, key, z).Err(); err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
+}
+
+// ZRem 删除有序集合的成员
+func (r *RedisCache) ZRem(ctx context.Context, key string, members ...string) error {
+	if err := r.client.ZRem(ctx, key, members).Err(); err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
+}
+
+// ZRange 根据分数从小到大排序，根据开始跟结束为止进行数据返回0, -1
+func (r *RedisCache) ZRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
+	res, err := r.client.ZRange(ctx, key, start, stop).Result()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return res, nil
+}
+
+// ZCard 获取有序结合的成员数
+func (r *RedisCache) ZCard(ctx context.Context, key string) (int64, error) {
+	val, err := r.client.ZCard(ctx, key).Result()
+	if err != nil {
+		return 0, errors.WithStack(err)
+	}
+	return val, nil
+}
+
 func (r *RedisCache) Exists(ctx context.Context, key string) (bool, error) {
 	exists, err := r.client.Exists(ctx, key).Result()
 	if err != nil {

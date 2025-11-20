@@ -39,6 +39,18 @@ type Cache interface {
 	// HLen returns the number of fields contained in a hash.
 	HLen(ctx context.Context, key string) (int64, error)
 
+	// ZAdd adds a member with a score to a sorted set.
+	ZAdd(ctx context.Context, key string, score float64, member string) error
+
+	// ZRem removes one or more members from a sorted set.
+	ZRem(ctx context.Context, key string, members ...string) error
+
+	// ZRange returns members in a sorted set within the given range [start, stop].
+	ZRange(ctx context.Context, key string, start, stop int64) ([]string, error)
+
+	// ZCard returns the number of members in a sorted set.
+	ZCard(ctx context.Context, key string) (int64, error)
+
 	// Exists checks if a key exists.
 	Exists(ctx context.Context, key string) (bool, error)
 

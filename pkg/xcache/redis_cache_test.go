@@ -35,6 +35,7 @@ func TestRedisCache(t *testing.T) {
 	value := "test-value"
 	hashKey := "test-hash"
 	field := "test-field"
+	zKey := "test-zset"
 
 	// =========================
 	// 1. Eval 测试
@@ -183,4 +184,64 @@ return cnt
 			t.Fatalf("Key should expire")
 		}
 	})
+
+	// =========================
+	// 7. ZSet Operations
+	// =========================
+	t.Run("ZSet Operations", func(t *testing.T) {
+		_, _ = redisCache.Delete(ctx, key)
+
+		// ZAdd
+		if err := redisCache.ZAdd(ctx, zKey, 10, "a"); err != nil {
+			t.Fatalf("ZAdd failed: %v", err)
+		}
+		if err := redisCache.ZAdd(ctx, zKey, 20, "b"); err != nil {
+			t.Fatalf("ZAdd failed: %v", err)
+		}
+		if err := redisCache.ZAdd(ctx, zKey, 15, "c"); err != nil {
+			t.Fatalf("ZAdd failed: %v", err)
+		}
+
+		// ZCard
+		card, err := redisCache.ZCard(ctx, zKey)
+		if err != nil || card != 3 {
+			t.Fatalf("ZCard returned wrong value: got %v want %v", card, 3)
+		}
+
+		// ZRange
+		members, err := redisCache.ZRange(ctx, zKey, 0, -1)
+		if err != nil {
+			t.Fatalf("ZRange failed: %v", err)
+		}
+		expectedOrder := []string{"a", "c", "b"} // 按 score 升序
+		for i, m := range expectedOrder {
+			if members[i] != m {
+				t.Fatalf("ZRange order incorrect at index %d: got %v want %v", i, members[i], m)
+			}
+		}
+
+		// ZRem
+		if err := redisCache.ZRem(ctx, zKey, "c"); err != nil {
+			t.Fatalf("ZRem failed: %v", err)
+		}
+
+		// ZCard after remove
+		card, err = redisCache.ZCard(ctx, zKey)
+		if err != nil || card != 2 {
+			t.Fatalf("ZCard after ZRem wrong: got %v want %v", card, 2)
+		}
+
+		// ZRange after remove
+		members, err = redisCache.ZRange(ctx, zKey, 0, -1)
+		if err != nil {
+			t.Fatalf("ZRange failed: %v", err)
+		}
+		expectedAfterRemove := []string{"a", "b"}
+		for i, m := range expectedAfterRemove {
+			if members[i] != m {
+				t.Fatalf("ZRange order incorrect after remove at index %d: got %v want %v", i, members[i], m)
+			}
+		}
+	})
+
 }
