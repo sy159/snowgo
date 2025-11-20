@@ -1,10 +1,12 @@
 package account
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"snowgo/internal/constant"
 	"snowgo/internal/di"
 	e "snowgo/pkg/xerror"
+	"snowgo/pkg/xlimiter"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
 )
@@ -20,15 +22,36 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	container := di.GetContainer(c)
+	cache := container.Cache
+
+	// 3分钟内，最多失败5次
+	loginFailKey := fmt.Sprintf("%s%s", constant.CacheLoginFailPrefix, req.Username)
+	limiter := xlimiter.NewFixedWindowLimiter(cache, loginFailKey, constant.CacheLoginFailWindowSecond, 5)
+	// 尝试增加失败计数前，先检查限流器
+	allowed, _, ttl, err := limiter.Add(c)
+	if err != nil {
+		xlogger.Errorf("login limiter error: %v", err)
+		xresponse.FailByError(c, e.HttpInternalServerError)
+		return
+	}
+
+	// 如果不允许，直接返回锁定信息
+	if !allowed {
+		xresponse.Fail(c, e.LoginLocked.GetErrCode(), fmt.Sprintf("登录失败次数过多，请等待%d秒后再试", int(ttl.Seconds())))
+		return
+	}
+
 	// 验证用户名密码
-	user, err := di.GetContainer(c).UserService.Authenticate(c, req.Username, req.Password)
+	user, err := container.UserService.Authenticate(c, req.Username, req.Password)
 	if err != nil {
 		xresponse.FailByError(c, e.AuthError)
 		return
 	}
 
-	// 生成 JWT
-	container := di.GetContainer(c)
+	// 成功登录 → 重置失败计数
+	_ = limiter.Reset(c)
+
 	jwtMgr := container.JwtManager
 	token, err := jwtMgr.GenerateTokens(int64(user.ID), user.Username)
 	if err != nil {

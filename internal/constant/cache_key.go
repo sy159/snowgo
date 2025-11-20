@@ -12,3 +12,9 @@ const (
 	CacheUserRoleExpirationDay  = 15                    // 用户对应角色权限缓存天数
 	CacheRefreshJtiPrefix       = "jwt:refresh:jti:"
 )
+
+const (
+	// CacheLoginFailPrefix 用户登录相关
+	CacheLoginFailPrefix       = "login:fail:" // 登录失败key（用户判断用户在xx时间内登录失败的次数）
+	CacheLoginFailWindowSecond = 180           // 登录失败窗口/s
+)
