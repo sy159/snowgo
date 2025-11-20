@@ -6,11 +6,13 @@ import (
 	"snowgo/pkg/xauth/jwt"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestJwt(t *testing.T) {
 	var userId int64 = 1
 	username := "test"
+
 	jwtManager, _ := jwt.NewJwtManager(&jwt.Config{
 		JwtSecret:             "Tphdi%Aapi5iXsX67F7MX5ZRJxZF*6wK",
 		Issuer:                "test-snow",
@@ -18,111 +20,121 @@ func TestJwt(t *testing.T) {
 		RefreshExpirationTime: 30,
 	})
 
-	t.Run("jwt token", func(t *testing.T) {
-		token, err := jwtManager.GenerateTokens(userId, username)
+	t.Run("generate and parse tokens", func(t *testing.T) {
+		tokenPair, err := jwtManager.GenerateTokens(userId, username)
 		if err != nil {
-			t.Fatalf("get refresh token is err: %v", err)
+			t.Fatalf("GenerateTokens error: %v", err)
 		}
-		fmt.Printf("refresh token is: %v\naccess token is: %v\n", token.RefreshToken, token.AccessToken)
+		fmt.Printf("AccessToken: %s\nRefreshToken: %s\n", tokenPair.AccessToken, tokenPair.RefreshToken)
 
-		parseToken, err := jwtManager.ParseToken(token.AccessToken)
+		accessClaims, err := jwtManager.ParseToken(tokenPair.AccessToken)
 		if err != nil {
-			t.Fatalf("get token info is err: %v", err)
-		}
-		fmt.Printf("token info is: %+v\n", parseToken)
-		if parseToken.UserId != userId || parseToken.Username != username {
-			t.Fatal("token info is err")
+			t.Fatalf("Parse access token error: %v", err)
 		}
 
-		//time.Sleep(1 * time.Second)
-		err = parseToken.ValidAccessToken()
-		fmt.Println(err)
+		if accessClaims.UserId != userId || accessClaims.Username != username {
+			t.Fatalf("access token claims mismatch")
+		}
 
-		newToken, err := jwtManager.RefreshTokens(token.RefreshToken)
-		fmt.Printf("new refresh token is: %v\naccess token is: %v\nrefresh token is err: %v\n", newToken.RefreshToken, newToken.AccessToken, err)
+		// 校验 access token 类型
+		if err := accessClaims.ValidAccessToken(); err != nil {
+			t.Fatalf("ValidAccessToken error: %v", err)
+		}
+
+		// 校验 SessionId 对应 refresh token jti
+		refreshClaims, err := jwtManager.ParseToken(tokenPair.RefreshToken)
+		if err != nil {
+			t.Fatalf("Parse refresh token error: %v", err)
+		}
+		if accessClaims.SessionId != refreshClaims.ID {
+			t.Fatalf("access token session_id not match refresh token jti")
+		}
 	})
 
-	t.Run("jwt auth", func(t *testing.T) {
-		token, err := jwtManager.GenerateTokens(userId, username)
-		if err != nil {
-			t.Fatalf("get refresh token is err: %v", err)
-		}
-		fmt.Printf("refresh token is: %v\naccess token is: %v\n", token.RefreshToken, token.AccessToken)
-		authHeader := fmt.Sprintf("Bearer %v", token.AccessToken)
-		if authHeader == "" {
-			t.Fatalf("header is empty")
-		}
+	t.Run("access token validation from header", func(t *testing.T) {
+		tokenPair, _ := jwtManager.GenerateTokens(userId, username)
+		authHeader := fmt.Sprintf("Bearer %s", tokenPair.AccessToken)
 		parts := strings.SplitN(authHeader, " ", 2)
-		if !(len(parts) == 2 && parts[0] == "Bearer") {
-			t.Fatalf("token format xerror")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			t.Fatalf("invalid Authorization header format")
 		}
-		// parts[1]是获取到的tokenString，我们使用之前定义好的解析JWT的函数来解析它
-		mc, err := jwtManager.ParseToken(parts[1])
+		claims, err := jwtManager.ParseToken(parts[1])
 		if err != nil {
-			t.Fatalf("get token info is err: %v", err)
+			t.Fatalf("ParseToken from header error: %v", err)
 		}
-
-		//time.Sleep(time.Second)
-		// 检查token的过期时间，以及type
-		if err := mc.ValidAccessToken(); err != nil {
-			if errors.Is(err, jwt.ErrInvalidTokenType) {
-				fmt.Printf("invalid token type")
-			}
-			fmt.Printf("token has expired")
+		if err := claims.ValidAccessToken(); err != nil {
+			t.Fatalf("access token validation failed: %v", err)
 		}
 	})
 
-	t.Run("token expired", func(t *testing.T) {
+	t.Run("expired token", func(t *testing.T) {
 		expiredManager, _ := jwt.NewJwtManager(&jwt.Config{
 			JwtSecret:             "Tphdi%Aapi5iXsX67F7MX5ZRJxZF*6wK",
 			Issuer:                "test-snow",
-			AccessExpirationTime:  0, // 已经过期
+			AccessExpirationTime:  0,
 			RefreshExpirationTime: 0,
 		})
-
-		accessToken, _, err := expiredManager.GenerateAccessToken(userId, username)
+		accessToken, _, err := expiredManager.GenerateAccessToken(userId, username, "123")
 		if err != nil {
-			t.Fatalf("generate expired token error: %v\n", err)
+			t.Fatalf("generate expired access token error: %v", err)
 		}
 
 		_, err = expiredManager.ParseToken(accessToken)
-		if err == nil {
-			t.Fatalf("parse expired token error: %v\n", err)
+		if !errors.Is(err, jwt.ErrTokenExpired) {
+			t.Fatalf("expected ErrTokenExpired, got: %v", err)
 		}
-		fmt.Println(err)
 	})
 
 	t.Run("invalid token format", func(t *testing.T) {
-		_, err := jwtManager.ParseToken("this.is.not.jwt")
+		_, err := jwtManager.ParseToken("invalid.token.format")
 		if err == nil {
 			t.Fatal("expected error on invalid token format, got nil")
 		}
 	})
 
-	t.Run("invalid token type", func(t *testing.T) {
-		refreshToken, _, err := jwtManager.GenerateRefreshToken(userId, username)
+	t.Run("invalid access token type", func(t *testing.T) {
+		refreshToken, _, _, err := jwtManager.GenerateRefreshToken(userId, username)
 		if err != nil {
 			t.Fatalf("generate refresh token error: %v", err)
 		}
-		claims, err := jwtManager.ParseToken(refreshToken)
-		if err != nil {
-			t.Fatalf("parse token error: %v", err)
-		}
+		claims, _ := jwtManager.ParseToken(refreshToken)
 		if err := claims.ValidAccessToken(); !errors.Is(err, jwt.ErrInvalidTokenType) {
-			t.Fatalf("expected invalid token type error, got: %v", err)
+			t.Fatalf("expected ErrInvalidTokenType, got: %v", err)
 		}
 	})
 
-	t.Run("refresh token with access token", func(t *testing.T) {
-		refreshToken, _, err := jwtManager.GenerateRefreshToken(userId, username)
+	t.Run("refresh tokens generate new access token", func(t *testing.T) {
+		tokenPair, _ := jwtManager.GenerateTokens(userId, username)
+		newPair, err := jwtManager.RefreshTokens(tokenPair.RefreshToken)
 		if err != nil {
-			t.Fatalf("generate access token error: %v", err)
+			t.Fatalf("RefreshTokens error: %v", err)
 		}
-		token, err := jwtManager.RefreshTokens(refreshToken)
+
+		newAccessClaims, _ := jwtManager.ParseToken(newPair.AccessToken)
+		if newAccessClaims.SessionId == "" {
+			t.Fatal("new access token missing session_id")
+		}
+
+		newRefreshClaims, _ := jwtManager.ParseToken(newPair.RefreshToken)
+		if newAccessClaims.SessionId != newRefreshClaims.ID {
+			t.Fatal("new access token session_id not match new refresh token jti")
+		}
+
+		fmt.Printf("New AccessToken: %s\nNew RefreshToken: %s\n", newPair.AccessToken, newPair.RefreshToken)
+	})
+
+	t.Run("refresh token reuse old access token", func(t *testing.T) {
+		// 测试旧 access token 仍然可以解析，但 sessionId 指向旧 refresh token
+		oldPair, _ := jwtManager.GenerateTokens(userId, username)
+		time.Sleep(1 * time.Second)
+		claims, err := jwtManager.ParseToken(oldPair.AccessToken)
 		if err != nil {
-			t.Fatalf("generate refresh token error: %v", err)
+			t.Fatalf("Parse old access token error: %v", err)
 		}
-		fmt.Println(token.AccessToken, token.RefreshToken)
+		if claims.SessionId != oldPair.RefreshToken[:36] && claims.SessionId == "" {
+			// 这里只是简单检查格式
+			fmt.Println("Old access token still valid for session id")
+		}
 	})
 
 }

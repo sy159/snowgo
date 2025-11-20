@@ -59,12 +59,13 @@ type Claims struct {
 	GrantType string `json:"grant_type"` // 授权类型，区分 accessToken 与 refreshToken
 	UserId    int64  `json:"user_id"`
 	Username  string `json:"username"`
+	SessionId string `json:"session_id"`
 	//Role      string `json:"role"`
 	jwt.RegisteredClaims
 }
 
 // GenerateAccessToken 创建 access token
-func (m *Manager) GenerateAccessToken(userId int64, username string) (string, time.Time, error) {
+func (m *Manager) GenerateAccessToken(userId int64, username, refreshJti string) (string, time.Time, error) {
 	now := time.Now().UTC()
 	exp := now.Add(time.Duration(m.jwtConf.AccessExpirationTime) * time.Minute)
 	exp = time.Unix(exp.Unix(), 0) // 去除纳秒
@@ -72,6 +73,7 @@ func (m *Manager) GenerateAccessToken(userId int64, username string) (string, ti
 		GrantType: accessType,
 		UserId:    userId,
 		Username:  username,
+		SessionId: refreshJti, // refresh id，用于关联信息
 		//Role:      role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(exp),
@@ -87,37 +89,39 @@ func (m *Manager) GenerateAccessToken(userId int64, username string) (string, ti
 }
 
 // GenerateRefreshToken 创建 refresh token
-func (m *Manager) GenerateRefreshToken(userId int64, username string) (string, time.Time, error) {
+func (m *Manager) GenerateRefreshToken(userId int64, username string) (string, string, time.Time, error) {
 	now := time.Now().UTC()
 	exp := now.Add(time.Duration(m.jwtConf.RefreshExpirationTime) * time.Minute)
 	exp = time.Unix(exp.Unix(), 0) // 去除纳秒
+	jti := uuid.New().String()
 	refreshClaims := Claims{
 		GrantType: refreshType,
 		UserId:    userId,
 		Username:  username,
+		SessionId: jti,
 		//Role:      role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(exp),
 			Issuer:    m.jwtConf.Issuer,
 			Subject:   strconv.FormatInt(userId, 10),
 			IssuedAt:  jwt.NewNumericDate(now),
-			ID:        uuid.NewString(), // jti
+			ID:        jti, // jti
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 	tokenString, err := token.SignedString([]byte(m.jwtConf.JwtSecret))
-	return tokenString, exp, err
+	return tokenString, jti, exp, err
 }
 
 // GenerateTokens 创建一对 access + refresh token
 func (m *Manager) GenerateTokens(userId int64, username string) (token *Token, err error) {
-	accessToken, accessExp, err := m.GenerateAccessToken(userId, username)
-	if err != nil {
-		return nil, errors.Wrap(err, "Generate Access Token error")
-	}
-	refreshToken, refreshExp, err := m.GenerateRefreshToken(userId, username)
+	refreshToken, refreshJti, refreshExp, err := m.GenerateRefreshToken(userId, username)
 	if err != nil {
 		return nil, errors.Wrap(err, "Generate Refresh Token error")
+	}
+	accessToken, accessExp, err := m.GenerateAccessToken(userId, username, refreshJti)
+	if err != nil {
+		return nil, errors.Wrap(err, "Generate Access Token error")
 	}
 	return &Token{
 		AccessToken:   accessToken,
@@ -164,12 +168,12 @@ func (m *Manager) RefreshTokens(refreshToken string) (token *Token, err error) {
 	}
 
 	// 生成新的刷新令牌(这里如果重新生成，refresh token的过期时间又要重新算，如果沿用以前的，就是严格按照refresh token过期时间来)
-	newRefreshToken, refreshExp, err := m.GenerateRefreshToken(claims.UserId, claims.Username)
+	newRefreshToken, refreshJti, refreshExp, err := m.GenerateRefreshToken(claims.UserId, claims.Username)
 	if err != nil {
 		return nil, errors.Wrap(err, "Generate Refresh Token error")
 	}
 	// 生成新的访问令牌
-	accessToken, accessExp, err := m.GenerateAccessToken(claims.UserId, claims.Username)
+	accessToken, accessExp, err := m.GenerateAccessToken(claims.UserId, claims.Username, refreshJti)
 	if err != nil {
 		return nil, errors.Wrap(err, "Generate Access Token error")
 	}
