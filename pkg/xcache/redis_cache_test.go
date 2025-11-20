@@ -22,7 +22,7 @@ func setupTestRedis() *redis.Client {
 
 func teardownTestRedis(client *redis.Client) {
 	//client.FlushDB(context.Background())
-	client.Close()
+	_ = client.Close()
 }
 
 func TestRedisCache(t *testing.T) {
@@ -30,133 +30,157 @@ func TestRedisCache(t *testing.T) {
 	defer teardownTestRedis(client)
 
 	redisCache := xcache.NewRedisCache(client)
-
 	ctx := context.Background()
 	key := "test-key"
 	value := "test-value"
-	field := "test-field"
 	hashKey := "test-hash"
+	field := "test-field"
 
-	t.Run("CacheSet and CacheGet", func(t *testing.T) {
-		got, err := redisCache.Get(ctx, key)
+	// =========================
+	// 1. Eval 测试
+	// =========================
+	t.Run("Eval INCR Script", func(t *testing.T) {
+		_, _ = redisCache.Delete(ctx, key)
+
+		script := `
+local cnt = redis.call("INCR", KEYS[1])
+return cnt
+`
+		res, err := redisCache.Eval(ctx, script, []string{key})
 		if err != nil {
-			t.Fatalf("CacheGet failed: %v", err)
+			t.Fatalf("Eval failed: %v", err)
 		}
-		fmt.Println(got, err)
-		err = redisCache.Set(ctx, key, value, 5*time.Minute)
-		fmt.Println(err)
+		fmt.Println("Eval INCR:", res)
+
+		cnt, ok := res.(int64)
+		if !ok || cnt != 1 {
+			t.Fatalf("Eval returned wrong value: got %v want %v", res, 1)
+		}
+	})
+
+	// =========================
+	// 2. Set/Get
+	// =========================
+	t.Run("CacheSet and CacheGet", func(t *testing.T) {
+		err := redisCache.Set(ctx, key, value, 5*time.Minute)
 		if err != nil {
 			t.Fatalf("CacheSet failed: %v", err)
 		}
-		got, err = redisCache.Get(ctx, key)
+		got, err := redisCache.Get(ctx, key)
 		if err != nil {
 			t.Fatalf("CacheGet failed: %v", err)
 		}
-		fmt.Println(got, err)
+		if got != value {
+			t.Fatalf("CacheGet returned wrong value: got %v want %v", got, value)
+		}
 	})
 
+	// =========================
+	// 3. Delete
+	// =========================
 	t.Run("CacheDelete", func(t *testing.T) {
-		got, err := redisCache.Get(ctx, key)
-		fmt.Println(got, err)
-		num, err := redisCache.Delete(ctx, key, key)
+		num, err := redisCache.Delete(ctx, key)
 		if err != nil {
 			t.Fatalf("CacheDelete failed: %v", err)
 		}
-		fmt.Println(num, err)
+		if num != 1 {
+			t.Fatalf("CacheDelete returned wrong value: got %v want %v", num, 1)
+		}
 
-		got, err = redisCache.Get(ctx, key)
-		fmt.Println(got, err)
+		got, err := redisCache.Get(ctx, key)
+		if err != nil {
+			t.Fatalf("CacheGet failed: %v", err)
+		}
+		if got != "" {
+			t.Fatalf("CacheDelete failed, key still exists")
+		}
 	})
 
+	// =========================
+	// 4. IncrBy/DecrBy
+	// =========================
 	t.Run("CacheIncrBy and CacheDecrBy", func(t *testing.T) {
 		incrKey := "test-incr-key"
 		_, _ = redisCache.Delete(ctx, incrKey)
-		_, err := redisCache.IncrBy(ctx, incrKey, 5)
-		if err != nil {
+
+		cnt, err := redisCache.IncrBy(ctx, incrKey, 5)
+		if err != nil || cnt != 5 {
 			t.Fatalf("CacheIncrBy failed: %v", err)
 		}
-
-		value, err := redisCache.Get(ctx, incrKey)
-		if err != nil {
-			t.Fatalf("CacheGet failed: %v", err)
-		}
-		if value != "5" {
-			t.Fatalf("CacheIncrBy returned wrong value: got %v want %v", value, "5")
-		}
-
-		_, err = redisCache.DecrBy(ctx, incrKey, 3)
-		if err != nil {
+		cnt, err = redisCache.DecrBy(ctx, incrKey, 3)
+		if err != nil || cnt != 2 {
 			t.Fatalf("CacheDecrBy failed: %v", err)
 		}
-
-		value, err = redisCache.Get(ctx, incrKey)
-		if err != nil {
-			t.Fatalf("CacheGet failed: %v", err)
-		}
-		if value != "2" {
-			t.Fatalf("CacheDecrBy returned wrong value: got %v want %v", value, "2")
-		}
 	})
 
-	t.Run("CacheHSet and CacheHGet", func(t *testing.T) {
+	// =========================
+	// 5. HSet/HGet/HGetAll/HDel/HLen
+	// =========================
+	t.Run("Hash Operations", func(t *testing.T) {
+		_, _ = redisCache.HDel(ctx, hashKey, field)
+
+		err := redisCache.HSet(ctx, hashKey, field, value)
+		if err != nil {
+			t.Fatalf("HSet failed: %v", err)
+		}
+
 		got, err := redisCache.HGet(ctx, hashKey, field)
 		if err != nil {
-			t.Fatalf("CacheHGet failed: %v", err)
-		}
-		fmt.Println(got, err)
-		err = redisCache.HSet(ctx, hashKey, field, value)
-		if err != nil {
-			t.Fatalf("CacheHSet failed: %v", err)
-		}
-
-		got, err = redisCache.HGet(ctx, hashKey, field)
-		fmt.Println(got, err)
-		if err != nil {
-			t.Fatalf("CacheHGet failed: %v", err)
+			t.Fatalf("HGet failed: %v", err)
 		}
 		if got != value {
-			t.Fatalf("CacheHGet returned wrong value: got %v want %v", got, value)
+			t.Fatalf("HGet returned wrong value: got %v want %v", got, value)
+		}
+
+		all, err := redisCache.HGetAll(ctx, hashKey)
+		if err != nil {
+			t.Fatalf("HGetAll failed: %v", err)
+		}
+		if all[field] != value {
+			t.Fatalf("HGetAll returned wrong value: got %v want %v", all[field], value)
+		}
+
+		length, err := redisCache.HLen(ctx, hashKey)
+		if err != nil || length != 1 {
+			t.Fatalf("HLen returned wrong value: got %v want %v", length, 1)
+		}
+
+		delNum, err := redisCache.HDel(ctx, hashKey, field)
+		if err != nil || delNum != 1 {
+			t.Fatalf("HDel failed: %v", err)
 		}
 	})
 
-	t.Run("CacheExists", func(t *testing.T) {
-		exists, err := redisCache.Exists(ctx, key)
-		fmt.Println(exists, err)
-		if err != nil {
-			t.Fatalf("CacheExists failed: %v", err)
-		}
+	// =========================
+	// 6. Exists / Expire / TTL
+	// =========================
+	t.Run("Exists Expire TTL", func(t *testing.T) {
+		_, _ = redisCache.Delete(ctx, key)
+		exists, _ := redisCache.Exists(ctx, key)
 		if exists {
-			t.Fatalf("CacheExists returned wrong value: got %v want %v", exists, false)
+			t.Fatalf("Exists before set should be false")
 		}
 
-		err = redisCache.Set(ctx, key, value, time.Minute)
+		err := redisCache.Set(ctx, key, value, 2*time.Second)
 		if err != nil {
-			t.Fatalf("CacheSet failed: %v", err)
+			t.Fatalf("Set failed: %v", err)
 		}
 
-		exists, err = redisCache.Exists(ctx, key)
-		fmt.Println(exists, err)
-		if err != nil {
-			t.Fatalf("CacheExists failed: %v", err)
-		}
+		exists, _ = redisCache.Exists(ctx, key)
 		if !exists {
-			t.Fatalf("CacheExists returned wrong value: got %v want %v", exists, true)
-		}
-	})
-
-	t.Run("CacheExpire", func(t *testing.T) {
-		err := redisCache.Expire(ctx, key, time.Second*2)
-		if err != nil {
-			t.Fatalf("CacheExpire failed: %v", err)
+			t.Fatalf("Exists after set should be true")
 		}
 
-		time.Sleep(time.Second * 3)
-		exists, err := redisCache.Exists(ctx, key)
-		if err != nil {
-			t.Fatalf("CacheExists failed: %v", err)
+		ttl, err := redisCache.TTL(ctx, key)
+		if err != nil || ttl <= 0 {
+			t.Fatalf("TTL failed: %v", err)
 		}
+
+		time.Sleep(3 * time.Second)
+
+		exists, _ = redisCache.Exists(ctx, key)
 		if exists {
-			t.Fatalf("CacheExists returned wrong value: got %v want %v", exists, false)
+			t.Fatalf("Key should expire")
 		}
 	})
 }

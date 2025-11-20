@@ -15,6 +15,15 @@ func NewRedisCache(client *redis.Client) Cache {
 	return &RedisCache{client: client}
 }
 
+// Eval 在 Redis 上执行 lua 脚本并返回结果（包装错误）
+func (r *RedisCache) Eval(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error) {
+	res, err := r.client.Eval(ctx, script, keys, args...).Result()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return res, nil
+}
+
 // Get 如果没有值会直接返回空
 func (r *RedisCache) Get(ctx context.Context, key string) (string, error) {
 	result, err := r.client.Get(ctx, key).Result()
@@ -80,6 +89,30 @@ func (r *RedisCache) HGet(ctx context.Context, key string, field string) (string
 	return result, nil
 }
 
+func (r *RedisCache) HGetAll(ctx context.Context, key string) (map[string]string, error) {
+	m, err := r.client.HGetAll(ctx, key).Result()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return m, nil
+}
+
+func (r *RedisCache) HDel(ctx context.Context, key string, fields ...string) (int64, error) {
+	n, err := r.client.HDel(ctx, key, fields...).Result()
+	if err != nil {
+		return 0, errors.WithStack(err)
+	}
+	return n, nil
+}
+
+func (r *RedisCache) HLen(ctx context.Context, key string) (int64, error) {
+	n, err := r.client.HLen(ctx, key).Result()
+	if err != nil {
+		return 0, errors.WithStack(err)
+	}
+	return n, nil
+}
+
 func (r *RedisCache) HIncrBy(ctx context.Context, key string, field string, increment int64) (int64, error) {
 	result, err := r.client.HIncrBy(ctx, key, field, increment).Result()
 	if err != nil {
@@ -102,4 +135,12 @@ func (r *RedisCache) Expire(ctx context.Context, key string, expiration time.Dur
 		return errors.WithStack(err)
 	}
 	return nil
+}
+
+func (r *RedisCache) TTL(ctx context.Context, key string) (time.Duration, error) {
+	d, err := r.client.TTL(ctx, key).Result()
+	if err != nil {
+		return 0, errors.WithStack(err)
+	}
+	return d, nil
 }
