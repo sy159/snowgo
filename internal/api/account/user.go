@@ -48,8 +48,8 @@ type UserList struct {
 }
 
 var (
-	allowedPasswordChars = regexp.MustCompile(`^[A-Za-z0-9!@#$%^&*?_~-]+$`)
-	symbolChars          = "!@#$%^&*?_~-"
+	allowedPasswordChars = regexp.MustCompile(`^[A-Za-z0-9.!@#$%^&*?_~-]+$`)
+	symbolChars          = ".!@#$%^&*?_~-"
 )
 
 func ValidatePassword(pw string) error {
@@ -60,7 +60,7 @@ func ValidatePassword(pw string) error {
 		return errors.New("密码长度需为 6-32 位")
 	}
 	if !allowedPasswordChars.MatchString(pw) {
-		return errors.New("密码只能包含字母、数字或特殊字符(!@#$%^&*?_~-)")
+		return errors.New("密码只能包含字母、数字或特殊字符(.!@#$%^&*?_~-)")
 	}
 	var hasLetter, hasDigit, hasSymbol bool
 	typeCount := 0
@@ -80,7 +80,7 @@ func ValidatePassword(pw string) error {
 		}
 	}
 	if typeCount < 2 {
-		return errors.New("密码必须同时包含以下任意两类：字母、数字或特殊字符(!@#$%^&*?_~-)")
+		return errors.New("密码必须同时包含以下任意两类：字母、数字或特殊字符(.!@#$%^&*?_~-)")
 	}
 	return nil
 }

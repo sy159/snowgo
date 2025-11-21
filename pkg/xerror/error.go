@@ -58,7 +58,7 @@ var (
 	UserNameTelEmptyError = NewCode(10305, "用户名或电话不能为空")
 	UserNameTelExistError = NewCode(10306, "用户名或电话已存在")
 	AuthError             = NewCode(10307, "用户名或密码错误")
-	PwdError              = NewCode(10308, "密码须为 6–32 位，并至少包含数字、字母、特殊符号（!@#$%^&*?_~-）中的两种类型")
+	PwdError              = NewCode(10308, "密码须为 6–32 位，并至少包含数字、字母、特殊符号（.!@#$%^&*?_~-）中的两种类型")
 
 	// MenuNotFound 菜单权限相关
 	MenuNotFound    = NewCode(10311, "菜单不存在")

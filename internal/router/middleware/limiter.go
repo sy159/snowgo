@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlimiter"
@@ -31,7 +30,6 @@ func KeyLimiter(r xlimiter.BucketLimit, b int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// key 除了ip 之外也可以是其他的，例如user name等根据需求调整
 		key := c.ClientIP()
-		fmt.Println(key)
 
 		bucketLimiter, _ := xlimiter.NewTokenBucket(key, r, b)
 		if !bucketLimiter.Allow() {
