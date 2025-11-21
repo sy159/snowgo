@@ -17,7 +17,7 @@ const (
 	PunctuationFlag             // 特殊字符
 )
 
-var seededRand = rand.New(rand.NewSource(time.Now().UnixNano())) // nolint:gosec
+var seededRand = rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // G404: 非安全场景，仅用于生成混淆字符串
 
 // ReverseStr 字符串反转
 func ReverseStr(s string) string {

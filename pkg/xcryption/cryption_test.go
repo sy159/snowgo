@@ -26,21 +26,6 @@ func TestCrypto(t *testing.T) {
 	})
 }
 
-func TestEncode(t *testing.T) {
-	var id uint = 11111
-	t.Run("encode/decode", func(t *testing.T) {
-		code := xcryption.Id2Code(id, 8)
-		fmt.Println(code)
-		code2Id, err := xcryption.Code2Id(code)
-		if err != nil {
-			t.Error(err)
-		}
-		if code2Id != id {
-			t.Error("code xerror")
-		}
-	})
-}
-
 func TestHashPassword(t *testing.T) {
 	pwd := "123456"
 	t.Run("hash pwd", func(t *testing.T) {
@@ -69,19 +54,6 @@ func BenchmarkCrypto(b *testing.B) {
 		}
 		if plainText != decrypt {
 			b.Error("decrypt xerror")
-		}
-	}
-}
-
-func BenchmarkEncode(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		code := xcryption.Id2Code(uint(i), 8)
-		id, err := xcryption.Code2Id(code)
-		if err != nil {
-			b.Error(err)
-		}
-		if uint(i) != id {
-			b.Error("code xerror")
 		}
 	}
 }

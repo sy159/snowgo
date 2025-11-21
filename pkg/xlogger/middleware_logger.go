@@ -22,7 +22,7 @@ type LogOptions func(*logOptions)
 
 type logOptions struct {
 	enableConsoleOutput bool
-	fileMaxAgeDays      uint
+	fileMaxAgeDays      uint32
 }
 
 // WithConsoleOutput 选择是否启用控制台输出
@@ -33,7 +33,7 @@ func WithConsoleOutput(enabled bool) LogOptions {
 }
 
 // WithFileMaxAgeDays 设置日志保存的天数
-func WithFileMaxAgeDays(days uint) LogOptions {
+func WithFileMaxAgeDays(days uint32) LogOptions {
 	return func(l *logOptions) {
 		if days > 2 {
 			l.fileMaxAgeDays = days

@@ -45,8 +45,8 @@ type ServerConfig struct {
 	Version      string `mapstructure:"version"`
 	Addr         string `mapstructure:"addr"`
 	Port         uint32 `mapstructure:"port"`
-	ReadTimeout  uint   `mapstructure:"readTimeout"`
-	WriteTimeout uint   `mapstructure:"writeTimeout"`
+	ReadTimeout  uint32 `mapstructure:"readTimeout"`
+	WriteTimeout uint32 `mapstructure:"writeTimeout"`
 	MaxHeaderMB  int    `mapstructure:"maxHeaderMB"`
 }
 
@@ -55,8 +55,8 @@ type LogConfig struct {
 	Output              string `mapstructure:"output"`
 	AccessEncoder       string `mapstructure:"accessEncoder"`
 	LogEncoder          string `mapstructure:"logEncoder"`
-	AccessFileMaxAgeDay uint   `mapstructure:"accessFileMaxAgeDay"`
-	LogFileMaxAgeDay    uint   `mapstructure:"logFileMaxAgeDay"`
+	AccessFileMaxAgeDay uint32 `mapstructure:"accessFileMaxAgeDay"`
+	LogFileMaxAgeDay    uint32 `mapstructure:"logFileMaxAgeDay"`
 }
 
 // RedisConfig Redis配置

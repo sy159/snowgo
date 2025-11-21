@@ -33,7 +33,7 @@ var (
 		"Content-Type": "application/json; charset=UTF-8",
 	}
 	defaultMaxRetries = 0
-	backoffRand       = rand.New(rand.NewSource(time.Now().UnixNano())) // nolint:gosec
+	backoffRand       = rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // G404: 非安全场景
 )
 
 type Option func(*requestOptions)

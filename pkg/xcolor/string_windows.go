@@ -5,18 +5,10 @@ package xcolor
 
 import (
 	"fmt"
-	"math/rand"
 	"net/http"
 	e "snowgo/pkg/xerror"
 	"strconv"
 )
-
-var _ = RandomColor()
-
-// RandomColor generates a random xcolor.
-func RandomColor() string {
-	return fmt.Sprintf("#%s", strconv.FormatInt(int64(rand.Intn(16777216)), 16)) // nolint:gosec
-}
 
 // RedFont ...
 func RedFont(msg string) string {

@@ -22,7 +22,8 @@ func TestId2CodeAndCode2Id(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		code := xcryption.Id2Code(test.id, test.minLength)
+		testId := int64(test.id)
+		code := xcryption.Id2Code(testId, test.minLength)
 		if len(code) < test.minLength {
 			t.Fatalf("code length %d < minLength %d", len(code), test.minLength)
 		}
@@ -31,7 +32,7 @@ func TestId2CodeAndCode2Id(t *testing.T) {
 		if err != nil {
 			t.Fatalf("decode failed: %v", err)
 		}
-		if decoded != test.id {
+		if decoded != testId {
 			t.Fatalf("decoded id %d != original id %d", decoded, test.id)
 		}
 		t.Logf("id=%d -> code=%s -> decoded=%d", test.id, code, decoded)
@@ -51,7 +52,7 @@ func BenchmarkId2CodeConcurrent(b *testing.B) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < total/concurrency; j++ {
-				id := uint(rand.Intn(1000000))
+				id := int64(rand.Intn(1000000))
 				minLen := 6 + rand.Intn(6) // 随机 minLength 6~11
 				code := xcryption.Id2Code(id, minLen)
 				decoded, err := xcryption.Code2Id(code)
@@ -83,7 +84,7 @@ func TestRandomStress(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < total/concurrency; j++ {
-				id := uint(rand.Intn(1_000_000_000))
+				id := int64(rand.Intn(1_000_000_000))
 				minLen := 6 + rand.Intn(12)
 				code := xcryption.Id2Code(id, minLen)
 				decoded, err := xcryption.Code2Id(code)
