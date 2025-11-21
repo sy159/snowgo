@@ -195,7 +195,7 @@ func sleepBackoff(ctx context.Context, i int, base time.Duration) {
 		backoff = maxBackoff
 	}
 
-	jitter := time.Duration(common.WeakRandInt63n(backoff))
+	jitter := time.Duration(common.WeakRandInt63n(int64(backoff)))
 
 	timer := time.NewTimer(jitter)
 	defer timer.Stop()
