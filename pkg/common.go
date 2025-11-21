@@ -3,24 +3,42 @@ package common
 import (
 	"crypto/rand"
 	"fmt"
-	"math"
 	"math/big"
+	mrand "math/rand"
 	"reflect"
+	"sync"
+	"time"
 )
 
-// SecureRandInt 返回 [0, max) 的安全随机整数
-func SecureRandInt(max int) (int, error) {
+var (
+	weakOnce sync.Once
+	weakRng  *mrand.Rand
+)
+
+func initWeakRng() {
+	//nolint:gosec // G404: 非安全场景，仅用于生成混淆/测试数据
+	weakRng = mrand.New(mrand.NewSource(time.Now().UnixNano()))
+}
+
+// WeakRandInt63n 返回高性能随机数（非安全）
+func WeakRandInt63n(max int64) int64 {
+	if max <= 0 {
+		return 0
+	}
+	weakOnce.Do(initWeakRng)
+	return weakRng.Int63n(max)
+}
+
+// SecureRandInt63n 返回 [0, max) 的安全随机整数
+func SecureRandInt63n(max int64) (int64, error) {
 	if max <= 0 {
 		return 0, nil
 	}
-	if max > math.MaxInt32 {
-		return 0, fmt.Errorf("max too large for 32-bit platform")
-	}
-	nBig, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
+	nBig, err := rand.Int(rand.Reader, big.NewInt(max))
 	if err != nil {
 		return 0, err
 	}
-	return int(nBig.Int64()), nil
+	return nBig.Int64(), nil
 }
 
 // ErrorToString 错误转为字符串

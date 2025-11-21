@@ -2,10 +2,9 @@ package xcryption
 
 import (
 	"errors"
-	"math/rand"
+	common "snowgo/pkg"
 	str "snowgo/pkg/xstr_tool"
 	"strings"
-	"time"
 )
 
 const (
@@ -13,8 +12,6 @@ const (
 	charLen = int64(len(chars))
 	divider = "i" // 分割标识符
 )
-
-var seededRand = rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // G404: 非安全场景，仅用于生成混淆字符串
 
 // Id2Code id转code，可用于邀请码，短链接等生成
 func Id2Code(id int64, minLength int) (code string) {
@@ -32,7 +29,7 @@ func Id2Code(id int64, minLength int) (code string) {
 		code += divider
 		for i := 0; i < fixLen-1; i++ {
 			//code += string(chars[i])
-			code += string(chars[seededRand.Intn(len(chars))])
+			code += string(chars[common.WeakRandInt63n(int64(len(chars)))])
 		}
 	}
 	return code

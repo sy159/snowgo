@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"net/url"
+	common "snowgo/pkg"
 	"time"
 )
 
@@ -33,7 +33,6 @@ var (
 		"Content-Type": "application/json; charset=UTF-8",
 	}
 	defaultMaxRetries = 0
-	backoffRand       = rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // G404: 非安全场景
 )
 
 type Option func(*requestOptions)
@@ -196,7 +195,7 @@ func sleepBackoff(ctx context.Context, i int, base time.Duration) {
 		backoff = maxBackoff
 	}
 
-	jitter := time.Duration(backoffRand.Int63n(int64(backoff)))
+	jitter := time.Duration(common.WeakRandInt63n(backoff))
 
 	timer := time.NewTimer(jitter)
 	defer timer.Stop()

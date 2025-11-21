@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"math/rand"
+	common "snowgo/pkg"
 	"snowgo/pkg/xlogger"
 
 	"time"
@@ -212,7 +212,7 @@ func (p *PulsarProducer) SendMessage(ctx context.Context, message []byte, proper
 				backoff = maxBackoff
 			}
 			// jitter：在 backoff/2 - backoff 范围内随机
-			jitter := time.Duration(rand.Int63n(int64(backoff / 2))) //nolint:gosec // G404: 非安全场景
+			jitter := time.Duration(common.WeakRandInt63n(backoff / 2))
 			time.Sleep(backoff/2 + jitter)
 		}
 	}

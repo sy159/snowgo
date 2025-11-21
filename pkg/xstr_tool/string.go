@@ -1,9 +1,8 @@
 package xstr_tool
 
 import (
-	"math/rand"
+	"snowgo/pkg"
 	"strings"
-	"time"
 )
 
 const (
@@ -16,8 +15,6 @@ const (
 	DigitFlag                   // 数字
 	PunctuationFlag             // 特殊字符
 )
-
-var seededRand = rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // G404: 非安全场景，仅用于生成混淆字符串
 
 // ReverseStr 字符串反转
 func ReverseStr(s string) string {
@@ -52,7 +49,7 @@ func RandStr(n int, flag int) string {
 	charsLen := len(chars)
 	b := make([]byte, n)
 	for i := range b {
-		b[i] = chars[seededRand.Intn(charsLen)]
+		b[i] = chars[common.WeakRandInt63n(int64(charsLen))]
 	}
 	return string(b)
 }
@@ -81,7 +78,7 @@ func RandShuffleStr(n int, flag int) string {
 	charByte := []byte(chars)
 	for i := len(charByte) - 1; i > 0; i-- {
 		// 随机交换位置，实现打乱效果
-		num := seededRand.Intn(i + 1)
+		num := common.WeakRandInt63n(int64(i + 1))
 		charByte[i], charByte[num] = charByte[num], charByte[i]
 	}
 	return string(charByte[:n])
