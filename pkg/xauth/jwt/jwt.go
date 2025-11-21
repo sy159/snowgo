@@ -57,7 +57,7 @@ func NewJwtManager(conf *Config) (*Manager, error) {
 // Claims 自定义声明
 type Claims struct {
 	GrantType string `json:"grant_type"` // 授权类型，区分 accessToken 与 refreshToken
-	UserId    int64  `json:"user_id"`
+	UserId    int32  `json:"user_id"`
 	Username  string `json:"username"`
 	SessionId string `json:"session_id"`
 	//Role      string `json:"role"`
@@ -65,7 +65,7 @@ type Claims struct {
 }
 
 // GenerateAccessToken 创建 access token
-func (m *Manager) GenerateAccessToken(userId int64, username, refreshJti string) (string, time.Time, error) {
+func (m *Manager) GenerateAccessToken(userId int32, username, refreshJti string) (string, time.Time, error) {
 	now := time.Now().UTC()
 	exp := now.Add(time.Duration(m.jwtConf.AccessExpirationTime) * time.Minute)
 	exp = time.Unix(exp.Unix(), 0) // 去除纳秒
@@ -78,7 +78,7 @@ func (m *Manager) GenerateAccessToken(userId int64, username, refreshJti string)
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(exp),
 			Issuer:    m.jwtConf.Issuer,
-			Subject:   strconv.FormatInt(userId, 10),
+			Subject:   strconv.FormatInt(int64(userId), 10),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ID:        uuid.NewString(), // jti
 		},
@@ -89,7 +89,7 @@ func (m *Manager) GenerateAccessToken(userId int64, username, refreshJti string)
 }
 
 // GenerateRefreshToken 创建 refresh token
-func (m *Manager) GenerateRefreshToken(userId int64, username string) (string, string, time.Time, error) {
+func (m *Manager) GenerateRefreshToken(userId int32, username string) (string, string, time.Time, error) {
 	now := time.Now().UTC()
 	exp := now.Add(time.Duration(m.jwtConf.RefreshExpirationTime) * time.Minute)
 	exp = time.Unix(exp.Unix(), 0) // 去除纳秒
@@ -103,7 +103,7 @@ func (m *Manager) GenerateRefreshToken(userId int64, username string) (string, s
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(exp),
 			Issuer:    m.jwtConf.Issuer,
-			Subject:   strconv.FormatInt(userId, 10),
+			Subject:   strconv.FormatInt(int64(userId), 10),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ID:        jti, // jti
 		},
@@ -114,7 +114,7 @@ func (m *Manager) GenerateRefreshToken(userId int64, username string) (string, s
 }
 
 // GenerateTokens 创建一对 access + refresh token
-func (m *Manager) GenerateTokens(userId int64, username string) (token *Token, err error) {
+func (m *Manager) GenerateTokens(userId int32, username string) (token *Token, err error) {
 	refreshToken, refreshJti, refreshExp, err := m.GenerateRefreshToken(userId, username)
 	if err != nil {
 		return nil, errors.Wrap(err, "Generate Refresh Token error")

@@ -54,7 +54,7 @@ func Login(c *gin.Context) {
 	_ = limiter.Reset(c)
 
 	jwtMgr := container.JwtManager
-	token, err := jwtMgr.GenerateTokens(int64(user.ID), user.Username)
+	token, err := jwtMgr.GenerateTokens(user.ID, user.Username)
 	if err != nil {
 		xlogger.Errorf("jwt generate tokens err: %v", err)
 		xresponse.FailByError(c, e.TokenError)

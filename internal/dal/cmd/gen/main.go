@@ -190,7 +190,7 @@ func GetQueryModels() []interface{} {
 	}
 }
 `, modelPkg, strings.Join(modelNames, ",\n\t\t"))
-	err = os.WriteFile("./internal/dal/query_model.go", []byte(constantContext), 0644)
+	err = os.WriteFile("./internal/dal/query_model.go", []byte(constantContext), 0600)
 	if err != nil {
 		panic(err)
 	}

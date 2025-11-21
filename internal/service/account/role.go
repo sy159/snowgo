@@ -147,7 +147,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 
 		// 创建操作日志
 		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
-			OperatorID:   int32(userContext.UserId),
+			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
 			Resource:     constant.ResourceRole,
@@ -250,7 +250,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 
 		// 创建操作日志
 		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
-			OperatorID:   int32(userContext.UserId),
+			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
 			Resource:     constant.ResourceRole,
@@ -323,7 +323,7 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 
 		// 创建操作日志
 		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
-			OperatorID:   int32(userContext.UserId),
+			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
 			Resource:     constant.ResourceRole,

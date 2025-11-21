@@ -71,7 +71,7 @@ func PermissionAuth(requiredPerm string) gin.HandlerFunc {
 			return
 		}
 
-		userId, ok := uidIfc.(int64)
+		userId, ok := uidIfc.(int32)
 		if !ok {
 			xresponse.FailByError(c, e.HttpUnauthorized)
 			c.Abort()
@@ -80,7 +80,7 @@ func PermissionAuth(requiredPerm string) gin.HandlerFunc {
 
 		container := di.GetContainer(c)
 		// 拿该用户的perms列表
-		perms, err := container.UserService.GetPermsListById(c, int32(userId))
+		perms, err := container.UserService.GetPermsListById(c, userId)
 		if err != nil {
 			xresponse.FailByError(c, e.HttpInternalServerError)
 			c.Abort()

@@ -211,7 +211,7 @@ func (p *PulsarProducer) SendMessage(ctx context.Context, message []byte, proper
 			if backoff > maxBackoff {
 				backoff = maxBackoff
 			}
-			// jitter：在 backoff/2 .. backoff 范围内随机
+			//nolint:gosec // jitter：在 backoff/2 - backoff 范围内随机
 			jitter := time.Duration(rand.Int63n(int64(backoff / 2)))
 			time.Sleep(backoff/2 + jitter)
 		}

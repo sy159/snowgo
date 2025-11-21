@@ -99,13 +99,21 @@ jobs:
           retention-days: 7
 
       - name: Fail on Critical Issues
+        if: always()
         run: |
-          critical_count=$(jq '[.Issues[] | select(.severity == "HIGH" or .severity == "CRITICAL")] | length' gosec-report.json)
-          if [ "$critical_count" -gt 0 ]; then
-            echo "❌ Found $critical_count HIGH/CRITICAL issues"
-            exit 1
+          if [ -f gosec-report.json ]; then
+            echo "### Gosec HIGH/CRITICAL Findings ###"
+            # 打印每条 HIGH/CRITICAL 问题
+            jq -r '.Issues[] | select(.severity=="HIGH" or .severity=="CRITICAL") | "\(.severity) - \(.file):\(.line) - \(.details) [rule: \(.rule_id)]"' gosec-report.json
+            critical_count=$(jq '[.Issues[] | select(.severity=="HIGH" or .severity=="CRITICAL")] | length' gosec-report.json)
+            if [ "$critical_count" -gt 0 ]; then
+              echo "❌ Found $critical_count HIGH/CRITICAL issues"
+              exit 1
+            else
+              echo "✅ No high/critical severity issues found"
+            fi
           else
-            echo "✅ No high/critical severity issues found"
+            echo "⚠️ Gosec report not found"
           fi
 
   security-report:

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -13,14 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 )
-
-// Md5 md5加密
-func Md5(s string) string {
-	m := md5.New()
-	m.Write([]byte(s))
-	res := hex.EncodeToString(m.Sum(nil))
-	return res
-}
 
 // Sha256 Sha256加密
 func Sha256(s string) string {

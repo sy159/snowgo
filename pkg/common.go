@@ -1,9 +1,27 @@
 package common
 
 import (
+	"crypto/rand"
 	"fmt"
+	"math"
+	"math/big"
 	"reflect"
 )
+
+// SecureRandInt 返回 [0, max) 的安全随机整数
+func SecureRandInt(max int) (int, error) {
+	if max <= 0 {
+		return 0, nil
+	}
+	if max > math.MaxInt32 {
+		return 0, fmt.Errorf("max too large for 32-bit platform")
+	}
+	nBig, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
+	if err != nil {
+		return 0, err
+	}
+	return int(nBig.Int64()), nil
+}
 
 // ErrorToString 错误转为字符串
 func ErrorToString(err interface{}) string {

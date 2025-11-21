@@ -14,7 +14,7 @@ const (
 	divider = "i" // 分割标识符
 )
 
-var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
+var seededRand = rand.New(rand.NewSource(time.Now().UnixNano())) // nolint:gosec
 
 // Id2Code id转code，可用于邀请码，短链接等生成
 func Id2Code(id uint, minLength int) (code string) {
@@ -45,7 +45,7 @@ func Code2Id(code string) (id uint, err error) {
 		if charIdx == -1 {
 			return 0, errors.New("code decode failed")
 		}
-		charIndex := uint(charIdx)
+		charIndex := uint(charIdx) // nolint:gosec
 		if i > 0 {
 			id = id*charLen + charIndex
 		} else {

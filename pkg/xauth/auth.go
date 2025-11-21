@@ -25,7 +25,7 @@ type UserContext struct {
 	TraceId   string
 	IP        string
 	UserAgent string
-	UserId    int64
+	UserId    int32
 	Username  string
 	SessionId string
 }
@@ -43,7 +43,7 @@ func GetContext(ctx context.Context) *Context {
 
 // GetUserContext 获取登录的ctx
 func GetUserContext(ctx context.Context) (*UserContext, error) {
-	userId, ok := ctx.Value(XUserId).(int64)
+	userId, ok := ctx.Value(XUserId).(int32)
 	if !ok || userId <= 0 {
 		return nil, errors.New(e.HttpForbidden.GetErrMsg())
 	}

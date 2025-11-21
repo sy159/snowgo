@@ -192,7 +192,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 
 		// 创建操作日志
 		err = u.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
-			OperatorID:   int32(userContext.UserId),
+			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
 			Resource:     constant.ResourceUser,
@@ -294,7 +294,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 
 		// 创建操作日志
 		err = u.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
-			OperatorID:   int32(userContext.UserId),
+			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
 			Resource:     constant.ResourceUser,
@@ -422,7 +422,7 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 
 		// 创建操作日志
 		err = u.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
-			OperatorID:   int32(userContext.UserId),
+			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
 			Resource:     constant.ResourceUser,

@@ -22,7 +22,8 @@ var (
 			MaxConnsPerHost:     0,
 			IdleConnTimeout:     90 * time.Second,
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: false, // 校验https
+				//InsecureSkipVerify: false, // 校验https
+				MinVersion: tls.VersionTLS12, // 强制 TLS 1.2 以上
 			},
 		},
 		Timeout: 10 * time.Second,
@@ -32,7 +33,7 @@ var (
 		"Content-Type": "application/json; charset=UTF-8",
 	}
 	defaultMaxRetries = 0
-	backoffRand       = rand.New(rand.NewSource(time.Now().UnixNano()))
+	backoffRand       = rand.New(rand.NewSource(time.Now().UnixNano())) // nolint:gosec
 )
 
 type Option func(*requestOptions)

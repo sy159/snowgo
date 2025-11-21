@@ -123,7 +123,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 
 		// 创建操作日志
 		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
-			OperatorID:   int32(userContext.UserId),
+			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
 			Resource:     constant.ResourceMenu,
@@ -204,7 +204,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 
 		// 创建操作日志
 		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
-			OperatorID:   int32(userContext.UserId),
+			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
 			Resource:     constant.ResourceMenu,
@@ -289,7 +289,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 
 		// 创建操作日志
 		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
-			OperatorID:   int32(userContext.UserId),
+			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
 			Resource:     constant.ResourceMenu,

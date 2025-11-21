@@ -17,7 +17,7 @@ const (
 	PunctuationFlag             // 特殊字符
 )
 
-var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
+var seededRand = rand.New(rand.NewSource(time.Now().UnixNano())) // nolint:gosec
 
 // ReverseStr 字符串反转
 func ReverseStr(s string) string {

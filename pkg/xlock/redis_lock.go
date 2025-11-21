@@ -130,7 +130,7 @@ func (r *RedisLock) ReTryLock(ctx context.Context, key string, expireSecond int6
 
 		if err = mutex.LockContext(ctx); err != nil {
 			r.logger.Errorf("[redis lock] redis retry lock failed key=%s attempt=%d err=%v", key, attempt, err)
-			time.Sleep(time.Millisecond*50 + time.Duration(rand.Intn(20))*time.Millisecond)
+			time.Sleep(time.Millisecond*50 + time.Duration(rand.Intn(20))*time.Millisecond) // nolint:gosec
 			attempt++
 			continue
 		}

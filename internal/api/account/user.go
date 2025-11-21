@@ -280,7 +280,7 @@ func GetUserPermission(c *gin.Context) {
 		return
 	}
 	container := di.GetContainer(c)
-	user, err := container.UserService.GetUserPermissionById(c, int32(userContext.UserId))
+	user, err := container.UserService.GetUserPermissionById(c, userContext.UserId)
 	if err != nil {
 		xlogger.Errorf("get user permission is err: %+v", err)
 		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())

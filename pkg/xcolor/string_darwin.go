@@ -15,7 +15,7 @@ var _ = RandomColor()
 
 // RandomColor generates a random xcolor.
 func RandomColor() string {
-	return fmt.Sprintf("#%s", strconv.FormatInt(int64(rand.Intn(16777216)), 16))
+	return fmt.Sprintf("#%s", strconv.FormatInt(int64(rand.Intn(16777216)), 16)) // nolint:gosec
 }
 
 // RedFont ...

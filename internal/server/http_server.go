@@ -26,8 +26,8 @@ func StartHttpServer(container *di.Container) {
 	HttpServer = &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", cfg.Application.Server.Addr, cfg.Application.Server.Port),
 		Handler:        r,
-		ReadTimeout:    time.Duration(cfg.Application.Server.ReadTimeout) * time.Second,
-		WriteTimeout:   time.Duration(cfg.Application.Server.WriteTimeout) * time.Second,
+		ReadTimeout:    time.Duration(cfg.Application.Server.ReadTimeout) * time.Second,  // nolint:gosec
+		WriteTimeout:   time.Duration(cfg.Application.Server.WriteTimeout) * time.Second, // nolint:gosec
 		MaxHeaderBytes: cfg.Application.Server.MaxHeaderMB << 20,
 	}
 
