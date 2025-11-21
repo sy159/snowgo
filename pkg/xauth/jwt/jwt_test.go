@@ -10,7 +10,7 @@ import (
 )
 
 func TestJwt(t *testing.T) {
-	var userId int64 = 1
+	var userId int32 = 1
 	username := "test"
 
 	jwtManager, _ := jwt.NewJwtManager(&jwt.Config{
