@@ -16,8 +16,8 @@ var (
 )
 
 func initWeakRng() {
-	// 非安全场景，仅用于生成混淆/测试数据
-	weakRng = mrand.New(mrand.NewSource(time.Now().UnixNano())) //nosec G404
+	// nosec G404非安全场景，仅用于生成混淆/测试数据
+	weakRng = mrand.New(mrand.NewSource(time.Now().UnixNano()))
 }
 
 // WeakRandInt63n 返回高性能随机数（非安全）
