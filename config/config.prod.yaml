@@ -1,6 +1,8 @@
 application:
   enableAccessLog: true  # 是否记录访问日志文件
   enablePprof: false  # 是否打开pprof
+  enableTrace: false  # 是否打开链路追踪
+  tempoEndpoint: ""  # tempo服务地址
   server:
     name: snowgo正式环境 # 服务名
     version: v1

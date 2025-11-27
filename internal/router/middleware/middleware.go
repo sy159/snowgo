@@ -8,6 +8,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"io"
 	"mime"
@@ -80,6 +83,23 @@ func fastMask(raw []byte) []byte {
 
 	return data
 }
+func getTraceID(c *gin.Context) string {
+	if tid, ok := c.Get(xauth.XTraceId); ok {
+		return tid.(string)
+	}
+	if span := trace.SpanFromContext(c.Request.Context()); span.SpanContext().IsValid() {
+		tid := span.SpanContext().TraceID().String()
+		c.Set(xauth.XTraceId, tid)
+		return tid
+	}
+	if tid := c.GetHeader(xauth.XTraceId); tid != "" {
+		c.Set(xauth.XTraceId, tid)
+		return tid
+	}
+	tid := strings.ReplaceAll(uuid.New().String(), "-", "")
+	c.Set(xauth.XTraceId, tid)
+	return tid
+}
 
 // 自定义一个结构体，实现 gin.ResponseWriter interface
 type responseWriter struct {
@@ -108,17 +128,15 @@ func AccessLogger() gin.HandlerFunc {
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
 		method := c.Request.Method
-		traceId := c.GetHeader(xauth.XTraceId)
-		if traceId == "" {
-			traceId = uuid.New().String()
-		}
+		traceId := getTraceID(c)
 
 		// 将请求 ID 存储到 Gin 上下文中
-		c.Set(xauth.XTraceId, traceId)
 		c.Set(xauth.XIp, c.ClientIP())
 		c.Set(xauth.XUserAgent, c.Request.UserAgent())
 		// trace_id放入header中
-		c.Writer.Header().Set(xauth.XTraceId, traceId)
+		if c.Writer.Header().Get(xauth.XTraceId) == "" {
+			c.Writer.Header().Set(xauth.XTraceId, traceId)
+		}
 
 		// 处理ico请求，不记录日志
 		if c.Request.URL.Path == "/favicon.ico" {
@@ -303,6 +321,37 @@ func Cors() gin.HandlerFunc {
 func InjectContainerMiddleware(container *di.Container) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set(constant.CONTAINER, container)
+		c.Next()
+	}
+}
+
+// TracingMiddleware 返回 otelgin 的中间件
+func TracingMiddleware(serviceName string) gin.HandlerFunc {
+	return otelgin.Middleware(serviceName)
+}
+
+// TraceAttrsMiddleware 在 otelgin 之后运行，用于把 trace id 注入 context/header 并附加通用 span 属性
+func TraceAttrsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		span := trace.SpanFromContext(c.Request.Context())
+		if span == nil || !span.SpanContext().IsValid() {
+			c.Next()
+			return
+		}
+
+		traceID := span.SpanContext().TraceID().String()
+		c.Set(xauth.XTraceId, traceID)
+		if c.Writer.Header().Get(xauth.XTraceId) == "" {
+			c.Writer.Header().Set(xauth.XTraceId, traceID)
+		}
+
+		span.SetAttributes(
+			attribute.String("http.client_ip", c.ClientIP()),
+			attribute.String("http.user_agent", c.Request.UserAgent()),
+			attribute.String("http.method", c.Request.Method),
+			attribute.String("http.route", c.FullPath()),
+		)
+
 		c.Next()
 	}
 }

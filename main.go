@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"snowgo/config"
 	"snowgo/internal/di"
 	"snowgo/internal/server"
+	"snowgo/pkg/xenv"
 	"snowgo/pkg/xlogger"
+	"snowgo/pkg/xtrace"
 	"syscall"
+	"time"
 )
 
 func init() {
@@ -19,8 +23,27 @@ func init() {
 }
 
 func main() {
-	// 手动注入依赖
+	// 获取配置
 	cfg := config.Get()
+	// 链路注入
+	var traceShutdown func(context.Context) error
+	if cfg.Application.EnableTrace {
+		traceShutdown = xtrace.InitTracer(
+			cfg.Application.Server.Name,
+			cfg.Application.Server.Version,
+			xenv.Env(),
+			cfg.Application.TempoEndpoint,
+		)
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+			defer cancel()
+			if err := traceShutdown(ctx); err != nil {
+				xlogger.Errorf("tracer shutdown failed: %v", err)
+			}
+		}()
+	}
+
+	// 手动注入依赖
 	container, err := di.NewContainer(
 		di.WithJWT(cfg.Jwt),
 		di.WithMySQL(cfg.Mysql, cfg.OtherDB),

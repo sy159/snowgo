@@ -28,7 +28,14 @@ func setMode() {
 
 // 中间件注册使用
 func loadMiddleWare(router *gin.Engine, container *di.Container) {
-	router.Use(middleware.AccessLogger(), middleware.Recovery())
+	cfg := config.Get()
+	router.Use(middleware.Recovery())
+	// 链路追踪
+	if cfg.Application.EnableTrace {
+		router.Use(middleware.TracingMiddleware(cfg.Application.Server.Name))
+		router.Use(middleware.TraceAttrsMiddleware())
+	}
+	router.Use(middleware.AccessLogger())
 	//router.Use(middleware.Cors())
 	// 依赖注入
 	router.Use(middleware.InjectContainerMiddleware(container))

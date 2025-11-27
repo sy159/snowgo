@@ -36,6 +36,8 @@ type Config struct {
 type ApplicationConfig struct {
 	EnableAccessLog bool         `mapstructure:"enableAccessLog"`
 	EnablePprof     bool         `mapstructure:"enablePprof"`
+	EnableTrace     bool         `mapstructure:"enableTrace"`
+	TempoEndpoint   string       `mapstructure:"tempoEndpoint"`
 	Server          ServerConfig `mapstructure:"server"`
 }
 
