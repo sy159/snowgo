@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
@@ -117,10 +118,6 @@ func AccessLogger() gin.HandlerFunc {
 		// 将请求 ID 存储到 Gin 上下文中
 		c.Set(xauth.XIp, c.ClientIP())
 		c.Set(xauth.XUserAgent, c.Request.UserAgent())
-		// trace_id放入header中
-		if c.Writer.Header().Get(xauth.XTraceId) == "" {
-			c.Writer.Header().Set(xauth.XTraceId, traceId)
-		}
 
 		// 处理ico请求，不记录日志
 		if c.Request.URL.Path == "/favicon.ico" {
@@ -310,6 +307,30 @@ func InjectContainerMiddleware(container *di.Container) gin.HandlerFunc {
 	}
 }
 
+// TraceMiddleware 用于设置trace
+func TraceMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var traceID string
+
+		// OTEL span 有效则取
+		if span := trace.SpanFromContext(c.Request.Context()); span.SpanContext().IsValid() {
+			traceID = span.SpanContext().TraceID().String()
+		} else if tid := c.GetHeader(xauth.XTraceId); tid != "" {
+			traceID = tid
+		} else {
+			traceID = strings.ReplaceAll(uuid.New().String(), "-", "")
+		}
+
+		c.Set(xauth.XTraceId, traceID)
+		if c.Writer.Header().Get(xauth.XTraceId) == "" {
+			c.Writer.Header().Set(xauth.XTraceId, traceID)
+		}
+		c.Request = c.Request.WithContext(xtrace.NewContextWithTrace(c.Request.Context(), traceID))
+
+		c.Next()
+	}
+}
+
 // TracingMiddleware 返回 otelgin 的中间件
 func TracingMiddleware(serviceName string) gin.HandlerFunc {
 	return otelgin.Middleware(serviceName)
@@ -323,9 +344,6 @@ func TraceAttrsMiddleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-
-		traceID := span.SpanContext().TraceID().String()
-		c.Set(xauth.XTraceId, traceID)
 
 		span.SetAttributes(
 			attribute.String("http.client_ip", c.ClientIP()),

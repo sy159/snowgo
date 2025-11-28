@@ -2,12 +2,8 @@ package xtrace
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"go.opentelemetry.io/otel/trace"
 	"os"
 	"snowgo/pkg/xauth"
-	"strings"
 	"time"
 
 	"snowgo/pkg/xlogger"
@@ -76,6 +72,8 @@ func InitTracer(serviceName, serviceVersion, env, tempoAddr string) func(context
 			sdktrace.WithMaxExportBatchSize(512),
 		),
 		sdktrace.WithResource(res),
+		// 10% 采样（如果链路过多，进行部分采样）
+		//sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(0.1))),
 	)
 
 	otel.SetTracerProvider(tp)
@@ -103,20 +101,18 @@ func InitTracer(serviceName, serviceVersion, env, tempoAddr string) func(context
 	}
 }
 
-func GetTraceID(c *gin.Context) string {
-	if tid, ok := c.Get(xauth.XTraceId); ok {
-		return tid.(string)
+// GetTraceID 只读 context，不生成 ID
+func GetTraceID(ctx context.Context) string {
+	if ctx == nil {
+		return ""
 	}
-	if span := trace.SpanFromContext(c.Request.Context()); span.SpanContext().IsValid() {
-		tid := span.SpanContext().TraceID().String()
-		c.Set(xauth.XTraceId, tid)
+	if tid, ok := ctx.Value(xauth.XTraceId).(string); ok {
 		return tid
 	}
-	if tid := c.GetHeader(xauth.XTraceId); tid != "" {
-		c.Set(xauth.XTraceId, tid)
-		return tid
-	}
-	tid := strings.ReplaceAll(uuid.New().String(), "-", "")
-	c.Set(xauth.XTraceId, tid)
-	return tid
+	return ""
+}
+
+// NewContextWithTrace 注入 trace_id 到 context
+func NewContextWithTrace(ctx context.Context, traceID string) context.Context {
+	return context.WithValue(ctx, xauth.XTraceId, traceID)
 }

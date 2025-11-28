@@ -37,6 +37,9 @@ func loadMiddleWare(router *gin.Engine, container *di.Container) {
 		router.Use(middleware.TraceAttrsMiddleware()) // 注入 trace id、span...
 	}
 
+	// 注入trace, 便于后续统一获取
+	router.Use(middleware.TraceMiddleware())
+
 	// 依赖注入
 	router.Use(middleware.InjectContainerMiddleware(container))
 
