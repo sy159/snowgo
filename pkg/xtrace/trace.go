@@ -2,7 +2,12 @@ package xtrace
 
 import (
 	"context"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/trace"
 	"os"
+	"snowgo/pkg/xauth"
+	"strings"
 	"time"
 
 	"snowgo/pkg/xlogger"
@@ -96,4 +101,22 @@ func InitTracer(serviceName, serviceVersion, env, tempoAddr string) func(context
 		xlogger.Info("[otlp] otel tracer shutdown succeeded")
 		return nil
 	}
+}
+
+func GetTraceID(c *gin.Context) string {
+	if tid, ok := c.Get(xauth.XTraceId); ok {
+		return tid.(string)
+	}
+	if span := trace.SpanFromContext(c.Request.Context()); span.SpanContext().IsValid() {
+		tid := span.SpanContext().TraceID().String()
+		c.Set(xauth.XTraceId, tid)
+		return tid
+	}
+	if tid := c.GetHeader(xauth.XTraceId); tid != "" {
+		c.Set(xauth.XTraceId, tid)
+		return tid
+	}
+	tid := strings.ReplaceAll(uuid.New().String(), "-", "")
+	c.Set(xauth.XTraceId, tid)
+	return tid
 }

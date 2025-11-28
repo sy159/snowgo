@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
@@ -23,9 +22,11 @@ import (
 	"snowgo/internal/di"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcolor"
+	"snowgo/pkg/xenv"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
+	"snowgo/pkg/xtrace"
 	"strings"
 	"time"
 )
@@ -83,23 +84,6 @@ func fastMask(raw []byte) []byte {
 
 	return data
 }
-func getTraceID(c *gin.Context) string {
-	if tid, ok := c.Get(xauth.XTraceId); ok {
-		return tid.(string)
-	}
-	if span := trace.SpanFromContext(c.Request.Context()); span.SpanContext().IsValid() {
-		tid := span.SpanContext().TraceID().String()
-		c.Set(xauth.XTraceId, tid)
-		return tid
-	}
-	if tid := c.GetHeader(xauth.XTraceId); tid != "" {
-		c.Set(xauth.XTraceId, tid)
-		return tid
-	}
-	tid := strings.ReplaceAll(uuid.New().String(), "-", "")
-	c.Set(xauth.XTraceId, tid)
-	return tid
-}
 
 // 自定义一个结构体，实现 gin.ResponseWriter interface
 type responseWriter struct {
@@ -128,7 +112,7 @@ func AccessLogger() gin.HandlerFunc {
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
 		method := c.Request.Method
-		traceId := getTraceID(c)
+		traceId := xtrace.GetTraceID(c)
 
 		// 将请求 ID 存储到 Gin 上下文中
 		c.Set(xauth.XIp, c.ClientIP())
@@ -210,7 +194,8 @@ func AccessLogger() gin.HandlerFunc {
 				zap.String("end_time", endTime.Format("2006-01-02 15:04:05.000")),
 			)
 		}
-		if !cfg.Application.EnableAccessLog || cfg.Log.Output == xlogger.MultiWriter {
+		// 正式环境不进行标准输出
+		if !xenv.Prod() && (!cfg.Application.EnableAccessLog || cfg.Log.Output == xlogger.MultiWriter) {
 			// 控制台输出访问日志
 			fmt.Printf("%s %s %20s | status %3s | biz code %6s | %8v | %5s  %#v | %12s | %s\n",
 				xcolor.GreenFont(fmt.Sprintf("[%s:%s]", cfg.Application.Server.Name, cfg.Application.Server.Version)),
@@ -263,7 +248,7 @@ func Recovery() gin.HandlerFunc {
 					zap.String("path", c.Request.URL.Path),
 					zap.String("query", c.Request.URL.RawQuery),
 					zap.String("ip", c.ClientIP()),
-					zap.String("trace_id", c.GetString(xauth.XTraceId)),
+					zap.String("trace_id", xtrace.GetTraceID(c)),
 					zap.String("user_agent", c.Request.UserAgent()),
 					zap.ByteString("request", httpRequest),
 				}
@@ -341,15 +326,18 @@ func TraceAttrsMiddleware() gin.HandlerFunc {
 
 		traceID := span.SpanContext().TraceID().String()
 		c.Set(xauth.XTraceId, traceID)
-		if c.Writer.Header().Get(xauth.XTraceId) == "" {
-			c.Writer.Header().Set(xauth.XTraceId, traceID)
-		}
 
 		span.SetAttributes(
 			attribute.String("http.client_ip", c.ClientIP()),
 			attribute.String("http.user_agent", c.Request.UserAgent()),
 			attribute.String("http.method", c.Request.Method),
-			attribute.String("http.route", c.FullPath()),
+			// FullPath 可能在某些路由为空，做个保护
+			attribute.String("http.route", func() string {
+				if p := c.FullPath(); p != "" {
+					return p
+				}
+				return c.Request.URL.Path
+			}()),
 		)
 
 		c.Next()

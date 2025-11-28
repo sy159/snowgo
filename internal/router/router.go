@@ -30,15 +30,18 @@ func setMode() {
 func loadMiddleWare(router *gin.Engine, container *di.Container) {
 	cfg := config.Get()
 	router.Use(middleware.Recovery())
+
 	// 链路追踪
 	if cfg.Application.EnableTrace {
 		router.Use(middleware.TracingMiddleware(cfg.Application.Server.Name))
-		router.Use(middleware.TraceAttrsMiddleware())
+		router.Use(middleware.TraceAttrsMiddleware()) // 注入 trace id、span...
 	}
-	router.Use(middleware.AccessLogger())
-	//router.Use(middleware.Cors())
+
 	// 依赖注入
 	router.Use(middleware.InjectContainerMiddleware(container))
+
+	router.Use(middleware.AccessLogger())
+	//router.Use(middleware.Cors())
 }
 
 // 注册所有路由
