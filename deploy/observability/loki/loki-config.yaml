@@ -1,0 +1,34 @@
+auth_enabled: false   # 简单部署不启用认证，生产环境可启用
+
+server:
+  http_listen_port: 3100  # Loki HTTP 接口端口
+
+# 日志 ingester 配置
+ingester:
+  wal:
+    enabled: true           # 启用 WAL 增强数据可靠性
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+storage_config:
+  boltdb_shipper:
+    active_index_directory: /loki/index
+    cache_location: /loki/cache
+    shared_store: filesystem
+  filesystem:
+    directory: /loki/chunks   # 日志 chunks 存储
+
+limits_config:
+  retention_period: 30d      # 日志保留 30 天
+  max_entries_limit_per_query: 5000
+
+chunk_target_size: 1048576     # 单个 chunk 大小约 1MB
+

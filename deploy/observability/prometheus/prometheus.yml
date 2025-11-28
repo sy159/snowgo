@@ -1,0 +1,33 @@
+# 全局配置
+global:
+  scrape_interval: 15s        # 默认抓取指标间隔
+  evaluation_interval: 15s    # 默认规则评估间隔
+
+# Alertmanager 配置（可选，生产可配置邮件/Slack告警）
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Metrics 抓取配置
+scrape_configs:
+
+  # Prometheus 自身指标
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # OTEL Collector metrics（所有应用统一接入 Collector）
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otelcol:8888']   # Collector exporter prometheus端口
+
+  # 自定义应用 metrics
+  - job_name: 'my-app'
+    static_configs:
+      - targets: ['host.docker.internal:8080']  # 替换为你的服务地址
+
+# 备注：
+# - scrape_interval 可根据应用指标量调整，生产通常 10~30s
+# - retention 可在 docker-compose 命令里设置，例如 30d
+# - enable-lifecycle 支持通过 API 热重载配置

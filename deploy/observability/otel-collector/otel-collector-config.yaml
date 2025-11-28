@@ -1,0 +1,43 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:        # gRPC 接收
+      http/protobuf:  # OTLP HTTP protobuf 接收
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 512  # 批量发送，减少网络请求压力
+
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:8888"  # Collector metrics 输出端口
+
+  loki:
+    endpoint: "http://loki:3100/loki/api/v1/push"
+    labels:
+      job: "app-logs"          # 可自定义
+
+  otlp/tempo:
+    endpoint: "tempo:14250"
+    tls:
+      insecure: true           # 单机部署无需证书
+
+service:
+  pipelines:
+    traces:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ otlp/tempo ]
+    metrics:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ prometheus ]
+    logs:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ loki ]
+
+# 备注：
+# - Collector 统一收集日志、metrics、traces
+# - batch processor 提高性能，减少网络压力
+# - 生产可扩展：增加 filters、transformations

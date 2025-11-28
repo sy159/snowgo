@@ -1,0 +1,20 @@
+server:
+  http_listen_port: 3200    # 查询端口（Grafana Tempo datasource 使用）
+  grpc_listen_port: 14250   # OTLP/gRPC 接收端口（应用上报 trace）
+
+distributor:
+  receivers: [otlp]         # 支持 OTLP/gRPC 收集 trace
+
+ingester:
+  trace_idle_period: 5m     # trace 空闲多久释放 block
+  max_block_bytes: 1048576  # 单 block 最大字节数（1MB）
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /tempo/traces   # trace 数据存储路径
+
+compactor:
+  compaction_interval: 10m   # 压缩间隔
+  block_retention: 7d      # trace 保留 7 天
