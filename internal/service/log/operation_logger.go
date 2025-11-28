@@ -141,7 +141,7 @@ func (o *OperationLogService) GetOperationLogList(ctx context.Context, condition
 		Limit:        condition.Limit,
 	})
 	if err != nil {
-		xlogger.Errorf("获取操作日志信息列表异常: %v", err)
+		xlogger.ErrorfCtx(ctx, "获取操作日志信息列表异常: %v", err)
 		return nil, errors.WithMessage(err, "操作日志信息列表查询失败")
 	}
 	logList := make([]*OperationLog, 0, len(operationLogList))

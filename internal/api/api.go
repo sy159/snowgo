@@ -33,7 +33,7 @@ func Readiness(c *gin.Context) {
 	container := di.GetContainer(c)
 	// mysql检查
 	if _, err := container.GetMyDB().CheckDBAlive(ctx); err != nil {
-		xlogger.Errorf("db check err: %v", err.Error())
+		xlogger.ErrorfCtx(c, "db check err: %v", err.Error())
 		c.JSON(503, gin.H{
 			"status": "not ready",
 			"error":  err.Error(),
@@ -42,7 +42,7 @@ func Readiness(c *gin.Context) {
 	}
 	// redis检查
 	if _, err := container.GetRDB().Ping(ctx).Result(); err != nil {
-		xlogger.Errorf("redis check err: %v", err.Error())
+		xlogger.ErrorfCtx(c, "redis check err: %v", err.Error())
 		c.JSON(503, gin.H{
 			"status": "not ready",
 			"error":  err.Error(),

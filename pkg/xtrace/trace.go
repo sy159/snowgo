@@ -2,11 +2,10 @@ package xtrace
 
 import (
 	"context"
+	"go.uber.org/zap"
 	"os"
 	"snowgo/pkg/xauth"
 	"time"
-
-	"snowgo/pkg/xlogger"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -24,7 +23,7 @@ func InitTracer(serviceName, serviceVersion, env, tempoAddr string) func(context
 	defer cancel()
 
 	if tempoAddr == "" {
-		xlogger.Fatalf("tempo endpoint is empty, please set cfg.Application.TempoEndpoint")
+		zap.S().Fatalf("tempo endpoint is empty, please set cfg.Application.TempoEndpoint")
 	}
 
 	// 创建 exporter
@@ -35,13 +34,13 @@ func InitTracer(serviceName, serviceVersion, env, tempoAddr string) func(context
 		),
 	)
 	if err != nil {
-		xlogger.Errorf("[otlp] create otlp exporter failed, fallback to noop: %v", err)
+		zap.S().Errorf("[otlp] create otlp exporter failed, fallback to noop: %v", err)
 		otel.SetTextMapPropagator(
 			propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}),
 		)
 		otel.SetErrorHandler(otel.ErrorHandlerFunc(func(err error) {
 			if err != nil {
-				xlogger.Errorf("[otlp] otel internal error (noop): %v", err)
+				zap.S().Errorf("[otlp] otel internal error (noop): %v", err)
 			}
 		}))
 		tp := sdktrace.NewTracerProvider()
@@ -61,7 +60,7 @@ func InitTracer(serviceName, serviceVersion, env, tempoAddr string) func(context
 		),
 	)
 	if err != nil {
-		xlogger.Errorf("[otlp] merge resource failed: %v, fallback to default", err)
+		zap.S().Errorf("[otlp] merge resource failed: %v, fallback to default", err)
 		res = resource.Default()
 	}
 
@@ -82,21 +81,21 @@ func InitTracer(serviceName, serviceVersion, env, tempoAddr string) func(context
 	)
 	otel.SetErrorHandler(otel.ErrorHandlerFunc(func(err error) {
 		if err != nil {
-			xlogger.Errorf("[otlp] otel internal error: %v", err)
+			zap.S().Errorf("[otlp] otel internal error: %v", err)
 		}
 	}))
 
-	xlogger.Infof("[otlp] otel tracer initialized for service=%s version=%s env=%s endpoint=%s",
+	zap.S().Infof("[otlp] otel tracer initialized for service=%s version=%s env=%s endpoint=%s",
 		serviceName, serviceVersion, env, tempoAddr)
 
 	return func(ctx context.Context) error {
 		c, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		if err := tp.Shutdown(c); err != nil {
-			xlogger.Errorf("[otlp] otel tracer shutdown error: %v", err)
+			zap.S().Errorf("[otlp] otel tracer shutdown error: %v", err)
 			return err
 		}
-		xlogger.Info("[otlp] otel tracer shutdown succeeded")
+		zap.S().Info("[otlp] otel tracer shutdown succeeded")
 		return nil
 	}
 }

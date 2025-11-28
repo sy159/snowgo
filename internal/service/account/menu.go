@@ -117,7 +117,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		// 创建菜单
 		menuObj, err = s.menuDao.TransactionCreateMenu(ctx, tx, menu)
 		if err != nil {
-			xlogger.Errorf("创建菜单失败: %v", err)
+			xlogger.ErrorfCtx(ctx, "创建菜单失败: %v", err)
 			return errors.WithMessage(err, "创建菜单失败")
 		}
 
@@ -137,7 +137,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 			IP: userContext.IP,
 		})
 		if err != nil {
-			xlogger.Errorf("操作日志创建失败: %+v err: %v", menuObj, err)
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %v err: %v", menuObj, err)
 			return errors.WithMessage(err, "操作日志创建失败")
 		}
 
@@ -147,11 +147,11 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		return 0, err
 	}
 
-	xlogger.Infof("菜单创建成功: %+v", menuObj)
+	xlogger.InfofCtx(ctx, "菜单创建成功: %v", menuObj)
 
 	// 清理菜单树缓存
 	if _, err := s.cache.Delete(ctx, constant.CacheMenuTree); err != nil {
-		xlogger.Errorf("清理菜单树缓存失败: %v", err)
+		xlogger.ErrorfCtx(ctx, "清理菜单树缓存失败: %v", err)
 	}
 	return menuObj.ID, nil
 }
@@ -198,7 +198,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		menuObj, err := s.menuDao.TransactionUpdateMenu(ctx, tx, mn)
 		if err != nil {
-			xlogger.Errorf("更新菜单失败: %v", err)
+			xlogger.ErrorfCtx(ctx, "更新菜单失败: %v", err)
 			return errors.WithMessage(err, "更新菜单失败")
 		}
 
@@ -218,7 +218,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 			IP: userContext.IP,
 		})
 		if err != nil {
-			xlogger.Errorf("操作日志创建失败: %+v err: %v", p, err)
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %v err: %v", p, err)
 			return errors.WithMessage(err, "操作日志创建失败")
 		}
 
@@ -228,26 +228,26 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		return err
 	}
 
-	xlogger.Infof("菜单更新成功: old=%+v new=%+v", oldMenu, mn)
+	xlogger.InfofCtx(ctx, "菜单更新成功: old=%+v new=%+v", oldMenu, mn)
 
 	// 如果修改了接口权限，需要更新角色-接口权限数据缓存
 	if *oldMenu.Perms != p.Perms {
 		roleIds, err := s.menuDao.GetRoleIdsByIds(ctx, p.ID)
 		if err != nil {
-			xlogger.Errorf("获取角色ids异常: %v", err)
+			xlogger.ErrorfCtx(ctx, "获取角色ids异常: %v", err)
 		}
 		for _, roleId := range roleIds {
 			// 清除角色对应接口权限缓存
 			cacheKey := fmt.Sprintf("%s%d", constant.CacheRoleMenuPrefix, roleId)
 			if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
-				xlogger.Errorf("清除角色对应接口权限缓存失败: %v", err)
+				xlogger.ErrorfCtx(ctx, "清除角色对应接口权限缓存失败: %v", err)
 			}
 		}
 	}
 
 	// 清理菜单树缓存
 	if _, err := s.cache.Delete(ctx, constant.CacheMenuTree); err != nil {
-		xlogger.Errorf("清理菜单树缓存失败: %v", err)
+		xlogger.ErrorfCtx(ctx, "清理菜单树缓存失败: %v", err)
 	}
 	return nil
 }
@@ -283,7 +283,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 		// 删除菜单
 		err = s.menuDao.TransactionDeleteById(ctx, tx, id)
 		if err != nil {
-			xlogger.Errorf("删除菜单失败: %v", err)
+			xlogger.ErrorfCtx(ctx, "删除菜单失败: %v", err)
 			return errors.WithMessage(err, "删除菜单失败")
 		}
 
@@ -303,18 +303,18 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 			IP: userContext.IP,
 		})
 		if err != nil {
-			xlogger.Errorf("操作日志创建失败: %v", err)
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %v", err)
 			return errors.WithMessage(err, "操作日志创建失败")
 		}
 
 		return nil
 	})
 
-	xlogger.Infof("菜单删除成功: %d", id)
+	xlogger.InfofCtx(ctx, "菜单删除成功: %d", id)
 
 	// 清理菜单树缓存
 	if _, err := s.cache.Delete(ctx, constant.CacheMenuTree); err != nil {
-		xlogger.Errorf("清理菜单树缓存失败: %v", err)
+		xlogger.ErrorfCtx(ctx, "清理菜单树缓存失败: %v", err)
 	}
 	return nil
 }
@@ -325,14 +325,14 @@ func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 	if data, err := s.cache.Get(ctx, constant.CacheMenuTree); err == nil && data != "" {
 		var tree []*MenuInfo
 		if err := json.Unmarshal([]byte(data), &tree); err == nil {
-			xlogger.Infof("缓存获取菜单树")
+			xlogger.InfofCtx(ctx, "缓存获取菜单树")
 			return tree, nil
 		}
 	}
 
 	menus, err := s.menuDao.GetAllMenus(ctx)
 	if err != nil {
-		xlogger.Errorf("获取全部菜单失败: %v", err)
+		xlogger.ErrorfCtx(ctx, "获取全部菜单失败: %v", err)
 		return nil, errors.WithMessage(err, "获取全部菜单失败")
 	}
 
@@ -362,7 +362,7 @@ func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 		} else if parent, ok := nodeMap[node.ParentID]; ok {
 			parent.Children = append(parent.Children, node)
 		} else {
-			xlogger.Errorf("菜单[%d] 的父节点 [%d] 不存在，挂到根节点", node.ID, node.ParentID)
+			xlogger.ErrorfCtx(ctx, "菜单[%d] 的父节点 [%d] 不存在，挂到根节点", node.ID, node.ParentID)
 			roots = append(roots, node)
 		}
 	}
@@ -385,7 +385,7 @@ func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 	// 缓存结果 15天
 	if bs, err := json.Marshal(roots); err == nil {
 		if err := s.cache.Set(ctx, constant.CacheMenuTree, string(bs), constant.CacheMenuTreeExpirationDay*24*time.Hour); err != nil {
-			xlogger.Errorf("缓存菜单树失败: %v", err)
+			xlogger.ErrorfCtx(ctx, "缓存菜单树失败: %v", err)
 		}
 	}
 	return roots, nil

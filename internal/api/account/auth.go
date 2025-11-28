@@ -32,7 +32,7 @@ func Login(c *gin.Context) {
 	// 尝试增加失败计数前，先检查限流器
 	allowed, _, ttl, err := limiter.Add(c)
 	if err != nil {
-		xlogger.Errorf("login limiter error: %v", err)
+		xlogger.ErrorfCtx(c, "login limiter error: %v", err)
 		xresponse.FailByError(c, e.HttpInternalServerError)
 		return
 	}
@@ -56,7 +56,7 @@ func Login(c *gin.Context) {
 	jwtMgr := container.JwtManager
 	token, err := jwtMgr.GenerateTokens(user.ID, user.Username)
 	if err != nil {
-		xlogger.Errorf("jwt generate tokens err: %v", err)
+		xlogger.ErrorfCtx(c, "jwt generate tokens err: %v", err)
 		xresponse.FailByError(c, e.TokenError)
 		return
 	}
@@ -98,14 +98,14 @@ func RefreshToken(c *gin.Context) {
 	// 生成新的token
 	token, err := jwtMgr.RefreshTokens(req.RefreshToken)
 	if err != nil {
-		xlogger.Errorf("refresh access token err: %s", err.Error())
+		xlogger.ErrorfCtx(c, "refresh access token err: %s", err.Error())
 		xresponse.FailByError(c, e.TokenError)
 		return
 	}
 
 	jtiKey := constant.CacheRefreshJtiPrefix + claims.ID
 	if del, _ := container.Cache.Delete(c, jtiKey); del == 0 {
-		xlogger.Errorf("refresh token reuse attempt: userID=%d, jti=%s", claims.UserId, claims.ID)
+		xlogger.ErrorfCtx(c, "refresh token reuse attempt: userID=%d, jti=%s", claims.UserId, claims.ID)
 		xresponse.FailByError(c, e.TokenUseDError)
 		return
 	}

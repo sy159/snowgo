@@ -21,7 +21,7 @@ func CreateRole(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	roleID, err := container.RoleService.CreateRole(c, &param)
 	if err != nil {
-		xlogger.Errorf("create role is err: %+v", err)
+		xlogger.ErrorfCtx(c, "create role is err: %v", err)
 		xresponse.Fail(c, e.RoleCreateError.GetErrCode(), err.Error())
 		return
 	}
@@ -39,7 +39,7 @@ func UpdateRole(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	err := container.RoleService.UpdateRole(c, &param)
 	if err != nil {
-		xlogger.Errorf("update role is err: %+v", err)
+		xlogger.ErrorfCtx(c, "update role is err: %v", err)
 		xresponse.Fail(c, e.RoleUpdateError.GetErrCode(), err.Error())
 		return
 	}
@@ -59,7 +59,7 @@ func DeleteRole(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	err := container.RoleService.DeleteRole(c, param.ID)
 	if err != nil {
-		xlogger.Errorf("delete role is err: %+v", err)
+		xlogger.ErrorfCtx(c, "delete role is err: %v", err)
 		xresponse.Fail(c, e.RoleDeleteError.GetErrCode(), err.Error())
 		return
 	}
@@ -87,7 +87,7 @@ func GetRoleList(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	list, err := container.RoleService.ListRoles(c, &cond)
 	if err != nil {
-		xlogger.Errorf("get role list is err: %+v", err)
+		xlogger.ErrorfCtx(c, "get role list is err: %v", err)
 		xresponse.FailByError(c, e.HttpInternalServerError)
 		return
 	}
@@ -107,7 +107,7 @@ func GetRoleById(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	role, err := container.RoleService.GetRoleById(c, param.ID)
 	if err != nil {
-		xlogger.Errorf("get role by id is err: %+v", err)
+		xlogger.ErrorfCtx(c, "get role by id is err: %v", err)
 		xresponse.Fail(c, e.RoleNotFound.GetErrCode(), err.Error())
 		return
 	}

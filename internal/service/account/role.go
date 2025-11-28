@@ -94,7 +94,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 	// 校验 code 是否存在
 	exists, err := s.roleDao.IsCodeExists(ctx, param.Code, 0)
 	if err != nil {
-		xlogger.Errorf("校验角色code异常: %v", err)
+		xlogger.ErrorfCtx(ctx, "校验角色code异常: %v", err)
 		return 0, errors.WithMessage(err, "校验角色编码失败")
 	}
 	if exists {
@@ -105,7 +105,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 	if len(param.MenuIds) > 0 {
 		menuLen, err := s.roleDao.CountMenuByIds(ctx, param.MenuIds)
 		if err != nil {
-			xlogger.Errorf("获取菜单数量异常: %v", err)
+			xlogger.ErrorfCtx(ctx, "获取菜单数量异常: %v", err)
 			return 0, errors.WithMessage(err, "校验设置的菜单失败")
 		}
 		if menuLen != int64(len(param.MenuIds)) {
@@ -125,7 +125,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 		// 创建角色
 		roleObj, err = s.roleDao.TransactionCreateRole(ctx, tx, role)
 		if err != nil {
-			xlogger.Errorf("角色创建失败: %v", err)
+			xlogger.ErrorfCtx(ctx, "角色创建失败: %v", err)
 			return errors.WithMessage(err, "角色创建失败")
 		}
 
@@ -140,7 +140,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 			}
 			err = s.roleDao.TransactionCreateRoleMenu(ctx, tx, roleMenuList)
 			if err != nil {
-				xlogger.Errorf("角色与菜单关联关系创建失败: %v", err)
+				xlogger.ErrorfCtx(ctx, "角色与菜单关联关系创建失败: %v", err)
 				return errors.WithMessage(err, "角色与菜单关联关系创建失败")
 			}
 		}
@@ -161,7 +161,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 			IP: userContext.IP,
 		})
 		if err != nil {
-			xlogger.Errorf("操作日志创建失败: %+v err: %v", roleObj, err)
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", roleObj, err)
 			return errors.WithMessage(err, "操作日志创建失败")
 		}
 
@@ -170,7 +170,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 	if err != nil {
 		return 0, err
 	}
-	xlogger.Infof("角色创建成功: %+v", roleObj)
+	xlogger.InfofCtx(ctx, "角色创建成功: %+v", roleObj)
 	return roleObj.ID, nil
 }
 
@@ -203,7 +203,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 	if len(param.MenuIds) > 0 {
 		menuLen, err := s.roleDao.CountMenuByIds(ctx, param.MenuIds)
 		if err != nil {
-			xlogger.Errorf("获取菜单数量异常: %v", err)
+			xlogger.ErrorfCtx(ctx, "获取菜单数量异常: %v", err)
 			return errors.WithMessage(err, "校验设置的菜单失败")
 		}
 		if menuLen != int64(len(param.MenuIds)) {
@@ -228,7 +228,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 		// 删除角色关联权限
 		err = s.roleDao.TransactionDeleteRoleMenu(ctx, tx, param.ID)
 		if err != nil {
-			xlogger.Errorf("角色与菜单关联关系删除失败: %v", err)
+			xlogger.ErrorfCtx(ctx, "角色与菜单关联关系删除失败: %v", err)
 			return errors.WithMessage(err, "角色与菜单关联关系删除失败")
 		}
 
@@ -243,7 +243,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 			}
 			err = s.roleDao.TransactionCreateRoleMenu(ctx, tx, roleMenuList)
 			if err != nil {
-				xlogger.Errorf("角色与菜单关联关系创建失败: %v", err)
+				xlogger.ErrorfCtx(ctx, "角色与菜单关联关系创建失败: %v", err)
 				return errors.WithMessage(err, "角色与菜单关联关系创建失败")
 			}
 		}
@@ -264,7 +264,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 			IP: userContext.IP,
 		})
 		if err != nil {
-			xlogger.Errorf("操作日志创建失败: %+v err: %v", param, err)
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", param, err)
 			return errors.WithMessage(err, "操作日志创建失败")
 		}
 
@@ -274,12 +274,12 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 		return err
 	}
 
-	xlogger.Infof("角色更新成功: old=%+v new=%+v", oldRole, ruleObj)
+	xlogger.InfofCtx(ctx, "角色更新成功: old=%+v new=%+v", oldRole, ruleObj)
 
 	// 清除角色对应接口权限缓存
 	cacheKey := fmt.Sprintf("%s%d", constant.CacheRoleMenuPrefix, param.ID)
 	if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
-		xlogger.Errorf("清除角色对应接口权限缓存失败: %v", err)
+		xlogger.ErrorfCtx(ctx, "清除角色对应接口权限缓存失败: %v", err)
 	}
 
 	return nil
@@ -310,14 +310,14 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 		// 删除角色
 		err := s.roleDao.TransactionDeleteById(ctx, tx, id)
 		if err != nil {
-			xlogger.Errorf("角色删除失败: %v", err)
+			xlogger.ErrorfCtx(ctx, "角色删除失败: %v", err)
 			return errors.WithMessage(err, "角色删除失败")
 		}
 
 		// 删除角色关联权限
 		err = s.roleDao.TransactionDeleteRoleMenu(ctx, tx, id)
 		if err != nil {
-			xlogger.Errorf("角色与菜单关联关系删除失败: %v", err)
+			xlogger.ErrorfCtx(ctx, "角色与菜单关联关系删除失败: %v", err)
 			return errors.WithMessage(err, "角色与菜单关联关系删除失败")
 		}
 
@@ -337,7 +337,7 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 			IP: userContext.IP,
 		})
 		if err != nil {
-			xlogger.Errorf("操作日志创建失败: %v", err)
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %v", err)
 			return errors.WithMessage(err, "操作日志创建失败")
 		}
 
@@ -346,12 +346,12 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 	if err != nil {
 		return err
 	}
-	xlogger.Infof("角色删除成功: %d", id)
+	xlogger.InfofCtx(ctx, "角色删除成功: %d", id)
 
 	// 清除角色对应接口权限缓存
 	cacheKey := fmt.Sprintf("%s%d", constant.CacheRoleMenuPrefix, id)
 	if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
-		xlogger.Errorf("清除角色对应接口权限缓存失败: %v", err)
+		xlogger.ErrorfCtx(ctx, "清除角色对应接口权限缓存失败: %v", err)
 	}
 
 	return nil
@@ -365,14 +365,14 @@ func (s *RoleService) GetRoleById(ctx context.Context, id int32) (*RoleInfo, err
 	// 获取role信息
 	r, err := s.roleDao.GetRoleById(ctx, id)
 	if err != nil {
-		xlogger.Errorf("获取角色失败: %v", err)
+		xlogger.ErrorfCtx(ctx, "获取角色失败: %v", err)
 		return nil, errors.WithMessage(err, "获取角色失败")
 	}
 
 	// 获取role对应的菜单ids
 	menuIds, err := s.roleDao.GetMenuIdsByRoleId(ctx, id)
 	if err != nil {
-		xlogger.Errorf("获取关联的菜单id列表失败: %v", err)
+		xlogger.ErrorfCtx(ctx, "获取关联的菜单id列表失败: %v", err)
 		return nil, errors.WithMessage(err, "获取关联的菜单id列表失败")
 	}
 	return &RoleInfo{
@@ -388,7 +388,7 @@ func (s *RoleService) GetRoleById(ctx context.Context, id int32) (*RoleInfo, err
 
 // ListRoles 获取角色列表
 func (s *RoleService) ListRoles(ctx context.Context, cond *RoleListCondition) (*RoleList, error) {
-	xlogger.Infof("获取角色列表: %+v", cond)
+	xlogger.InfofCtx(ctx, "获取角色列表: %+v", cond)
 	list, total, err := s.roleDao.GetRoleList(ctx, &account.RoleListCondition{
 		Ids:    cond.Ids,
 		Name:   cond.Name,
@@ -397,7 +397,7 @@ func (s *RoleService) ListRoles(ctx context.Context, cond *RoleListCondition) (*
 		Limit:  cond.Limit,
 	})
 	if err != nil {
-		xlogger.Errorf("角色列表查询失败: %v", err)
+		xlogger.ErrorfCtx(ctx, "角色列表查询失败: %v", err)
 		return nil, errors.WithMessage(err, "角色列表查询失败")
 	}
 	infos := make([]*RoleInfo, 0, len(list))
@@ -468,7 +468,7 @@ func (s *RoleService) GetRoleMenuListByRuleID(ctx context.Context, roleId int32)
 	// 获取roleId: perms数组
 	menuList, err := s.roleDao.GetMenuListByRoleId(ctx, roleId)
 	if err != nil {
-		xlogger.Errorf("list role menu is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "list role menu is err: %v", err)
 		return nil, err
 	}
 

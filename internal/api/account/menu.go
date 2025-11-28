@@ -35,7 +35,7 @@ func CreateMenu(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	menuId, err := container.MenuService.CreateMenu(c, &menuParam)
 	if err != nil {
-		xlogger.Errorf("create menu is err: %+v", err)
+		xlogger.ErrorfCtx(c, "create menu is err: %v", err)
 		xresponse.Fail(c, e.MenuCreateError.GetErrCode(), err.Error())
 		return
 	}
@@ -53,7 +53,7 @@ func UpdateMenu(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	err := container.MenuService.UpdateMenu(c, &menuParam)
 	if err != nil {
-		xlogger.Errorf("update menu is err: %+v", err)
+		xlogger.ErrorfCtx(c, "update menu is err: %v", err)
 		xresponse.Fail(c, e.MenuUpdateError.GetErrCode(), err.Error())
 		return
 	}
@@ -65,7 +65,7 @@ func GetMenuList(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	res, err := container.MenuService.GetMenuTree(c)
 	if err != nil {
-		xlogger.Errorf("get user list is err: %+v", err)
+		xlogger.ErrorfCtx(c, "get user list is err: %v", err)
 		xresponse.FailByError(c, e.HttpInternalServerError)
 		return
 	}
@@ -86,7 +86,7 @@ func DeleteMenuById(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	err := container.MenuService.DeleteMenuById(c, menuParam.ID)
 	if err != nil {
-		xlogger.Errorf("delete menu is err: %+v", err)
+		xlogger.ErrorfCtx(c, "delete menu is err: %v", err)
 		xresponse.Fail(c, e.MenuNotFound.GetErrCode(), err.Error())
 		return
 	}

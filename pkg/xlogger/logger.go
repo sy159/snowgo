@@ -1,6 +1,7 @@
 package xlogger
 
 import (
+	"context"
 	"fmt"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"go.uber.org/zap"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"snowgo/config"
 	"snowgo/pkg/xcolor"
+	"snowgo/pkg/xtrace"
 	"strings"
 	"time"
 	//"gopkg.in/natefinch/lumberjack.v2"
@@ -186,7 +188,7 @@ func getJsonEncoder() zapcore.Encoder {
 		LineEnding:    zapcore.DefaultLineEnding,
 		//EncodeLevel: 带颜色输出 CapitalColorLevelEncoder
 		EncodeLevel: func(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
-			enc.AppendString("[" + level.CapitalString() + "]")
+			enc.AppendString(level.CapitalString())
 		},
 		// 时间格式 zapcore.ISO8601TimeEncoder
 		EncodeTime: func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
@@ -332,4 +334,50 @@ func Fatalf(template string, args ...interface{}) {
 // Access 写入访问日志
 func Access(msg string, fields ...zap.Field) {
 	zap.L().Warn(msg, fields...)
+}
+
+// getTraceField 从 ctx 读取 trace_id，返回 zap.Field
+func getTraceField(ctx context.Context) zap.Field {
+	if ctx == nil {
+		return zap.Skip()
+	}
+	// trace信息
+	if tid := xtrace.GetTraceID(ctx); tid != "" {
+		return zap.String("trace_id", fmt.Sprintf("%v", tid))
+	}
+	return zap.Skip()
+}
+
+// getTraceAndMergeFields 将 trace 字段放到前端，然后把 user 提供的 fields 接上
+func mergeFieldsWithTrace(ctx context.Context, fields []zap.Field) []zap.Field {
+	tf := getTraceField(ctx)
+	if tf == zap.Skip() {
+		return fields
+	}
+	out := make([]zap.Field, 0, 1+len(fields))
+	out = append(out, tf)
+	out = append(out, fields...)
+	return out
+}
+
+// InfofCtx 使用 fmt 风格的 Info（接受 format + args），内部自动把 trace 加入
+func InfofCtx(ctx context.Context, template string, args ...interface{}) {
+	zap.L().With(getTraceField(ctx)).Sugar().Infof(template, args...)
+}
+
+// ErrorfCtx 使用 fmt 风格的 Error（接受 format + args）
+func ErrorfCtx(ctx context.Context, template string, args ...interface{}) {
+	zap.L().With(getTraceField(ctx)).Sugar().Errorf(template, args...)
+}
+
+// InfoCtx 使用 zap.Field 风格的 Info（适合结构化日志）
+func InfoCtx(ctx context.Context, msg string, fields ...zap.Field) {
+	all := mergeFieldsWithTrace(ctx, fields)
+	zap.L().With(all...).Info(msg)
+}
+
+// ErrorCtx 使用 zap.Field 风格的 Error（适合结构化日志）
+func ErrorCtx(ctx context.Context, msg string, fields ...zap.Field) {
+	all := mergeFieldsWithTrace(ctx, fields)
+	zap.L().With(all...).Error(msg)
 }
