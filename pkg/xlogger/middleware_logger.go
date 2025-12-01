@@ -14,7 +14,7 @@ type MiddlewareLogger struct {
 }
 
 var defaultLog = logOptions{
-	enableConsoleOutput: true,
+	enableConsoleOutput: false,
 	fileMaxAgeDays:      7,
 }
 
@@ -57,7 +57,7 @@ func NewLogger(basePath, name string, opts ...LogOptions) *MiddlewareLogger {
 	encoder := getMiddlewareJsonEncoder()
 
 	infoLevel := zap.LevelEnablerFunc(func(level zapcore.Level) bool {
-		return level == zapcore.InfoLevel
+		return level >= zapcore.InfoLevel
 	})
 
 	infoWriter := getTimeWriter(filepath.Join(basePath, fmt.Sprintf("%s/%s.log", name, name)), logOpts.fileMaxAgeDays)
@@ -82,12 +82,13 @@ func NewLogger(basePath, name string, opts ...LogOptions) *MiddlewareLogger {
 // json编码器配置
 func getMiddlewareJsonEncoder() zapcore.Encoder {
 	return zapcore.NewJSONEncoder(zapcore.EncoderConfig{
-		TimeKey: "log_timestamp",
-		NameKey: "xlogger",
-		//CallerKey:  "log_caller",
+		TimeKey:    "log_timestamp",
+		CallerKey:  "log_caller",
 		MessageKey: "log_msg",
+		LevelKey:   "log_level",
 		LineEnding: zapcore.DefaultLineEnding,
 		EncodeLevel: func(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
+			enc.AppendString(level.CapitalString())
 		},
 		// 时间格式 zapcore.ISO8601TimeEncoder
 		EncodeTime: func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
@@ -103,9 +104,19 @@ func getMiddlewareJsonEncoder() zapcore.Encoder {
 	})
 }
 
-// Log 记录信息日志
-func (l *MiddlewareLogger) Log(msg string, fields ...zap.Field) {
+// Warn 警告日志
+func (l *MiddlewareLogger) Warn(msg string, fields ...zap.Field) {
+	l.logger.Warn(msg, fields...)
+}
+
+// Info 记录信息日志
+func (l *MiddlewareLogger) Info(msg string, fields ...zap.Field) {
 	l.logger.Info(msg, fields...)
+}
+
+// Error 错误日志
+func (l *MiddlewareLogger) Error(msg string, fields ...zap.Field) {
+	l.logger.Error(msg, fields...)
 }
 
 // Sync 确保日志写入文件或控制台
