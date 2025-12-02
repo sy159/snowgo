@@ -2,14 +2,52 @@ package xmq
 
 import (
 	"context"
+	"errors"
+	"time"
+
+	"go.uber.org/zap"
 )
 
-// Producer 定义MQ生产者统一接口
+var (
+	ErrClosed            = errors.New("client closed")
+	ErrPublishTimeout    = errors.New("publish confirm timeout")
+	ErrPublishNack       = errors.New("publish nack from broker")
+	ErrNoConnection      = errors.New("no connection")
+	ErrGetChannelTimeout = errors.New("get producer channel timeout")
+)
+
+// Message 消息结构体
+type Message struct {
+	Body      []byte                 // 业务数据
+	Headers   map[string]interface{} // 自定义 key/value（可用于存放 trace_id、业务字段等）
+	Timestamp time.Time              // 发送时间（在 Publish 前会默认填充）
+	MessageId string                 //业务唯一 ID（用于幂等/追踪）
+}
+
+type Logger interface {
+	Info(msg string, fields ...zap.Field)
+	Warn(msg string, fields ...zap.Field)
+	Error(msg string, fields ...zap.Field)
+}
+
+// Producer 生产者
 type Producer interface {
-	// SendMessage 同步发送消息
-	SendMessage(ctx context.Context, message []byte, properties map[string]string) error
-	// SendAsyncMessage 异步发送消息
-	SendAsyncMessage(ctx context.Context, message []byte, properties map[string]string, callback func(messageID any, msg interface{}, err error))
-	// Close 关闭生产者
-	Close() error
+	// Publish 同步发布，成功返回 nil；失败返回 error（带确认超时、nack）。
+	Publish(ctx context.Context, exchange, routingKey string, message *Message) error
+
+	// PublishDelayed 使用 x-delayed-message 插件将消息延时投递到指定 delayed exchange。
+	PublishDelayed(ctx context.Context, delayedExchange, routingKey string, message *Message, delayMillis int64) error
+
+	// Close 优雅关闭：等待 inflight 消息确认后释放资源。
+	Close(ctx context.Context) error
+}
+
+// Handler 业务唯一需要实现的函数。 返回 nil 表示成功，框架自动 ACK；返回error框架自动 NACK 并重试。
+type Handler func(ctx context.Context, msg Message) error
+
+// Consumer 业务注册 Handler，框架负责 ACK/重试
+type Consumer interface {
+	Register(topic string, group string, handler Handler) error
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
 }
