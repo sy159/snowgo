@@ -3,7 +3,7 @@ package rabbitmq
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
+	"math/rand"
 	"snowgo/pkg/xmq"
 	"sync"
 	"sync/atomic"
@@ -12,17 +12,36 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// confirmChannel 包装了 amqp.Channel 并监听 confirm
-type confirmChannel struct {
-	ch        *amqp.Channel
-	notifyCh  chan amqp.Confirmation
-	mu        sync.Mutex
-	closed    int32
-	logger    xmq.Logger
-	closeOnce sync.Once
+type pendingRec struct {
+	ch   chan amqp.Confirmation
+	once sync.Once
 }
 
-// 创建一个 confirmChannel 并启动 confirmRouter
+type confirmChannel struct {
+	ch        *amqp.Channel
+	mu        sync.Mutex
+	closed    int32
+	broken    int32
+	closeOnce sync.Once
+	logger    xmq.Logger
+	closeCh   chan struct{}
+	pending   sync.Map
+	nextSeq   uint64
+}
+
+type connectionManager struct {
+	cfg            *Config
+	conn           atomic.Value // *amqp.Connection
+	closed         int32
+	pool           chan *confirmChannel
+	poolMu         sync.Mutex
+	logger         xmq.Logger
+	stopCh         chan struct{}
+	wg             sync.WaitGroup
+	watcherStarted int32
+	inflight       int64
+}
+
 func newConfirmChannel(conn *amqp.Connection, cfg *Config) (*confirmChannel, error) {
 	if conn == nil {
 		return nil, xmq.ErrNoConnection
@@ -32,85 +51,136 @@ func newConfirmChannel(conn *amqp.Connection, cfg *Config) (*confirmChannel, err
 		return nil, err
 	}
 	if err := ch.Confirm(false); err != nil {
-		ch.Close()
+		_ = ch.Close()
 		return nil, fmt.Errorf("confirm: %w", err)
 	}
 	cc := &confirmChannel{
-		ch:       ch,
-		notifyCh: make(chan amqp.Confirmation, cfg.NotifyBufSize),
-		logger:   cfg.Logger,
+		ch:      ch,
+		logger:  cfg.Logger,
+		closeCh: make(chan struct{}),
 	}
 	go cc.confirmRouter()
+
+	// notifyClose watcher
+	go func() {
+		closeC := ch.NotifyClose(make(chan *amqp.Error, 1))
+		if e := <-closeC; e != nil {
+			atomic.StoreInt32(&cc.broken, 1)
+			cc.close()
+			if cc.logger != nil {
+				cc.logger.Warn("channel closed by broker", "error", e.Error())
+			}
+		}
+	}()
 	return cc, nil
 }
 
-// confirmRouter 从底层 channel 读取 confirms 并放入 notifyCh
 func (cc *confirmChannel) confirmRouter() {
-	confSrc := cc.ch.NotifyPublish(make(chan amqp.Confirmation, cap(cc.notifyCh)))
-	for c := range confSrc {
+	confSrc := cc.ch.NotifyPublish(make(chan amqp.Confirmation, 1))
+	for {
 		select {
-		case cc.notifyCh <- c:
-		default:
-			if cc.logger != nil {
-				cc.logger.Warn("confirm router drop", zap.Any("tag", c.DeliveryTag))
+		case c, ok := <-confSrc:
+			if !ok {
+				goto exit
 			}
+			if v, ok := cc.pending.Load(c.DeliveryTag); ok {
+				rec := v.(*pendingRec)
+				select {
+				case rec.ch <- c:
+					rec.once.Do(func() { close(rec.ch) })
+					cc.pending.Delete(c.DeliveryTag)
+				default:
+					atomic.StoreInt32(&cc.broken, 1)
+					cc.pending.Delete(c.DeliveryTag)
+					cc.close()
+				}
+			} else if cc.logger != nil {
+				cc.logger.Warn("confirmRouter: no pending rec for tag", "tag", c.DeliveryTag)
+			}
+		case <-cc.closeCh:
+			goto exit
 		}
 	}
+exit:
 	atomic.StoreInt32(&cc.closed, 1)
-	close(cc.notifyCh)
+	cc.pending.Range(func(k, v interface{}) bool {
+		if rec, ok := v.(*pendingRec); ok {
+			rec.once.Do(func() { close(rec.ch) })
+			cc.pending.Delete(k)
+		}
+		return true
+	})
 }
 
-// publishWithConfirm 发送消息并等待 broker ack/nack
 func (cc *confirmChannel) publishWithConfirm(ctx context.Context, exchange, routingKey string, pub amqp.Publishing, timeout time.Duration) error {
-	cc.mu.Lock()
-	defer cc.mu.Unlock()
-	if atomic.LoadInt32(&cc.closed) == 1 {
-		return fmt.Errorf("channel closed")
+	if atomic.LoadInt32(&cc.closed) == 1 || atomic.LoadInt32(&cc.broken) == 1 {
+		return fmt.Errorf("channel closed or broken")
 	}
+
+	cc.mu.Lock()
+	seq := cc.nextSeq + 1
+	if seq == 0 {
+		cc.mu.Unlock()
+		return fmt.Errorf("seq overflow")
+	}
+	cc.nextSeq = seq
+	rec := &pendingRec{ch: make(chan amqp.Confirmation, 1)}
+	cc.pending.Store(seq, rec)
+
 	if err := cc.ch.PublishWithContext(ctx, exchange, routingKey, false, false, pub); err != nil {
+		cc.pending.Delete(seq)
+		atomic.StoreInt32(&cc.broken, 1)
+		cc.mu.Unlock()
+		cc.close()
 		return fmt.Errorf("publish: %w", err)
 	}
+	cc.mu.Unlock()
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 
 	select {
-	case c, ok := <-cc.notifyCh:
+	case c, ok := <-rec.ch:
 		if !ok {
-			return fmt.Errorf("notify closed")
+			return fmt.Errorf("confirm channel closed")
 		}
 		if !c.Ack {
+			atomic.StoreInt32(&cc.broken, 1)
+			cc.close()
 			return xmq.ErrPublishNack
 		}
 		return nil
+	case <-timer.C:
+		if v, ok := cc.pending.Load(seq); ok {
+			r := v.(*pendingRec)
+			r.once.Do(func() { close(r.ch) })
+			cc.pending.Delete(seq)
+		}
+		atomic.StoreInt32(&cc.broken, 1)
+		cc.close()
+		return xmq.ErrPublishTimeout
 	case <-ctx.Done():
+		if v, ok := cc.pending.Load(seq); ok {
+			r := v.(*pendingRec)
+			r.once.Do(func() { close(r.ch) })
+			cc.pending.Delete(seq)
+		}
 		return ctx.Err()
 	}
 }
 
-// 关闭 channel
 func (cc *confirmChannel) close() {
 	cc.closeOnce.Do(func() {
 		atomic.StoreInt32(&cc.closed, 1)
+		select {
+		case <-cc.closeCh:
+		default:
+			close(cc.closeCh)
+		}
 		if cc.ch != nil {
 			_ = cc.ch.Close()
 		}
 	})
-}
-
-// ----------------- connectionManager -----------------
-
-type connectionManager struct {
-	cfg            *Config
-	conn           atomic.Value // *amqp.Connection
-	closed         int32
-	pool           chan *confirmChannel
-	poolMu         sync.Mutex // 保护 pool 刷新
-	logger         xmq.Logger
-	stopCh         chan struct{}
-	wg             sync.WaitGroup
-	watcherStarted int32
-	inflight       int64 // 真实 inflight 消息计数
 }
 
 func newConnectionManager(cfg *Config) *connectionManager {
@@ -122,41 +192,84 @@ func newConnectionManager(cfg *Config) *connectionManager {
 	}
 }
 
-// start 建立连接并填充 channel pool
 func (m *connectionManager) start() error {
 	m.poolMu.Lock()
 	defer m.poolMu.Unlock()
-
-	if m.loadConn() != nil && !m.loadConn().IsClosed() {
+	if c := m.loadConn(); c != nil && !c.IsClosed() {
 		return nil
 	}
-
 	conn, err := amqp.Dial(m.cfg.URL)
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}
 	m.storeConn(conn)
-	m.logger.Info("connected", zap.String("url", m.cfg.URL))
-
+	m.log("tcp连接建立", "event.outcome", "success")
 	if err := m.refreshPool(conn); err != nil {
 		m.drainPoolLocked()
 		return err
 	}
-
-	// 启动单 watcher
 	if atomic.CompareAndSwapInt32(&m.watcherStarted, 0, 1) {
 		m.wg.Add(1)
 		go m.reconnectWatcher()
 	}
-
 	return nil
 }
 
-// 刷新池：清空旧池 + 创建新池
-func (m *connectionManager) refreshPool(conn *amqp.Connection) error {
-	// 已加锁保护
-	m.drainPoolLocked()
+func (m *connectionManager) reconnectWatcher() {
+	defer m.wg.Done()
+	for {
+		conn := m.loadConn()
+		if conn == nil || conn.IsClosed() {
+			if err := m.tryReconnect(); err != nil {
+				return
+			}
+			continue
+		}
+		closeCh := conn.NotifyClose(make(chan *amqp.Error, 1))
+		if err := <-closeCh; err != nil {
+			m.log("tcp连接断开", "error", err.Error())
+		} else {
+			m.log("tcp连接关闭(nil)")
+		}
+		m.storeConn(nil)
+		m.poolMu.Lock()
+		m.drainPoolLocked()
+		m.poolMu.Unlock()
+		select {
+		case <-m.stopCh:
+			return
+		default:
+		}
+		if err := m.tryReconnect(); err != nil {
+			return
+		}
+	}
+}
 
+func (m *connectionManager) tryReconnect() error {
+	backoff := m.cfg.ReconnectInitialDelay
+	for {
+		if m.isClosed() {
+			return fmt.Errorf("stopped")
+		}
+		if err := m.start(); err == nil {
+			m.log("重连成功", "event.outcome", "success")
+			return nil
+		}
+		backoff = jitter(backoff)
+		if backoff > m.cfg.ReconnectMaxDelay {
+			backoff = m.cfg.ReconnectMaxDelay
+		}
+		time.Sleep(backoff)
+	}
+}
+
+func jitter(d time.Duration) time.Duration {
+	return time.Duration(float64(d) * (0.8 + 0.4*rand.Float64()))
+}
+
+func (m *connectionManager) refreshPool(conn *amqp.Connection) error {
+	m.drainPoolLocked()
 	var created []*confirmChannel
 	for i := 0; i < m.cfg.ProducerChannelPoolSize; i++ {
 		cc, err := newConfirmChannel(conn, m.cfg)
@@ -168,128 +281,54 @@ func (m *connectionManager) refreshPool(conn *amqp.Connection) error {
 		}
 		created = append(created, cc)
 	}
-
 	for _, c := range created {
 		m.pool <- c
 	}
 	return nil
 }
 
-// drainPoolLocked 必须在 poolMu 锁保护下调用
 func (m *connectionManager) drainPoolLocked() {
 	for {
 		select {
 		case cc := <-m.pool:
 			cc.close()
 		default:
+			time.Sleep(time.Millisecond)
 			return
 		}
 	}
 }
 
-func (m *connectionManager) storeConn(conn *amqp.Connection) { m.conn.Store(conn) }
-func (m *connectionManager) loadConn() *amqp.Connection {
-	if v := m.conn.Load(); v != nil {
-		return v.(*amqp.Connection)
-	}
-	return nil
-}
-
-// reconnectWatcher 单 goroutine watcher
-func (m *connectionManager) reconnectWatcher() {
-	defer m.wg.Done()
-	for {
-		conn := m.loadConn()
-		if conn == nil {
-			if err := m.tryReconnect(); err != nil {
-				return
-			}
-			continue
-		}
-		closeCh := conn.NotifyClose(make(chan *amqp.Error, 1))
-		if err := <-closeCh; err != nil {
-			m.logger.Warn("connection closed", zap.String("err", err.Error()))
-		} else {
-			m.logger.Info("connection closed (nil err)")
-		}
-
-		m.storeConn(nil)
-		m.poolMu.Lock()
-		m.drainPoolLocked()
-		m.poolMu.Unlock()
-
-		select {
-		case <-m.stopCh:
-			return
-		default:
-		}
-
-		if err := m.tryReconnect(); err != nil {
-			return
-		}
-	}
-}
-
-// tryReconnect 指数回退重连
-func (m *connectionManager) tryReconnect() error {
-	backoff := m.cfg.ReconnectInitialDelay
-	for {
-		if m.isClosed() {
-			return fmt.Errorf("stopped")
-		}
-		if err := m.start(); err == nil {
-			m.logger.Info("reconnect success")
-			return nil
-		} else {
-			m.logger.Warn("reconnect attempt failed", zap.Error(err), zap.Duration("retry_in", backoff))
-		}
-
-		select {
-		case <-time.After(backoff):
-		case <-m.stopCh:
-			return fmt.Errorf("stopped")
-		}
-
-		backoff *= 2
-		if backoff > m.cfg.ReconnectMaxDelay {
-			backoff = m.cfg.ReconnectMaxDelay
-		}
-	}
-}
-
-// getProducerChannel 获取 channel
-func (m *connectionManager) getProducerChannel(ctx context.Context) (*confirmChannel, error) {
+func (m *connectionManager) GetProducerChannel(ctx context.Context) (*confirmChannel, error) {
 	if m.isClosed() {
 		return nil, xmq.ErrClosed
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if _, ok := ctx.Deadline(); !ok && m.cfg.PublishGetTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, m.cfg.PublishGetTimeout)
-		defer cancel()
-	}
-
-	select {
-	case cc := <-m.pool:
-		if atomic.LoadInt32(&cc.closed) == 0 {
-			return cc, nil
+	timer := time.NewTimer(m.cfg.PublishGetTimeout)
+	defer timer.Stop()
+	for {
+		select {
+		case cc := <-m.pool:
+			if atomic.LoadInt32(&cc.closed) == 0 && atomic.LoadInt32(&cc.broken) == 0 {
+				return cc, nil
+			}
+			cc.close()
+			continue
+		case <-timer.C:
+			return nil, xmq.ErrGetChannelTimeout
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		}
-		return m.fallbackChannel()
-	case <-ctx.Done():
-		return nil, xmq.ErrGetChannelTimeout
 	}
 }
 
-// fallbackChannel pool 空时新建
-func (m *connectionManager) fallbackChannel() (*confirmChannel, error) {
-	return newConfirmChannel(m.loadConn(), m.cfg)
-}
-
-// putProducerChannel 归还 channel
-func (m *connectionManager) putProducerChannel(cc *confirmChannel) {
-	if cc == nil || atomic.LoadInt32(&cc.closed) == 1 || m.isClosed() {
+func (m *connectionManager) PutProducerChannel(cc *confirmChannel) {
+	if cc == nil {
+		return
+	}
+	if m.isClosed() || atomic.LoadInt32(&cc.closed) == 1 || atomic.LoadInt32(&cc.broken) == 1 {
 		cc.close()
 		return
 	}
@@ -300,53 +339,34 @@ func (m *connectionManager) putProducerChannel(cc *confirmChannel) {
 	}
 }
 
-// getConsumerChannel 用于声明/获取一个消费者 Channel
-func (m *connectionManager) getConsumerChannel(queue, exchange, routingKey string, qos int) (*amqp.Channel, error) {
+// 公开给消费者使用
+func (m *connectionManager) GetConsumerChannel(queue, exchange, routingKey string, qos int) (*amqp.Channel, error) {
 	conn := m.loadConn()
-	if conn == nil {
-		return nil, fmt.Errorf("no connection")
+	if conn == nil || conn.IsClosed() {
+		return nil, xmq.ErrNoConnection
 	}
-
 	ch, err := conn.Channel()
 	if err != nil {
 		return nil, err
 	}
-
 	if err := ch.Qos(qos, 0, false); err != nil {
-		ch.Close()
+		_ = ch.Close()
 		return nil, err
 	}
-
-	// 声明队列
-	if _, err := ch.QueueDeclare(
-		queue,
-		true,  // durable
-		false, // autoDelete
-		false, // exclusive
-		false, // noWait
-		nil,   // args
-	); err != nil {
-		ch.Close()
+	if _, err := ch.QueueDeclare(queue, true, false, false, false, nil); err != nil {
+		_ = ch.Close()
 		return nil, err
 	}
-
-	// 如果 exchange 不为空，绑定
 	if exchange != "" {
 		if err := ch.QueueBind(queue, routingKey, exchange, false, nil); err != nil {
-			ch.Close()
+			_ = ch.Close()
 			return nil, err
 		}
 	}
-
 	return ch, nil
 }
 
-func (m *connectionManager) isClosed() bool {
-	return atomic.LoadInt32(&m.closed) == 1
-}
-
-// close 关闭 manager & pool
-func (m *connectionManager) close() error {
+func (m *connectionManager) close(ctx context.Context) error {
 	if !atomic.CompareAndSwapInt32(&m.closed, 0, 1) {
 		return nil
 	}
@@ -354,9 +374,41 @@ func (m *connectionManager) close() error {
 	m.poolMu.Lock()
 	m.drainPoolLocked()
 	m.poolMu.Unlock()
+
+	tick := time.NewTicker(50 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-tick.C:
+			if atomic.LoadInt64(&m.inflight) == 0 {
+				goto closeConn
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+closeConn:
 	if conn := m.loadConn(); conn != nil {
 		_ = conn.Close()
 	}
 	m.wg.Wait()
 	return nil
+}
+
+func (m *connectionManager) loadConn() *amqp.Connection {
+	if v := m.conn.Load(); v != nil {
+		return v.(*amqp.Connection)
+	}
+	return nil
+}
+
+func (m *connectionManager) storeConn(conn *amqp.Connection) { m.conn.Store(conn) }
+func (m *connectionManager) isClosed() bool                  { return atomic.LoadInt32(&m.closed) == 1 }
+func (m *connectionManager) log(msg string, kvs ...interface{}) {
+	if m.cfg.Logger != nil {
+		m.cfg.Logger.Info(msg, append([]interface{}{"xmq.role", "producer"}, kvs...)...)
+	}
+}
+func (m *connectionManager) Close(ctx context.Context) error {
+	return m.close(ctx)
 }

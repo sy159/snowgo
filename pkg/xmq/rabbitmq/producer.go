@@ -11,70 +11,96 @@ import (
 )
 
 type Producer struct {
-	cm  *connectionManager
-	cfg *Config
+	cm *connectionManager
 }
 
-// Publish 同步发送消息，保证 confirm 成功
+func NewProducer(cfg *Config) (*Producer, error) {
+	cm := newConnectionManager(cfg)
+	if err := cm.start(); err != nil {
+		return nil, err
+	}
+	return &Producer{cm: cm}, nil
+}
+
+// 普通 publish
 func (p *Producer) Publish(ctx context.Context, exchange, routingKey string, msg *xmq.Message) error {
-	atomic.AddInt64(&p.cm.inflight, 1)
-	defer atomic.AddInt64(&p.cm.inflight, -1)
-
-	if p.cm.isClosed() {
-		return xmq.ErrClosed
-	}
-
-	if p.cfg.BeforePublish != nil {
-		if err := p.cfg.BeforePublish(msg); err != nil {
-			return err
-		}
-	}
-
-	cc, err := p.cm.getProducerChannel(ctx)
-	if err != nil {
-		return err
-	}
-	defer p.cm.putProducerChannel(cc)
-
-	pub := amqp.Publishing{
-		Body:      msg.Body,
-		Headers:   amqp.Table(msg.Headers),
-		Timestamp: time.Now(),
-		MessageId: msg.MessageId,
-	}
-
-	return cc.publishWithConfirm(ctx, exchange, routingKey, pub, p.cfg.PublishConfirmTimeout)
+	return p.publish(ctx, exchange, routingKey, msg)
 }
 
-// PublishDelayed 支持 x-delayed-message 插件
+// 延迟消息 publish，优先使用 x-delay，失败降级 TTL+DLX
 func (p *Producer) PublishDelayed(ctx context.Context, delayedExchange, routingKey string, msg *xmq.Message, delayMillis int64) error {
-	if !p.cfg.EnableXDelayed {
-		return fmt.Errorf("x-delayed-message disabled")
-	}
 	if msg.Headers == nil {
 		msg.Headers = make(map[string]interface{})
 	}
 	msg.Headers["x-delay"] = delayMillis
-	return p.Publish(ctx, delayedExchange, routingKey, msg)
+	err := p.publish(ctx, delayedExchange, routingKey, msg)
+	if err == nil {
+		return nil
+	}
+	// 降级 TTL+DLX
+	delete(msg.Headers, "x-delay")
+	return p.publishWithTTL(ctx, delayedExchange, routingKey, msg, delayMillis)
 }
 
-// Close 优雅关闭，等待 inflight 消息完成
-func (p *Producer) Close(ctx context.Context) error {
-	if err := p.cm.close(); err != nil {
-		return err
+// TTL publish（降级）
+func (p *Producer) publishWithTTL(ctx context.Context, exchange, routingKey string, msg *xmq.Message, ttlMillis int64) error {
+	if msg.Headers == nil {
+		msg.Headers = make(map[string]interface{})
 	}
 
-	wait := time.NewTimer(10 * time.Second)
-	defer wait.Stop()
-	for {
-		if atomic.LoadInt64(&p.cm.inflight) == 0 {
-			return nil
-		}
-		select {
-		case <-wait.C:
-			return fmt.Errorf("graceful close timeout, inflight=%d", atomic.LoadInt64(&p.cm.inflight))
-		default:
-			time.Sleep(50 * time.Millisecond)
-		}
+	cc, err := p.cm.GetProducerChannel(ctx)
+	if err != nil {
+		return err
 	}
+	defer p.cm.PutProducerChannel(cc)
+
+	if msg.MessageId == "" {
+		msg.MessageId = fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	msg.Timestamp = time.Now()
+
+	pub := amqp.Publishing{
+		Body:         msg.Body,
+		Headers:      amqp.Table(msg.Headers),
+		Timestamp:    msg.Timestamp,
+		MessageId:    msg.MessageId,
+		DeliveryMode: amqp.Persistent,
+		Expiration:   fmt.Sprintf("%d", ttlMillis),
+	}
+	return cc.publishWithConfirm(ctx, exchange, routingKey, pub, p.cm.cfg.ConfirmTimeout)
+}
+
+// 内部通用 publish
+func (p *Producer) publish(ctx context.Context, exchange, routingKey string, msg *xmq.Message) error {
+	if p.cm.isClosed() {
+		return xmq.ErrClosed
+	}
+	if msg.MessageId == "" {
+		msg.MessageId = fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	msg.Timestamp = time.Now()
+
+	cc, err := p.cm.GetProducerChannel(ctx)
+	if err != nil {
+		return err
+	}
+	defer p.cm.PutProducerChannel(cc)
+
+	// 计数 inflight
+	atomic.AddInt64(&p.cm.inflight, 1)
+	defer atomic.AddInt64(&p.cm.inflight, -1)
+
+	pub := amqp.Publishing{
+		Body:         msg.Body,
+		Headers:      amqp.Table(msg.Headers),
+		Timestamp:    msg.Timestamp,
+		MessageId:    msg.MessageId,
+		DeliveryMode: amqp.Persistent,
+	}
+	return cc.publishWithConfirm(ctx, exchange, routingKey, pub, p.cm.cfg.ConfirmTimeout)
+}
+
+// 关闭 producer
+func (p *Producer) Close(ctx context.Context) error {
+	return p.cm.Close(ctx)
 }

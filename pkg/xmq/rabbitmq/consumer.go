@@ -3,32 +3,39 @@ package rabbitmq
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
-	"snowgo/pkg/xmq"
+	"math/rand"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	amqp "github.com/rabbitmq/amqp091-go"
+	"snowgo/pkg/xmq"
 )
 
-// consumerHandler 处理单 topic+group 的消息
 type consumerHandler struct {
 	topic    string
 	group    string
 	queue    string
 	handler  xmq.Handler
-	connMgr  *connectionManager
+	meta     *consumerMeta
+	cm       *connectionManager
 	stopCh   chan struct{}
-	wg       *sync.WaitGroup
+	wg       sync.WaitGroup
 	logger   xmq.Logger
-	inflight *int64
+	inflight int64
 }
 
-// runWorker 启动消费 goroutine
-func (h *consumerHandler) runWorker() {
-	defer h.wg.Done()
+func (h *consumerHandler) run() {
+	for i := 0; i < h.meta.WorkerNum; i++ {
+		h.wg.Add(1)
+		go h.worker()
+	}
+}
 
-	backoff := 500 * time.Millisecond
-	maxBackoff := 30 * time.Second
+func (h *consumerHandler) worker() {
+	defer h.wg.Done()
+	backoffBase := time.Second
 
 	for {
 		select {
@@ -37,141 +44,183 @@ func (h *consumerHandler) runWorker() {
 		default:
 		}
 
-		ch, err := h.connMgr.getConsumerChannel(h.queue, "", "", 1)
+		ch, err := h.cm.GetConsumerChannel(h.queue, h.topic, h.topic, h.meta.QoS)
 		if err != nil {
-			h.logger.Warn("get consumer channel failed, retrying", zap.Error(err))
-			time.Sleep(backoff)
-			backoff *= 2
-			if backoff > maxBackoff {
-				backoff = maxBackoff
+			delay := backoffBase + time.Duration(rand.Intn(500))*time.Millisecond
+			select {
+			case <-time.After(delay):
+				continue
+			case <-h.stopCh:
+				return
 			}
-			continue
-		}
-		backoff = 500 * time.Millisecond // 成功获取 channel，重置 backoff
-
-		msgs, err := ch.Consume(
-			h.queue,
-			"",
-			false, // autoAck false
-			false,
-			false,
-			false,
-			nil,
-		)
-		if err != nil {
-			h.logger.Warn("consume failed, retrying", zap.Error(err))
-			ch.Close()
-			time.Sleep(backoff)
-			backoff *= 2
-			if backoff > maxBackoff {
-				backoff = maxBackoff
-			}
-			continue
 		}
 
-	consumeLoop:
+		closeCh := ch.NotifyClose(make(chan *amqp.Error, 1))
+		go func(c *amqp.Channel) {
+			err := <-closeCh
+			if err != nil && h.logger != nil {
+				h.logger.Warn("consumer channel closed by broker", "error", err.Error())
+			}
+			_ = c.Close()
+		}(ch)
+
+		msgs, err := ch.Consume(h.queue, h.group, false, false, false, false, nil)
+		if err != nil {
+			_ = ch.Close()
+			delay := backoffBase + time.Duration(rand.Intn(500))*time.Millisecond
+			select {
+			case <-time.After(delay):
+				continue
+			case <-h.stopCh:
+				return
+			}
+		}
+
+	consumerLoop:
 		for {
 			select {
 			case <-h.stopCh:
-				ch.Close()
+				_ = ch.Close()
 				return
-			case msg, ok := <-msgs:
+			case d, ok := <-msgs:
 				if !ok {
-					break consumeLoop
+					_ = ch.Close()
+					break consumerLoop
 				}
-				atomic.AddInt64(h.inflight, 1)
+
+				atomic.AddInt64(&h.inflight, 1)
 				func() {
-					defer atomic.AddInt64(h.inflight, -1)
+					defer atomic.AddInt64(&h.inflight, -1)
+					var hdrs map[string]interface{}
+					if d.Headers != nil {
+						hdrs = make(map[string]interface{}, len(d.Headers))
+						for k, v := range d.Headers {
+							hdrs[k] = v
+						}
+					}
 					m := xmq.Message{
-						Body:      msg.Body,
-						Headers:   msg.Headers,
-						Timestamp: msg.Timestamp,
-						MessageId: msg.MessageId,
+						Body:      d.Body,
+						Headers:   hdrs,
+						Timestamp: d.Timestamp,
+						MessageId: d.MessageId,
 					}
 					if err := h.handler(context.Background(), m); err != nil {
-						_ = msg.Nack(false, true) // 失败重试
+						_ = d.Nack(false, false)
 					} else {
-						_ = msg.Ack(false)
+						_ = d.Ack(false)
 					}
 				}()
 			}
 		}
-		ch.Close()
 	}
 }
 
-// Consumer 实现 xmq.Consumer
 type Consumer struct {
+	cm       *connectionManager
 	cfg      *Config
-	connMgr  *connectionManager
-	handlers sync.Map // key = topic_group, value = *consumerHandler
+	handlers sync.Map // key=topic|group, value=*consumerHandler
 	stopCh   chan struct{}
-	wg       sync.WaitGroup
 	logger   xmq.Logger
 	inflight int64
 }
 
-func NewConsumer(cfg *Config, connMgr *connectionManager) *Consumer {
-	return &Consumer{
-		cfg:     cfg,
-		connMgr: connMgr,
-		stopCh:  make(chan struct{}),
-		logger:  cfg.Logger,
+func NewConsumer(cfg *Config) (*Consumer, error) {
+	cm := newConnectionManager(cfg)
+	if err := cm.start(); err != nil {
+		return nil, err
 	}
+	return &Consumer{
+		cm:     cm,
+		cfg:    cfg,
+		stopCh: make(chan struct{}),
+		logger: cfg.Logger,
+	}, nil
 }
 
-// Register 注册 topic + group
-func (c *Consumer) Register(topic, group string, handler xmq.Handler) error {
+func (c *Consumer) Register(topic, group string, handler xmq.Handler, opts ...interface{}) error {
 	if topic == "" || group == "" || handler == nil {
-		return fmt.Errorf("invalid consumer registration")
+		return fmt.Errorf("invalid registration")
 	}
-	key := fmt.Sprintf("%s_%s", topic, group)
-	queueName := key
-
-	ch := &consumerHandler{
-		topic:    topic,
-		group:    group,
-		queue:    queueName,
-		handler:  handler,
-		connMgr:  c.connMgr,
-		stopCh:   c.stopCh,
-		wg:       &c.wg,
-		logger:   c.logger,
-		inflight: &c.inflight,
+	key := topic + "|" + group
+	if _, ok := c.handlers.Load(key); ok {
+		return fmt.Errorf("handler duplicated")
 	}
-	c.handlers.Store(key, ch)
+	meta := DefaultConsumerMeta()
+	for _, opt := range opts {
+		if fn, ok := opt.(ConsumerOption); ok {
+			fn(meta)
+		}
+	}
+	meta.Handler = handler
+	h := &consumerHandler{
+		topic:   topic,
+		group:   group,
+		queue:   fmt.Sprintf("%s.%s", topic, group),
+		handler: handler,
+		meta:    meta,
+		cm:      c.cm,
+		stopCh:  c.stopCh,
+		logger:  c.logger,
+	}
+	c.handlers.Store(key, h)
 	return nil
 }
 
-// Start 启动所有注册的 consumerHandler
 func (c *Consumer) Start(ctx context.Context) error {
-	c.handlers.Range(func(key, value any) bool {
-		h := value.(*consumerHandler)
-		c.wg.Add(1)
-		go h.runWorker()
+	c.handlers.Range(func(_, v interface{}) bool {
+		if h, ok := v.(*consumerHandler); ok {
+			h.run()
+		}
 		return true
 	})
+	<-ctx.Done()
 	return nil
 }
 
-// Stop 优雅关闭，等待 inflight 消息处理完成
 func (c *Consumer) Stop(ctx context.Context) error {
-	close(c.stopCh)
-
-	doneCh := make(chan struct{})
-	go func() {
-		c.wg.Wait()
-		close(doneCh)
-	}()
-
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-doneCh:
-		return nil
+	case <-c.stopCh:
+	default:
+		close(c.stopCh)
 	}
+
+	c.handlers.Range(func(_, v interface{}) bool {
+		if h, ok := v.(*consumerHandler); ok {
+			h.wg.Wait()
+		}
+		return true
+	})
+
+	deadline := time.After(30 * time.Second)
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		var total int64
+		c.handlers.Range(func(_, v interface{}) bool {
+			if h, ok := v.(*consumerHandler); ok {
+				total += atomic.LoadInt64(&h.inflight)
+			}
+			return true
+		})
+		if total == 0 {
+			break
+		}
+		select {
+		case <-deadline:
+			return fmt.Errorf("consumer stop timeout, inflight=%d", total)
+		case <-ticker.C:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	return c.cm.Close(ctx)
+}
+
+func splitKey(key string) (topic, group string) {
+	parts := strings.Split(key, "|")
+	if len(parts) >= 2 {
+		return parts[0], parts[1]
+	}
+	return key, ""
 }
