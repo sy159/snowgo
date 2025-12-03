@@ -12,6 +12,7 @@ var (
 	ErrPublishNack       = errors.New("mq publish nack from broker")
 	ErrNoConnection      = errors.New("mq no connection")
 	ErrGetChannelTimeout = errors.New("mq get producer channel timeout")
+	ErrChannelExhausted  = errors.New("mq consumer channels exhausted")
 )
 
 // Message 消息结构体

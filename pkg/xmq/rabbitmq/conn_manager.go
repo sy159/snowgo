@@ -4,19 +4,23 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"snowgo/pkg/xmq"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"snowgo/pkg/xmq"
 )
 
+/* ---------- 内部数据结构 ---------- */
+
+// pendingRec 单条 publish 的 confirm 等待记录
 type pendingRec struct {
 	ch   chan amqp.Confirmation
 	once sync.Once
 }
 
+// confirmChannel 封装一个 amqp.Channel，提供「同步 confirm」能力
 type confirmChannel struct {
 	ch        *amqp.Channel
 	mu        sync.Mutex
@@ -26,21 +30,31 @@ type confirmChannel struct {
 	logger    xmq.Logger
 	closeCh   chan struct{}
 	pending   sync.Map
-	nextSeq   uint64
+	// 连续超时次数
+	consecutiveTimeout int32
 }
 
+// connectionManager 管理单条 TCP 连接与 Channel 池（仅 Producer 用）
 type connectionManager struct {
-	cfg            *Config
-	conn           atomic.Value // *amqp.Connection
-	closed         int32
-	pool           chan *confirmChannel
-	poolMu         sync.Mutex
-	logger         xmq.Logger
-	stopCh         chan struct{}
-	wg             sync.WaitGroup
+	cfg    *Config
+	conn   atomic.Value // *amqp.Connection
+	closed int32
+	pool   chan *confirmChannel
+	poolMu sync.Mutex
+	logger xmq.Logger
+	stopCh chan struct{}
+	wg     sync.WaitGroup
+
+	// 优雅关闭
+	inflight int64
+
+	// 保证 reconnectWatcher 只启动一次
 	watcherStarted int32
-	inflight       int64
+	// 连续超时阈值
+	consecutiveTimeoutThreshold int
 }
+
+/* ---------- 新建 Channel（confirm 模式） ---------- */
 
 func newConfirmChannel(conn *amqp.Connection, cfg *Config) (*confirmChannel, error) {
 	if conn == nil {
@@ -48,9 +62,9 @@ func newConfirmChannel(conn *amqp.Connection, cfg *Config) (*confirmChannel, err
 	}
 	ch, err := conn.Channel()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create channel: %w", err)
 	}
-	if err := ch.Confirm(false); err != nil {
+	if err = ch.Confirm(false); err != nil {
 		_ = ch.Close()
 		return nil, fmt.Errorf("confirm: %w", err)
 	}
@@ -60,19 +74,17 @@ func newConfirmChannel(conn *amqp.Connection, cfg *Config) (*confirmChannel, err
 		closeCh: make(chan struct{}),
 	}
 	go cc.confirmRouter()
-
-	// notifyClose watcher
-	go func() {
-		closeC := ch.NotifyClose(make(chan *amqp.Error, 1))
-		if e := <-closeC; e != nil {
-			atomic.StoreInt32(&cc.broken, 1)
-			cc.close()
-			if cc.logger != nil {
-				cc.logger.Warn("channel closed by broker", "error", e.Error())
-			}
-		}
-	}()
+	go cc.watchBrokerClose()
 	return cc, nil
+}
+
+func (cc *confirmChannel) watchBrokerClose() {
+	closeC := cc.ch.NotifyClose(make(chan *amqp.Error, 1))
+	if e := <-closeC; e != nil {
+		atomic.StoreInt32(&cc.broken, 1)
+		cc.close()
+		cc.logWarn("channel closed by broker", "error", e.Error())
+	}
 }
 
 func (cc *confirmChannel) confirmRouter() {
@@ -90,12 +102,10 @@ func (cc *confirmChannel) confirmRouter() {
 					rec.once.Do(func() { close(rec.ch) })
 					cc.pending.Delete(c.DeliveryTag)
 				default:
-					atomic.StoreInt32(&cc.broken, 1)
 					cc.pending.Delete(c.DeliveryTag)
-					cc.close()
 				}
-			} else if cc.logger != nil {
-				cc.logger.Warn("confirmRouter: no pending rec for tag", "tag", c.DeliveryTag)
+			} else {
+				cc.logWarn("confirmRouter: no pending rec for tag", "tag", c.DeliveryTag)
 			}
 		case <-cc.closeCh:
 			goto exit
@@ -112,29 +122,21 @@ exit:
 	})
 }
 
-func (cc *confirmChannel) publishWithConfirm(ctx context.Context, exchange, routingKey string, pub amqp.Publishing, timeout time.Duration) error {
+/* ---------- 同步 Publish ---------- */
+
+func (cc *confirmChannel) publishWithConfirm(ctx context.Context, exchange, routingKey string, pub amqp.Publishing, timeout time.Duration, mgr *connectionManager) error {
 	if atomic.LoadInt32(&cc.closed) == 1 || atomic.LoadInt32(&cc.broken) == 1 {
 		return fmt.Errorf("channel closed or broken")
 	}
-
-	cc.mu.Lock()
-	seq := cc.nextSeq + 1
-	if seq == 0 {
-		cc.mu.Unlock()
-		return fmt.Errorf("seq overflow")
-	}
-	cc.nextSeq = seq
-	rec := &pendingRec{ch: make(chan amqp.Confirmation, 1)}
+	seq := cc.ch.GetNextPublishSeqNo()
+	rec := &pendingRec{ch: make(chan amqp.Confirmation)}
 	cc.pending.Store(seq, rec)
 
 	if err := cc.ch.PublishWithContext(ctx, exchange, routingKey, false, false, pub); err != nil {
 		cc.pending.Delete(seq)
 		atomic.StoreInt32(&cc.broken, 1)
-		cc.mu.Unlock()
-		cc.close()
 		return fmt.Errorf("publish: %w", err)
 	}
-	cc.mu.Unlock()
 
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
@@ -146,27 +148,30 @@ func (cc *confirmChannel) publishWithConfirm(ctx context.Context, exchange, rout
 		}
 		if !c.Ack {
 			atomic.StoreInt32(&cc.broken, 1)
-			cc.close()
 			return xmq.ErrPublishNack
 		}
+		atomic.StoreInt32(&cc.consecutiveTimeout, 0)
 		return nil
 	case <-timer.C:
-		if v, ok := cc.pending.Load(seq); ok {
-			r := v.(*pendingRec)
-			r.once.Do(func() { close(r.ch) })
-			cc.pending.Delete(seq)
+		cc.pending.Delete(seq)
+		if cc.recordTimeout(mgr) >= mgr.consecutiveTimeoutThreshold {
+			atomic.StoreInt32(&cc.broken, 1)
+			cc.close()
 		}
-		atomic.StoreInt32(&cc.broken, 1)
-		cc.close()
 		return xmq.ErrPublishTimeout
 	case <-ctx.Done():
-		if v, ok := cc.pending.Load(seq); ok {
-			r := v.(*pendingRec)
-			r.once.Do(func() { close(r.ch) })
-			cc.pending.Delete(seq)
-		}
+		cc.pending.Delete(seq)
 		return ctx.Err()
 	}
+}
+
+func (cc *confirmChannel) recordTimeout(mgr *connectionManager) int {
+	cnt := int(atomic.LoadInt32(&cc.consecutiveTimeout))
+	if cnt >= mgr.consecutiveTimeoutThreshold {
+		atomic.StoreInt32(&cc.broken, 1)
+		cc.close()
+	}
+	return cnt
 }
 
 func (cc *confirmChannel) close() {
@@ -183,14 +188,25 @@ func (cc *confirmChannel) close() {
 	})
 }
 
-func newConnectionManager(cfg *Config) *connectionManager {
-	return &connectionManager{
-		cfg:    cfg,
-		pool:   make(chan *confirmChannel, cfg.ProducerChannelPoolSize),
-		logger: cfg.Logger,
-		stopCh: make(chan struct{}),
+func (cc *confirmChannel) logWarn(msg string, kvs ...interface{}) {
+	if cc.logger != nil {
+		cc.logger.Warn(msg, kvs...)
 	}
 }
+
+/* ---------- connectionManager 构造 ---------- */
+
+func newConnectionManager(cfg *Config) *connectionManager {
+	return &connectionManager{
+		cfg:                         cfg,
+		pool:                        make(chan *confirmChannel, cfg.ProducerChannelPoolSize),
+		logger:                      cfg.Logger,
+		stopCh:                      make(chan struct{}),
+		consecutiveTimeoutThreshold: 3,
+	}
+}
+
+/* ---------- TCP 连接保活 ---------- */
 
 func (m *connectionManager) start() error {
 	m.poolMu.Lock()
@@ -203,7 +219,7 @@ func (m *connectionManager) start() error {
 		return fmt.Errorf("dial: %w", err)
 	}
 	m.storeConn(conn)
-	m.log("tcp连接建立", "event.outcome", "success")
+	m.log("tcp connection established", "event.outcome", "success")
 	if err := m.refreshPool(conn); err != nil {
 		m.drainPoolLocked()
 		return err
@@ -227,9 +243,9 @@ func (m *connectionManager) reconnectWatcher() {
 		}
 		closeCh := conn.NotifyClose(make(chan *amqp.Error, 1))
 		if err := <-closeCh; err != nil {
-			m.log("tcp连接断开", "error", err.Error())
+			m.log("tcp connection lost", "error", err.Error())
 		} else {
-			m.log("tcp连接关闭(nil)")
+			m.log("tcp connection closed (nil)")
 		}
 		m.storeConn(nil)
 		m.poolMu.Lock()
@@ -253,7 +269,7 @@ func (m *connectionManager) tryReconnect() error {
 			return fmt.Errorf("stopped")
 		}
 		if err := m.start(); err == nil {
-			m.log("重连成功", "event.outcome", "success")
+			m.log("reconnect success", "event.outcome", "success")
 			return nil
 		}
 		backoff = jitter(backoff)
@@ -268,9 +284,11 @@ func jitter(d time.Duration) time.Duration {
 	return time.Duration(float64(d) * (0.8 + 0.4*rand.Float64()))
 }
 
+/* ---------- Channel 池 ---------- */
+
 func (m *connectionManager) refreshPool(conn *amqp.Connection) error {
 	m.drainPoolLocked()
-	var created []*confirmChannel
+	created := make([]*confirmChannel, 0, m.cfg.ProducerChannelPoolSize)
 	for i := 0; i < m.cfg.ProducerChannelPoolSize; i++ {
 		cc, err := newConfirmChannel(conn, m.cfg)
 		if err != nil {
@@ -293,11 +311,12 @@ func (m *connectionManager) drainPoolLocked() {
 		case cc := <-m.pool:
 			cc.close()
 		default:
-			time.Sleep(time.Millisecond)
 			return
 		}
 	}
 }
+
+/* ---------- Producer API ---------- */
 
 func (m *connectionManager) GetProducerChannel(ctx context.Context) (*confirmChannel, error) {
 	if m.isClosed() {
@@ -339,32 +358,47 @@ func (m *connectionManager) PutProducerChannel(cc *confirmChannel) {
 	}
 }
 
-// 公开给消费者使用
+/* ---------- Consumer API（仅新建 Channel，无池化） ---------- */
+
+var consumerChannelCount int64 // 进程级计数器
+
 func (m *connectionManager) GetConsumerChannel(queue, exchange, routingKey string, qos int) (*amqp.Channel, error) {
 	conn := m.loadConn()
 	if conn == nil || conn.IsClosed() {
 		return nil, xmq.ErrNoConnection
 	}
+	if atomic.LoadInt64(&consumerChannelCount) >= int64(m.cfg.MaxChannelsPerConn) {
+		return nil, xmq.ErrChannelExhausted
+	}
 	ch, err := conn.Channel()
 	if err != nil {
 		return nil, err
 	}
-	if err := ch.Qos(qos, 0, false); err != nil {
+	atomic.AddInt64(&consumerChannelCount, 1)
+	// 关闭时计数减一
+	go func() {
+		<-ch.NotifyClose(make(chan *amqp.Error, 1))
+		atomic.AddInt64(&consumerChannelCount, -1)
+	}()
+
+	if err = ch.Qos(qos, 0, false); err != nil {
 		_ = ch.Close()
 		return nil, err
 	}
-	if _, err := ch.QueueDeclare(queue, true, false, false, false, nil); err != nil {
+	if _, err = ch.QueueDeclare(queue, true, false, false, false, nil); err != nil {
 		_ = ch.Close()
 		return nil, err
 	}
 	if exchange != "" {
-		if err := ch.QueueBind(queue, routingKey, exchange, false, nil); err != nil {
+		if err = ch.QueueBind(queue, routingKey, exchange, false, nil); err != nil {
 			_ = ch.Close()
 			return nil, err
 		}
 	}
 	return ch, nil
 }
+
+/* ---------- 优雅关闭 ---------- */
 
 func (m *connectionManager) close(ctx context.Context) error {
 	if !atomic.CompareAndSwapInt32(&m.closed, 0, 1) {
@@ -380,7 +414,7 @@ func (m *connectionManager) close(ctx context.Context) error {
 	for {
 		select {
 		case <-tick.C:
-			if atomic.LoadInt64(&m.inflight) == 0 {
+			if atomic.LoadInt64(&m.inflight) == 0 && atomic.LoadInt32(&m.closed) == 1 {
 				goto closeConn
 			}
 		case <-ctx.Done():
@@ -395,20 +429,19 @@ closeConn:
 	return nil
 }
 
+/* ---------- 工具 ---------- */
+
 func (m *connectionManager) loadConn() *amqp.Connection {
 	if v := m.conn.Load(); v != nil {
 		return v.(*amqp.Connection)
 	}
 	return nil
 }
-
 func (m *connectionManager) storeConn(conn *amqp.Connection) { m.conn.Store(conn) }
 func (m *connectionManager) isClosed() bool                  { return atomic.LoadInt32(&m.closed) == 1 }
 func (m *connectionManager) log(msg string, kvs ...interface{}) {
 	if m.cfg.Logger != nil {
-		m.cfg.Logger.Info(msg, append([]interface{}{"xmq.role", "producer"}, kvs...)...)
+		m.cfg.Logger.Info(msg, append([]interface{}{"xmq.role", string(m.cfg.Role)}, kvs...)...)
 	}
 }
-func (m *connectionManager) Close(ctx context.Context) error {
-	return m.close(ctx)
-}
+func (m *connectionManager) Close(ctx context.Context) error { return m.close(ctx) }

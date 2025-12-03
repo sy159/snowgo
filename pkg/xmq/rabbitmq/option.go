@@ -15,39 +15,48 @@ const (
 	RoleConsumer Role = "consumer"
 )
 
-// Config 连接与行为配置
+// Config 全量配置
 type Config struct {
-	URL                   string
+	URL    string
+	Logger xmq.Logger
+	Role   Role // 新建连接时必须指定角色
+
+	// 公共重连
 	ReconnectInitialDelay time.Duration
 	ReconnectMaxDelay     time.Duration
-	Logger                xmq.Logger
 
 	// Producer 专用
 	ProducerChannelPoolSize int
 	ConfirmTimeout          time.Duration
 	PublishGetTimeout       time.Duration
-	NotifyBufSize           int // confirm notify buffer size per channel
+
+	// Consumer 专用
+	MaxChannelsPerConn int // 单连接最大 Channel 数，防止耗尽
 }
 
 func DefaultConfig() *Config {
 	return &Config{
 		URL:                   "amqp://guest:guest@localhost:5672/",
+		Logger:                &nopLogger{},
 		ReconnectInitialDelay: 1 * time.Second,
 		ReconnectMaxDelay:     30 * time.Second,
-		Logger:                &nopLogger{},
 
+		// Producer
 		ProducerChannelPoolSize: runtime.NumCPU() * 2,
 		ConfirmTimeout:          5 * time.Second,
 		PublishGetTimeout:       3 * time.Second,
-		NotifyBufSize:           256,
+
+		// Consumer
+		MaxChannelsPerConn: 2047, // 默认 rabbitmq 单连接上限
 	}
 }
 
-// Option 函数类型
+// Option 函数
 type Option func(*Config)
 
 func WithURL(url string) Option      { return func(c *Config) { c.URL = url } }
 func WithLogger(l xmq.Logger) Option { return func(c *Config) { c.Logger = l } }
+func WithRole(r Role) Option         { return func(c *Config) { c.Role = r } }
 func WithProducerChannelPoolSize(n int) Option {
 	return func(c *Config) { c.ProducerChannelPoolSize = n }
 }
@@ -55,20 +64,13 @@ func WithConfirmTimeout(d time.Duration) Option { return func(c *Config) { c.Con
 func WithPublishGetTimeout(d time.Duration) Option {
 	return func(c *Config) { c.PublishGetTimeout = d }
 }
-func WithNotifyBufSize(n int) Option { return func(c *Config) { c.NotifyBufSize = n } }
-
-type ConsumerOption func(*consumerMeta)
-
-type consumerMeta struct {
-	QoS       int
-	WorkerNum int
-	Handler   xmq.Handler
+func WithMaxChannelsPerConn(n int) Option { return func(c *Config) { c.MaxChannelsPerConn = n } }
+func WithReconnectDelay(init, max time.Duration) Option {
+	return func(c *Config) {
+		c.ReconnectInitialDelay = init
+		c.ReconnectMaxDelay = max
+	}
 }
-
-func DefaultConsumerMeta() *consumerMeta { return &consumerMeta{QoS: 16, WorkerNum: 4} }
-
-func WithConsumerQoS(qos int) ConsumerOption     { return func(m *consumerMeta) { m.QoS = qos } }
-func WithConsumerWorkerNum(n int) ConsumerOption { return func(m *consumerMeta) { m.WorkerNum = n } }
 
 type nopLogger struct{}
 
