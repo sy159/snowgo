@@ -3,6 +3,7 @@ package xmq
 import (
 	"context"
 	"errors"
+	"go.uber.org/zap"
 	"time"
 )
 
@@ -24,9 +25,9 @@ type Message struct {
 }
 
 type Logger interface {
-	Info(msg string, keysAndValues ...interface{})
-	Warn(msg string, keysAndValues ...interface{})
-	Error(msg string, keysAndValues ...interface{})
+	Info(msg string, fields ...zap.Field)
+	Warn(msg string, fields ...zap.Field)
+	Error(msg string, fields ...zap.Field)
 }
 
 // Producer 生产者
