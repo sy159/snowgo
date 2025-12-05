@@ -14,28 +14,28 @@ func (n *nopLogger) Info(msg string, fields ...zap.Field)  {}
 func (n *nopLogger) Warn(msg string, fields ...zap.Field)  {}
 func (n *nopLogger) Error(msg string, fields ...zap.Field) {}
 
-// ProducerConfig 专注于 producer 的配置（url 必传）
-type ProducerConfig struct {
-	URL                         string
-	ProducerChannelPoolSize     int
-	PublishGetTimeout           time.Duration
-	ConfirmTimeout              time.Duration
-	PutBackTimeout              time.Duration
-	ReconnectInitialDelay       time.Duration
-	ReconnectMaxDelay           time.Duration
-	ConsecutiveTimeoutThreshold int32
-	Logger                      xmq.Logger
+// ProducerConnConfig producer链接 的配置（url 必传）
+type ProducerConnConfig struct {
+	URL                         string        // 必填：RabbitMQ 连接 URL，例如 "amqp://user:pass@host:port/vhost"
+	ProducerChannelPoolSize     int           // 生产者 channel 池大小，决定并发发布能力，默认 8
+	PublishGetTimeout           time.Duration // 获取可用 channel 的超时时间，超过返回 ErrGetChannelTimeout，默认 3s
+	ConfirmTimeout              time.Duration // 等待 broker confirm 的超时时间，每条消息等待 confirm 的最大时长，默认 5s
+	PutBackTimeout              time.Duration // 当消息处理完成后，channel放回池，如果池满返回的最大等待时间（阻塞等待），避免瞬时池满导致频繁 close/recreate，默认 800ms
+	ReconnectInitialDelay       time.Duration // 连接失败或断开后的初始重连延迟（指数回退），默认 500ms
+	ReconnectMaxDelay           time.Duration // 重连延迟的最大值（指数回退上限），默认 30s
+	ConsecutiveTimeoutThreshold int32         // 连续 confirm 超时计数阈值，达到后会标记 channel 为 broken 并回收，默认 3
+	Logger                      xmq.Logger    // 日志接口，推荐传入 zap.Logger 封装的 xmq.Logger，否则使用默认 nopLogger（不输出日志）
 }
 
-type ProducerOption func(*ProducerConfig)
+type ProducerConnOption func(*ProducerConnConfig)
 
-func NewProducerConfig(url string, opts ...ProducerOption) *ProducerConfig {
+func NewProducerConnConfig(url string, opts ...ProducerConnOption) *ProducerConnConfig {
 	if url == "" {
-		panic("rabbitmq: NewProducerConfig url must be provided")
+		panic("rabbitmq: NewProducerConnConfig url must be provided")
 	}
-	cfg := &ProducerConfig{
+	cfg := &ProducerConnConfig{
 		URL:                         url,
-		ProducerChannelPoolSize:     16,
+		ProducerChannelPoolSize:     8,
 		PublishGetTimeout:           3 * time.Second,
 		ConfirmTimeout:              5 * time.Second,
 		PutBackTimeout:              800 * time.Millisecond,
@@ -50,85 +50,96 @@ func NewProducerConfig(url string, opts ...ProducerOption) *ProducerConfig {
 	return cfg
 }
 
-func WithPoolSize(n int) ProducerOption {
-	return func(c *ProducerConfig) {
+// WithChannelPoolSize 生产者 channel 池大小，决定并发发布能力，默认 8
+func WithChannelPoolSize(n int) ProducerConnOption {
+	return func(c *ProducerConnConfig) {
 		if n > 0 {
 			c.ProducerChannelPoolSize = n
 		}
 	}
 }
-func WithPublishGetTimeout(d time.Duration) ProducerOption {
-	return func(c *ProducerConfig) {
+
+// WithPublishGetTimeout 获取可用 channel 的超时时间，超过返回 ErrGetChannelTimeout，默认 3s
+func WithPublishGetTimeout(d time.Duration) ProducerConnOption {
+	return func(c *ProducerConnConfig) {
 		if d > 0 {
 			c.PublishGetTimeout = d
 		}
 	}
 }
-func WithConfirmTimeout(d time.Duration) ProducerOption {
-	return func(c *ProducerConfig) {
+
+// WithConfirmTimeout 等待 broker confirm 的超时时间，每条消息等待 confirm 的最大时长，默认 5s
+func WithConfirmTimeout(d time.Duration) ProducerConnOption {
+	return func(c *ProducerConnConfig) {
 		if d > 0 {
 			c.ConfirmTimeout = d
 		}
 	}
 }
-func WithPutBackTimeout(d time.Duration) ProducerOption {
-	return func(c *ProducerConfig) {
+
+// WithPutBackTimeout 当消息处理完成后，channel放回池，如果池满channel 放回池的最大等待时间（阻塞等待）
+func WithPutBackTimeout(d time.Duration) ProducerConnOption {
+	return func(c *ProducerConnConfig) {
 		if d > 0 {
 			c.PutBackTimeout = d
 		}
 	}
 }
-func WithProducerReconnectInitialDelay(d time.Duration) ProducerOption {
-	return func(c *ProducerConfig) {
+
+// WithProducerReconnectInitialDelay 连接失败或断开后的初始重连延迟（指数回退），默认 500ms
+func WithProducerReconnectInitialDelay(d time.Duration) ProducerConnOption {
+	return func(c *ProducerConnConfig) {
 		if d > 0 {
 			c.ReconnectInitialDelay = d
 		}
 	}
 }
-func WithProducerReconnectMaxDelay(d time.Duration) ProducerOption {
-	return func(c *ProducerConfig) {
+
+// WithProducerReconnectMaxDelay 重连延迟的最大值（指数回退上限），默认 30s
+func WithProducerReconnectMaxDelay(d time.Duration) ProducerConnOption {
+	return func(c *ProducerConnConfig) {
 		if d > 0 {
 			c.ReconnectMaxDelay = d
 		}
 	}
 }
-func WithConsecTimeoutThreshold(n int32) ProducerOption {
-	return func(c *ProducerConfig) {
+
+// WithConsecTimeoutThreshold 连续 confirm 超时计数阈值，达到后会标记 channel 为 broken 并回收，默认 3
+func WithConsecTimeoutThreshold(n int32) ProducerConnOption {
+	return func(c *ProducerConnConfig) {
 		if n > 0 {
 			c.ConsecutiveTimeoutThreshold = n
 		}
 	}
 }
-func WithProducerLogger(l xmq.Logger) ProducerOption {
-	return func(c *ProducerConfig) {
+
+// WithProducerLogger 生产日志
+func WithProducerLogger(l xmq.Logger) ProducerConnOption {
+	return func(c *ProducerConnConfig) {
 		if l != nil {
 			c.Logger = l
 		}
 	}
 }
 
-// ------------------------------------------------------------------
-
-// ConsumerConfig 专注 consumer 的配置（url 必传）
-type ConsumerConfig struct {
+// ConsumerConnConfig producer链接 的配置（url 必传）
+type ConsumerConnConfig struct {
 	URL                   string
-	ConsumerRetryLimit    int
-	ConsumerBackoffBase   time.Duration
-	ReconnectInitialDelay time.Duration
-	ReconnectMaxDelay     time.Duration
+	ConsumerBackoffBase   time.Duration // 消费获取 channel 失败时的基础重试间隔
+	ReconnectInitialDelay time.Duration // 连接失败或断开后的初始重连延迟（指数回退），默认 500ms
+	ReconnectMaxDelay     time.Duration // 重连延迟的最大值（指数回退上限），默认 30s
 
 	Logger xmq.Logger
 }
 
-type ConsumerOption func(*ConsumerConfig)
+type ConsumerConnOption func(*ConsumerConnConfig)
 
-func NewConsumerConfig(url string, opts ...ConsumerOption) *ConsumerConfig {
+func NewConsumerConnConfig(url string, opts ...ConsumerConnOption) *ConsumerConnConfig {
 	if url == "" {
-		panic("rabbitmq: NewConsumerConfig url must be provided")
+		panic("rabbitmq: NewConsumerConnConfig url must be provided")
 	}
-	cfg := &ConsumerConfig{
+	cfg := &ConsumerConnConfig{
 		URL:                   url,
-		ConsumerRetryLimit:    5,
 		ConsumerBackoffBase:   1 * time.Second,
 		ReconnectInitialDelay: 500 * time.Millisecond,
 		ReconnectMaxDelay:     30 * time.Second,
@@ -140,36 +151,36 @@ func NewConsumerConfig(url string, opts ...ConsumerOption) *ConsumerConfig {
 	return cfg
 }
 
-func WithRetryLimit(n int) ConsumerOption {
-	return func(c *ConsumerConfig) {
-		if n >= 0 {
-			c.ConsumerRetryLimit = n
-		}
-	}
-}
-func WithBackoffBase(d time.Duration) ConsumerOption {
-	return func(c *ConsumerConfig) {
+// WithBackoffBase 消费失败或获取 channel 失败时的基础重试间隔
+func WithBackoffBase(d time.Duration) ConsumerConnOption {
+	return func(c *ConsumerConnConfig) {
 		if d > 0 {
 			c.ConsumerBackoffBase = d
 		}
 	}
 }
-func WithConsumerReconnectInitialDelay(d time.Duration) ConsumerOption {
-	return func(c *ConsumerConfig) {
+
+// WithConsumerReconnectInitialDelay 连接失败或断开后的初始重连延迟（指数回退），默认 500ms
+func WithConsumerReconnectInitialDelay(d time.Duration) ConsumerConnOption {
+	return func(c *ConsumerConnConfig) {
 		if d > 0 {
 			c.ReconnectInitialDelay = d
 		}
 	}
 }
-func WithConsumerReconnectMaxDelay(d time.Duration) ConsumerOption {
-	return func(c *ConsumerConfig) {
+
+// WithConsumerReconnectMaxDelay 重连延迟的最大值（指数回退上限），默认 30s
+func WithConsumerReconnectMaxDelay(d time.Duration) ConsumerConnOption {
+	return func(c *ConsumerConnConfig) {
 		if d > 0 {
 			c.ReconnectMaxDelay = d
 		}
 	}
 }
-func WithConsumerLogger(l xmq.Logger) ConsumerOption {
-	return func(c *ConsumerConfig) {
+
+// WithConsumerLogger 消费日志
+func WithConsumerLogger(l xmq.Logger) ConsumerConnOption {
+	return func(c *ConsumerConnConfig) {
 		if l != nil {
 			c.Logger = l
 		}

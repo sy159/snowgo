@@ -12,18 +12,43 @@ import (
 	"go.uber.org/zap"
 )
 
+// 注册单元
+type consumerUnit struct {
+	topic   string
+	group   string
+	queue   string
+	handler xmq.Handler
+	meta    *consumerMeta
+}
+
+type consumerMeta struct {
+	Prefetch   int
+	WorkerNum  int
+	RetryLimit int
+}
+
+func defaultMeta() *consumerMeta { return &consumerMeta{Prefetch: 16, WorkerNum: 4, RetryLimit: 3} }
+
+// ConsumerOption 函数类型
+type ConsumerOption func(*consumerMeta)
+
+func WithPrefetch(n int) ConsumerOption   { return func(m *consumerMeta) { m.Prefetch = n } }
+func WithWorkerNum(n int) ConsumerOption  { return func(m *consumerMeta) { m.WorkerNum = n } }
+func WithRetryLimit(n int) ConsumerOption { return func(m *consumerMeta) { m.RetryLimit = n } }
+
 // Consumer 封装 consumerConnManager 和 worker 管理
 type Consumer struct {
 	cm     *consumerConnManager
-	cfg    *ConsumerConfig
+	cfg    *ConsumerConnConfig
 	logger xmq.Logger
 
 	stopped int32
 	wg      sync.WaitGroup
+	units   sync.Map
 }
 
 // NewConsumerWithConfig 使用 ConsumerConfig 创建 Consumer 实例
-func NewConsumerWithConfig(cfg *ConsumerConfig) (*Consumer, error) {
+func NewConsumerWithConfig(cfg *ConsumerConnConfig) (*Consumer, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("consumer config is nil")
 	}
@@ -47,19 +72,19 @@ func NewConsumerWithConfig(cfg *ConsumerConfig) (*Consumer, error) {
 // StartWorker 启动 workerCount 个 worker，每个 worker 拥有独立 channel。
 // prefetch: Qos prefetch count
 // handler: 业务函数，返回 error 则触发受控重试
-func (c *Consumer) StartWorker(ctx context.Context, queue string, prefetch int, workerCount int, handler xmq.Handler) error {
+func (c *Consumer) startWorker(ctx context.Context, queue string, prefetch int, workerCount int, retryLimit int, handler xmq.Handler) error {
 	if c == nil || c.cm == nil {
 		return fmt.Errorf("consumer not initialized")
 	}
 	for i := 0; i < workerCount; i++ {
 		c.wg.Add(1)
-		go c.workerLoop(ctx, queue, prefetch, i, handler)
+		go c.workerLoop(ctx, queue, prefetch, i, retryLimit, handler)
 	}
 	return nil
 }
 
 // workerLoop 每个 worker 的执行体
-func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, workerID int, handler xmq.Handler) {
+func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, workerID, retryLimit int, handler xmq.Handler) {
 	defer c.wg.Done()
 
 	backoff := c.cfg.ConsumerBackoffBase
@@ -165,7 +190,7 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 						// 写回 header
 						d.Headers["x-retry-count"] = retry
 
-						if retry <= c.cfg.ConsumerRetryLimit {
+						if retry <= retryLimit {
 							_ = d.Nack(false, true)
 							time.Sleep(100 * time.Millisecond) // 避免 tight loop
 						} else {
@@ -182,6 +207,48 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 		_ = ch.Close()
 		time.Sleep(1 * time.Second)
 	}
+}
+
+// Register 消费注册
+func (c *Consumer) Register(topic, group string, handler xmq.Handler, opts ...interface{}) error {
+	if topic == "" || group == "" || handler == nil {
+		return fmt.Errorf("Register: topic/group/handler must be non-empty")
+	}
+	key := topic + "|" + group
+	meta := defaultMeta()
+	for _, o := range opts {
+		if fn, ok := o.(ConsumerOption); ok {
+			fn(meta)
+		}
+	}
+	if _, loaded := c.units.LoadOrStore(key, &consumerUnit{
+		topic:   topic,
+		group:   group,
+		queue:   fmt.Sprintf("%s.%s", topic, group),
+		handler: handler,
+		meta:    meta,
+	}); loaded {
+		return fmt.Errorf("Register: duplicate handler for %s", key)
+	}
+	return nil
+}
+
+// Start 统一启动所有注册组（阻塞直到 ctx 取消）
+func (c *Consumer) Start(ctx context.Context) error {
+	var err error
+	c.units.Range(func(_, v interface{}) bool {
+		u := v.(*consumerUnit)
+		if e := c.startWorker(ctx, u.queue, u.meta.Prefetch, u.meta.WorkerNum, u.meta.RetryLimit, u.handler); e != nil {
+			err = e
+			return false
+		}
+		return true
+	})
+	if err != nil {
+		return err
+	}
+	<-ctx.Done()
+	return nil
 }
 
 // Stop 优雅停止：关闭连接管理，并等待 worker goroutine 完全退出

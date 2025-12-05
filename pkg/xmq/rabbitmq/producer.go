@@ -1,4 +1,3 @@
-// pkg/rabbitmq/producer.go
 package rabbitmq
 
 import (
@@ -14,14 +13,14 @@ import (
 // Producer 对外生产者 API 封装
 type Producer struct {
 	cm  *producerConnManager
-	cfg *ProducerConfig
+	cfg *ProducerConnConfig
 	log xmq.Logger
 }
 
-// NewProducerWithConfig 使用 ProducerConfig 创建 Producer 实例
+// NewProducerWithConfig 使用 ProducerConnConfig 创建 Producer 实例
 // cfg.URL 必须非空，否则 panic
 // cfg.Logger 若为 nil，则默认使用 nopLogger
-func NewProducerWithConfig(cfg *ProducerConfig) (*Producer, error) {
+func NewProducerWithConfig(cfg *ProducerConnConfig) (*Producer, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("producer config is nil")
 	}

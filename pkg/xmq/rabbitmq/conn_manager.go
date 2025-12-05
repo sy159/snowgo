@@ -12,17 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-////////////////////////////////////////////////////////////////////////////////
-// confirmChannel
-//
-// 负责单个 amqp.Channel 的 Confirm 订阅与 publishWithConfirm。
-// 关键点：
-//  - pending 每条消息使用缓冲 1 的 channel 用于接收 confirm。
-//  - confirmRouter 写 pending 时**绝不阻塞**（非阻塞写 + fallback close）
-//  - 在 publishWithConfirm 中，GetNextPublishSeqNo() 若返回 0 => 立即回收 channel 并返回错误。
-//  - publishWithConfirm 不做重试（上层 manager 会决定是否 retry/换 channel）。
-////////////////////////////////////////////////////////////////////////////////
-
 type pendingRec struct {
 	ch   chan amqp.Confirmation
 	once sync.Once
@@ -222,21 +211,8 @@ func (cc *confirmChannel) close() {
 	})
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// producerConnManager
-//
-//  - manages one AMQP connection for producers
-//  - maintains a fixed-size pool of confirmChannel (channels in confirm mode)
-//  - exposes Publish(ctx, exchange, routingKey, pub, timeout) which:
-//      1) gets a confirmChannel from pool
-//      2) increments inflight
-//      3) calls cc.publishWithConfirm(...)
-//      4) decrements inflight and returns channel to pool (with careful PutBackTimeout handling)
-//  - reconnect watcher: deterministic exponential backoff (no jitter) and rebuild pool on reconnect
-////////////////////////////////////////////////////////////////////////////////
-
 type producerConnManager struct {
-	cfg *ProducerConfig
+	cfg *ProducerConnConfig
 
 	conn atomic.Value // *amqp.Connection
 
@@ -251,7 +227,7 @@ type producerConnManager struct {
 	wg sync.WaitGroup
 }
 
-func newProducerConnManager(cfg *ProducerConfig) *producerConnManager {
+func newProducerConnManager(cfg *ProducerConnConfig) *producerConnManager {
 	if cfg == nil {
 		panic("producer config nil")
 	}
@@ -268,7 +244,7 @@ func newProducerConnManager(cfg *ProducerConfig) *producerConnManager {
 	return m
 }
 
-// Start: 建立连接并刷新 pool，启动 reconnect watcher
+// Start  建立连接并刷新 pool，启动 reconnect watcher
 func (m *producerConnManager) Start() error {
 	if atomic.LoadInt32(&m.closed) == 1 {
 		return fmt.Errorf("producerConnManager closed")
@@ -338,7 +314,7 @@ drained:
 	return nil
 }
 
-// GetProducerChannel: 从池中获取一个可用 channel（跳过 closed/broken）
+// GetProducerChannel  从池中获取一个可用 channel（跳过 closed/broken）
 // 注意：此方法只负责取出 channel；publish/inflight 管理由 Publish 方法完成，但是也提供给外部以兼容场景。
 func (m *producerConnManager) GetProducerChannel(ctx context.Context) (*confirmChannel, error) {
 	if atomic.LoadInt32(&m.closed) == 1 {
@@ -403,7 +379,7 @@ func (m *producerConnManager) PutProducerChannel(cc *confirmChannel) {
 	// 不调用 cc.close() —— 通道还活着，只是不归还池
 }
 
-// Publish: 对外封装的发布方法（推荐 Producer 使用此方法，而不是直接拿 channel publish）
+// Publish 对外封装的发布方法（推荐 Producer 使用此方法，而不是直接拿 channel publish）
 // 该方法负责：获取 channel、管理 inflight 计数、调用 publishWithConfirm、放回 channel。
 // 如果遇到 seq==0 或 channel broken，会重试在 timeout/ctx 限制下重新拿 channel 并重发（尝试次数有限由 ctx/外部控制）。
 func (m *producerConnManager) Publish(ctx context.Context, exchange, routingKey string, pub amqp.Publishing) error {
@@ -498,7 +474,7 @@ func (m *producerConnManager) reconnectWatcher() {
 	}
 }
 
-// Close: 优雅关闭，先设置 closed flag，关闭 pool 中所有 channel，等待 reconnect goroutine 退出
+// Close 优雅关闭，先设置 closed flag，关闭 pool 中所有 channel，等待 reconnect goroutine 退出
 // 会等待 inflight 在一定时间内归零（避免永远阻塞，这里用一个合理 timeout）
 func (m *producerConnManager) Close() error {
 	if !atomic.CompareAndSwapInt32(&m.closed, 0, 1) {
@@ -563,21 +539,14 @@ func (m *producerConnManager) loadConn() *amqp.Connection {
 }
 func (m *producerConnManager) storeConn(c *amqp.Connection) { m.conn.Store(c) }
 
-////////////////////////////////////////////////////////////////////////////////
-// consumerConnManager
-//
-//  - 管理 consumer 专用连接（worker 每次创建独立 amqp.Channel）
-//  - 提供稳定的 reconnect watcher（确定性 backoff）
-////////////////////////////////////////////////////////////////////////////////
-
 type consumerConnManager struct {
-	cfg    *ConsumerConfig
+	cfg    *ConsumerConnConfig
 	conn   atomic.Value // *amqp.Connection
 	closed int32
 	logger xmq.Logger
 }
 
-func newConsumerConnManager(cfg *ConsumerConfig) *consumerConnManager {
+func newConsumerConnManager(cfg *ConsumerConnConfig) *consumerConnManager {
 	if cfg == nil {
 		panic("consumer config nil")
 	}
@@ -652,7 +621,7 @@ func (m *consumerConnManager) reconnectWatcher() {
 	}
 }
 
-// GetConsumerChannel: 返回一个新的 amqp.Channel（调用者负责 close）
+// GetConsumerChannel 返回一个新的 amqp.Channel（调用者负责 close）
 func (m *consumerConnManager) GetConsumerChannel() (*amqp.Channel, error) {
 	conn := m.loadConn()
 	if conn == nil || conn.IsClosed() {
@@ -679,4 +648,5 @@ func (m *consumerConnManager) loadConn() *amqp.Connection {
 	}
 	return v.(*amqp.Connection)
 }
+
 func (m *consumerConnManager) storeConn(c *amqp.Connection) { m.conn.Store(c) }
