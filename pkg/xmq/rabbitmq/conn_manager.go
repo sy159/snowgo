@@ -342,41 +342,27 @@ func (m *producerConnManager) GetProducerChannel(ctx context.Context) (*confirmC
 	}
 }
 
-// PutProducerChannel 放回池。为避免高并发下瞬时池满导致频繁 close/recreate，这里采用等待重试的策略：
+// PutProducerChannel 放回池。为避免高并发下瞬时池满导致频繁
 func (m *producerConnManager) PutProducerChannel(cc *confirmChannel) {
 	if cc == nil {
 		return
 	}
-	// 1. 已关闭 / 已坏：直接 close
+
+	// 已关闭 / 已坏：直接 close
 	if atomic.LoadInt32(&m.closed) == 1 || atomic.LoadInt32(&cc.closed) == 1 || atomic.LoadInt32(&cc.broken) == 1 {
 		cc.close()
 		return
 	}
 
-	// 2. 非阻塞试一次
+	// 尝试1次非阻塞放入
 	select {
 	case m.pool <- cc:
 		return
 	default:
+		m.logger.Warn("PutProducerChannel: pool full, discard channel",
+			zap.Int("pool_size", cap(m.pool)),
+			zap.Int("pool_len", len(m.pool)))
 	}
-
-	// 3. 阻塞等待最多 PutBackTimeout（默认 500 ms ~ 1 s）
-	deadline := time.Now().Add(m.cfg.PutBackTimeout)
-	for time.Now().Before(deadline) {
-		select {
-		case m.pool <- cc:
-			return
-		default:
-			time.Sleep(5 * time.Millisecond)
-		}
-	}
-
-	// 4. 超时：直接丢弃（不 close），让 GC 回收
-	if m.logger != nil {
-		m.logger.Warn("PutProducerChannel: pool full, discard healthy channel to avoid close-storm",
-			zap.Duration("timeout", m.cfg.PutBackTimeout))
-	}
-	// 不调用 cc.close() —— 通道还活着，只是不归还池
 }
 
 // Publish 对外封装的发布方法（推荐 Producer 使用此方法，而不是直接拿 channel publish）
@@ -425,9 +411,7 @@ func (m *producerConnManager) reconnectWatcher() {
 		if conn == nil || conn.IsClosed() {
 			newConn, err := amqp.Dial(m.cfg.URL)
 			if err != nil {
-				if m.logger != nil {
-					m.logger.Warn("producer reconnect dial failed", zap.String("error", err.Error()))
-				}
+				m.logger.Warn("producer reconnect dial failed", zap.String("error", err.Error()))
 				time.Sleep(backoff)
 				backoff *= 2
 				if backoff > m.cfg.ReconnectMaxDelay {
@@ -458,9 +442,7 @@ func (m *producerConnManager) reconnectWatcher() {
 			}
 			// reset backoff
 			backoff = m.cfg.ReconnectInitialDelay
-			if m.logger != nil {
-				m.logger.Info("producer reconnected")
-			}
+			m.logger.Info("producer reconnected")
 			continue
 		}
 		// wait for close notification
@@ -514,9 +496,7 @@ drained:
 		select {
 		case <-timeout:
 			// force return, some inflight didn't finish
-			if m.logger != nil {
-				m.logger.Warn("producer Close timeout waiting inflight", zap.Int64("inflight", m.inflight))
-			}
+			m.logger.Warn("producer Close timeout waiting inflight", zap.Int64("inflight", m.inflight))
 			goto closeConn
 		case <-tick.C:
 		}
@@ -594,9 +574,7 @@ func (m *consumerConnManager) reconnectWatcher() {
 		if conn == nil || conn.IsClosed() {
 			newConn, err := amqp.Dial(m.cfg.URL)
 			if err != nil {
-				if m.logger != nil {
-					m.logger.Warn("consumer reconnect dial failed", zap.String("error", err.Error()))
-				}
+				m.logger.Warn("consumer reconnect dial failed", zap.String("error", err.Error()))
 				time.Sleep(backoff)
 				backoff *= 2
 				if backoff > m.cfg.ReconnectMaxDelay {
@@ -606,9 +584,7 @@ func (m *consumerConnManager) reconnectWatcher() {
 			}
 			m.storeConn(newConn)
 			backoff = m.cfg.ReconnectInitialDelay
-			if m.logger != nil {
-				m.logger.Info("consumer reconnected")
-			}
+			m.logger.Info("consumer reconnected")
 			continue
 		}
 		// wait for close
