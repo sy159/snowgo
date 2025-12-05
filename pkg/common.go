@@ -3,9 +3,11 @@ package common
 import (
 	"crypto/rand"
 	"fmt"
+	"github.com/bwmarrin/snowflake"
 	"math/big"
 	mrand "math/rand"
 	"reflect"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -13,10 +15,21 @@ import (
 var (
 	weakOnce sync.Once
 	weakRng  *mrand.Rand
+	sfNode   *snowflake.Node
 )
 
+func init() {
+	// 单机固定 NodeID=1（如需多节点，可从 env 配置）
+	n, err := snowflake.NewNode(1)
+	if err != nil {
+		panic("Failed to initialize snowflake node: " + err.Error())
+	}
+	sfNode = n
+}
+
+// 初始化高性能 RNG（非安全）
 func initWeakRng() {
-	// nosec G404非安全场景，仅用于生成混淆/测试数据
+	// nosec G404 非安全随机，仅用于生成测试数据/混淆用，不适用于安全用途
 	weakRng = mrand.New(mrand.NewSource(time.Now().UnixNano()))
 }
 
@@ -41,17 +54,36 @@ func SecureRandInt63n(max int64) (int64, error) {
 	return nBig.Int64(), nil
 }
 
-// ErrorToString 错误转为字符串
+// GenerateID 生成全局唯一消息 ID（数字字符串）
+func GenerateID() string {
+	if sfNode != nil {
+		return sfNode.Generate().String()
+	}
+
+	// 毫秒时间戳（41 bit）
+	ts := uint64(time.Now().UnixMilli()) << 22
+
+	// 22 bit 随机（0 ~ 4,194,304）
+	r, _ := SecureRandInt63n(1 << 22)
+
+	return strconv.FormatUint(ts|uint64(r), 10)
+}
+
+// ErrorToString 错误转字符串（可安全处理 panic）
 func ErrorToString(err interface{}) string {
 	switch v := err.(type) {
+	case nil:
+		return ""
 	case error:
 		return v.Error()
+	case string:
+		return v
 	default:
-		return err.(string)
+		return fmt.Sprintf("%v", v)
 	}
 }
 
-// StructToMap 结构体转为Map[string]interface{}, 直接通过序列化，反序列化为map会存在数字类型（整型、浮点型等）都会序列化成float64类型。
+// StructToMap 结构体转 map[string]interface{}，仅提取 tagName 的标签字段  示例：tagName="json" → 取 json:"xxx" 的字段
 func StructToMap(in interface{}, tagName string) (map[string]interface{}, error) {
 	out := make(map[string]interface{})
 
@@ -60,17 +92,19 @@ func StructToMap(in interface{}, tagName string) (map[string]interface{}, error)
 		v = v.Elem()
 	}
 
-	if v.Kind() != reflect.Struct { // 非结构体返回错误提示
-		return nil, fmt.Errorf("Struct to map only accepts struct or struct pointer; got %T\n", v)
+	if v.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("StructToMap only accepts struct or struct pointer; got %T", v)
 	}
 
 	t := v.Type()
 	// 指定tagName值为map中key;字段值为map中value
 	for i := 0; i < v.NumField(); i++ {
 		fi := t.Field(i)
-		if tagValue := fi.Tag.Get(tagName); tagValue != "" {
-			out[tagValue] = v.Field(i).Interface()
+		tagValue := fi.Tag.Get(tagName)
+		if tagValue == "" {
+			continue
 		}
+		out[tagValue] = v.Field(i).Interface()
 	}
 	return out, nil
 }
