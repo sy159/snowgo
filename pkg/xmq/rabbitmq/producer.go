@@ -3,6 +3,7 @@ package rabbitmq
 import (
 	"context"
 	"fmt"
+	common "snowgo/pkg"
 	"snowgo/pkg/xmq"
 	"time"
 
@@ -17,10 +18,8 @@ type Producer struct {
 	log xmq.Logger
 }
 
-// NewProducerWithConfig 使用 ProducerConnConfig 创建 Producer 实例
-// cfg.URL 必须非空，否则 panic
-// cfg.Logger 若为 nil，则默认使用 nopLogger
-func NewProducerWithConfig(cfg *ProducerConnConfig) (*Producer, error) {
+// NewProducer 使用 ProducerConnConfig 创建 Producer 实例
+func NewProducer(ctx context.Context, cfg *ProducerConnConfig) (*Producer, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("producer config is nil")
 	}
@@ -30,8 +29,8 @@ func NewProducerWithConfig(cfg *ProducerConnConfig) (*Producer, error) {
 	if cfg.Logger == nil {
 		cfg.Logger = &nopLogger{}
 	}
-	cm := newProducerConnManager(cfg)
-	if err := cm.Start(); err != nil {
+	cm := newProducerConnManager(ctx, cfg)
+	if err := cm.Start(ctx); err != nil {
 		return nil, fmt.Errorf("producer start failed: %w", err)
 	}
 	return &Producer{
@@ -51,7 +50,7 @@ func (p *Producer) Publish(ctx context.Context, exchange, routingKey string, msg
 	}
 
 	if msg.MessageId == "" {
-		msg.MessageId = fmt.Sprintf("%d", time.Now().UnixNano())
+		msg.MessageId = common.GenerateID()
 	}
 	msg.Timestamp = time.Now()
 
@@ -65,7 +64,7 @@ func (p *Producer) Publish(ctx context.Context, exchange, routingKey string, msg
 
 	// Publish 内部已经管理 inflight
 	err := p.cm.Publish(ctx, exchange, routingKey, pub)
-	if err != nil && p.log != nil {
+	if err != nil {
 		p.log.Warn("publish failed",
 			zap.String("exchange", exchange),
 			zap.String("routing_key", routingKey),
@@ -106,5 +105,5 @@ func (p *Producer) Close(ctx context.Context) error {
 	if p == nil || p.cm == nil {
 		return nil
 	}
-	return p.cm.Close()
+	return p.cm.Close(ctx)
 }

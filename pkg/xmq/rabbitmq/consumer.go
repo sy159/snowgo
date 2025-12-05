@@ -47,8 +47,8 @@ type Consumer struct {
 	units   sync.Map
 }
 
-// NewConsumerWithConfig 使用 ConsumerConfig 创建 Consumer 实例
-func NewConsumerWithConfig(cfg *ConsumerConnConfig) (*Consumer, error) {
+// NewConsumer 使用 ConsumerConfig 创建 Consumer 实例
+func NewConsumer(ctx context.Context, cfg *ConsumerConnConfig) (*Consumer, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("consumer config is nil")
 	}
@@ -58,8 +58,8 @@ func NewConsumerWithConfig(cfg *ConsumerConnConfig) (*Consumer, error) {
 	if cfg.Logger == nil {
 		cfg.Logger = &nopLogger{}
 	}
-	cm := newConsumerConnManager(cfg)
-	if err := cm.Start(); err != nil {
+	cm := newConsumerConnManager(ctx, cfg)
+	if err := cm.Start(ctx); err != nil {
 		return nil, fmt.Errorf("consumer start failed: %w", err)
 	}
 	return &Consumer{
@@ -105,7 +105,7 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 		}
 
 		// 获取独立 channel
-		ch, err := c.cm.GetConsumerChannel()
+		ch, err := c.cm.GetConsumerChannel(ctx)
 		if err != nil {
 			if c.logger != nil {
 				c.logger.Warn("consumer get channel failed", zap.String("error", err.Error()))
@@ -210,11 +210,11 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 }
 
 // Register 消费注册
-func (c *Consumer) Register(topic, group string, handler xmq.Handler, opts ...interface{}) error {
-	if topic == "" || group == "" || handler == nil {
+func (c *Consumer) Register(ctx context.Context, exchange, routingKey string, handler xmq.Handler, opts ...interface{}) error {
+	if exchange == "" || routingKey == "" || handler == nil {
 		return fmt.Errorf("Register: topic/group/handler must be non-empty")
 	}
-	key := topic + "|" + group
+	key := exchange + "|" + routingKey
 	meta := defaultMeta()
 	for _, o := range opts {
 		if fn, ok := o.(ConsumerOption); ok {
@@ -222,9 +222,9 @@ func (c *Consumer) Register(topic, group string, handler xmq.Handler, opts ...in
 		}
 	}
 	if _, loaded := c.units.LoadOrStore(key, &consumerUnit{
-		topic:   topic,
-		group:   group,
-		queue:   fmt.Sprintf("%s.%s", topic, group),
+		topic:   exchange,
+		group:   routingKey,
+		queue:   fmt.Sprintf("%s.%s", exchange, routingKey),
 		handler: handler,
 		meta:    meta,
 	}); loaded {
@@ -260,7 +260,7 @@ func (c *Consumer) Stop(ctx context.Context) error {
 		return nil
 	}
 	// 关闭 consumerConnManager
-	c.cm.Close()
+	c.cm.Close(ctx)
 	done := make(chan struct{})
 	go func() {
 		c.wg.Wait()

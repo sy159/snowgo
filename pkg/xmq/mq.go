@@ -8,12 +8,13 @@ import (
 )
 
 var (
-	ErrClosed            = errors.New("mq client closed")
-	ErrPublishTimeout    = errors.New("mq publish confirm timeout")
-	ErrPublishNack       = errors.New("mq publish nack from broker")
-	ErrNoConnection      = errors.New("mq no connection")
-	ErrGetChannelTimeout = errors.New("mq get producer channel timeout")
-	ErrChannelExhausted  = errors.New("mq consumer channels exhausted")
+	ErrClosed                    = errors.New("mq client closed")
+	ErrProducerConnManagerClosed = errors.New("mq producer conn manager closed")
+	ErrPublishTimeout            = errors.New("mq publish confirm timeout")
+	ErrPublishNack               = errors.New("mq publish nack from broker")
+	ErrNoConnection              = errors.New("mq no connection")
+	ErrGetChannelTimeout         = errors.New("mq get producer channel timeout")
+	ErrChannelExhausted          = errors.New("mq consumer channels exhausted")
 )
 
 // Message 消息结构体
@@ -47,7 +48,7 @@ type Handler func(ctx context.Context, msg Message) error
 
 // Consumer 业务注册 Handler，框架负责 ACK/重试
 type Consumer interface {
-	Register(topic string, group string, handler Handler, opts ...interface{}) error
+	Register(ctx context.Context, exchange string, routingKey string, handler Handler, opts ...interface{}) error
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
 }
