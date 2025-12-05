@@ -73,6 +73,7 @@ services:
         max-file: '10'
     environment:
       ENV: ${ENV:-container}
+      SNOWFLAKE_NODE: 1
     privileged: true
     volumes:
       - /etc/localtime:/etc/localtime
@@ -94,6 +95,7 @@ services:
         max-file: '10'
     environment:
       ENV: ${ENV:-container}
+      SNOWFLAKE_NODE: 2
     privileged: true
     volumes:
       - /etc/localtime:/etc/localtime
