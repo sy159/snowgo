@@ -182,7 +182,7 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 						MessageId: d.MessageId,
 					}
 
-					err := handler(context.Background(), m)
+					err := handler(ctx, m)
 					if err != nil {
 						// 处理受控重试
 						retry := 0

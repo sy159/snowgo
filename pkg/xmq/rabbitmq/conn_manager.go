@@ -13,26 +13,179 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	// 默认单个 confirmChannel 上允许的最大 pending 数（防止无限增长）
+	// 如果需要可将其移到 ProducerConnConfig 并通过配置注入。
+	defaultMaxPendingPerChannel = 100000
+	// 当尾部清理未命中时的有界反向扫描上限（可调）
+	defaultTailScanLimit = 1024
+)
+
+// pendingRec 保留等待 confirm 的通道
 type pendingRec struct {
 	ch   chan amqp.Confirmation
 	once sync.Once
 }
 
+// pendingNode 是 pendingList 的元素
+type pendingNode struct {
+	tag uint64
+	rec *pendingRec
+}
+
+// pendingList 并发安全的有序前缀列表（适合 seq 单调增加的场景）
+// 设计理由：在 confirm（尤其是 batch confirm）场景下，可以高效弹出前缀。
+// 实现假定 publish 的 seq 是单调递增（由 amqp channel 保证），因此 add 操作可以直接 append。
+type pendingList struct {
+	mu    sync.Mutex
+	list  []pendingNode
+	count int32 // 原子计数，避免 confirmRouter 频繁加锁获取大小
+}
+
+// add 将节点尾部 append（O(1)）
+// 前提：seq 单调递增（GetNextPublishSeqNo 保证）
+func (l *pendingList) add(tag uint64, rec *pendingRec) {
+	l.mu.Lock()
+	l.list = append(l.list, pendingNode{tag: tag, rec: rec})
+	atomic.AddInt32(&l.count, 1)
+	l.mu.Unlock()
+}
+
+// decCount: 原子安全地递减 count，保证不小于 0
+func (l *pendingList) decCount(n int32) {
+	if n <= 0 {
+		return
+	}
+	for {
+		old := atomic.LoadInt32(&l.count)
+		if old <= 0 {
+			// 已经为0或负，尝试把它置为0（防御性）
+			if atomic.CompareAndSwapInt32(&l.count, old, 0) {
+				return
+			}
+			continue
+		}
+		newv := old - n
+		if newv < 0 {
+			newv = 0
+		}
+		if atomic.CompareAndSwapInt32(&l.count, old, newv) {
+			return
+		}
+		// CAS 失败 -> retry
+	}
+}
+
+// ackLE 唤醒并移除所有 tag <= given tag，返回被唤醒的数量
+// ack 参数表示要发送给等待者的 Ack 值（true = ack，false = nack）
+func (l *pendingList) ackLE(tag uint64, ack bool) int {
+	l.mu.Lock()
+	i := 0
+	for ; i < len(l.list) && l.list[i].tag <= tag; i++ {
+		// non-blocking send: 如果阻塞则直接 close chan（唤醒等待方）
+		select {
+		case l.list[i].rec.ch <- amqp.Confirmation{DeliveryTag: l.list[i].tag, Ack: ack}:
+			l.list[i].rec.once.Do(func() { close(l.list[i].rec.ch) })
+		default:
+			l.list[i].rec.once.Do(func() { close(l.list[i].rec.ch) })
+		}
+	}
+	if i > 0 {
+		// 清零引用帮助 GC，并重切片
+		for j := 0; j < i; j++ {
+			l.list[j].rec = nil
+		}
+		l.list = l.list[i:]
+		// 防御性递减 count
+		l.decCount(int32(i))
+	}
+	l.mu.Unlock()
+	return i
+}
+
+// len 获取当前 pending 数量
+func (l *pendingList) len() int {
+	return int(atomic.LoadInt32(&l.count))
+}
+
+// drainAll 在关闭时唤醒所有 pending（按 nack/false）
+func (l *pendingList) drainAll() int {
+	// 直接调用 ackLE 用一个极大 tag（会在内部减少 count）
+	return l.ackLE(^uint64(0), false)
+}
+
+// popTailIfMatch: 如果尾部 tag == wantTag，则弹出尾部并关闭其 rec.ch，返回 true
+func (l *pendingList) popTailIfMatch(wantTag uint64) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	n := len(l.list)
+	if n == 0 {
+		return false
+	}
+	if l.list[n-1].tag == wantTag {
+		last := l.list[n-1]
+		last.rec.once.Do(func() { close(last.rec.ch) })
+		l.list = l.list[:n-1]
+		l.decCount(1)
+		return true
+	}
+	return false
+}
+
+// removeTailNearby: 从尾向前最多 scanLimit 个元素查找 wantTag，找到则移除该元素并返回 true
+// 注意：移除中间元素需要移动 slice（cost O(k)），但我们限制了 scanLimit 来控制最坏情况。
+// 只有在极罕见场景（回绕/异常）下才会触发此函数。
+func (l *pendingList) removeTailNearby(wantTag uint64, scanLimit int) bool {
+	if scanLimit <= 0 {
+		return false
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	n := len(l.list)
+	if n == 0 {
+		return false
+	}
+	scanned := 0
+	for i := n - 1; i >= 0 && scanned < scanLimit; i-- {
+		if l.list[i].tag == wantTag {
+			// 如果是尾部，直接 pop
+			if i == n-1 {
+				last := l.list[n-1]
+				last.rec.once.Do(func() { close(last.rec.ch) })
+				l.list = l.list[:n-1]
+				l.decCount(1)
+				return true
+			}
+			// 中间元素：移位
+			found := l.list[i]
+			found.rec.once.Do(func() { close(found.rec.ch) })
+			copy(l.list[i:], l.list[i+1:])
+			l.list[len(l.list)-1] = pendingNode{}
+			l.list = l.list[:len(l.list)-1]
+			l.decCount(1)
+			return true
+		}
+		scanned++
+	}
+	return false
+}
+
 type confirmChannel struct {
 	ch        *amqp.Channel
-	logger    xmq.Logger // 使用项目级 Logger（xmq.Logger）
+	logger    xmq.Logger
 	closeCh   chan struct{}
 	closeOnce sync.Once
 
-	// mu 用于保护 GetNextPublishSeqNo + PublishWithContext 的原子性
+	// mu 用于保护 GetNextPublishSeqNo + PublishWithContext 的原子性（保持 seq 与 publish 原子）
 	mu sync.Mutex
 
-	// pending map: key = deliveryTag (uint64) -> *pendingRec
-	pending sync.Map
+	pending *pendingList // 使用有序 pending 列表（尾部 append，前缀弹出）
 
-	closed   int32 // atomic flag
-	broken   int32 // atomic flag: channel 被标记为 broken（需要回收）
-	consecTO int32 // 连续 confirm 超时计数（用于触发回收）
+	closed   int32         // atomic flag
+	broken   int32         // atomic flag: channel 被标记为 broken（需要回收）
+	consecTO int32         // 连续 confirm 超时计数（用于触发回收）
+	lastSeq  uint64        // 仅在 cc.mu 持有时读写
+	lastSeqA atomic.Uint64 // 原子副本，供失败路径无锁读取
 }
 
 // newConfirmChannel 创建并启用 confirm 模式（会启动 confirmRouter），用于生产使用
@@ -52,17 +205,18 @@ func newConfirmChannel(ctx context.Context, conn *amqp.Connection, logger xmq.Lo
 		ch:      ch,
 		logger:  logger,
 		closeCh: make(chan struct{}),
+		pending: &pendingList{},
 	}
-	// start router
+	// 启动 confirmRouter
 	go cc.confirmRouter(ctx)
-	// watch NotifyClose to mark broken
+	// 监控 NotifyClose，保证 channel 被 broker 关闭时能正确回收并写日志
 	go func() {
 		closeC := ch.NotifyClose(make(chan *amqp.Error, 1))
 		if e := <-closeC; e != nil {
 			atomic.StoreInt32(&cc.broken, 1)
 			cc.close(ctx)
 			cc.logger.Warn(
-				fmt.Sprintf("confirm channel closed by broker, err is: %s", err.Error()),
+				fmt.Sprintf("confirm channel closed by broker, err is: %s", e),
 				zap.String("event", xmq.EventProducerConfirm),
 				zap.String("trace_id", xtrace.GetTraceID(ctx)),
 			)
@@ -72,59 +226,50 @@ func newConfirmChannel(ctx context.Context, conn *amqp.Connection, logger xmq.Lo
 }
 
 // confirmRouter: 读取 NotifyPublish 并路由给 pendingRec
-// 非阻塞写：如果写会阻塞（意味着 publisher 已经离开/未等待），会 close pending ch 并回收 channel，避免泄露。
-// 使用缓冲 1 的 rec.ch；写仍可能阻塞（如果接收者已退出且缓冲已满），因此使用 select non-blocking。
+// 兼容 broker 批量确认：当收到某个 deliveryTag 的 confirm 时，会一次性唤醒并删除所有 tag <= deliveryTag 的 pending。
+// 写入是非阻塞的；如果写阻塞，则关闭 pending chan 并回收 channel。
 func (cc *confirmChannel) confirmRouter(ctx context.Context) {
-	confSrc := cc.ch.NotifyPublish(make(chan amqp.Confirmation, 1))
+	confSrc := cc.ch.NotifyPublish(make(chan amqp.Confirmation, 128))
 	for {
 		select {
 		case c, ok := <-confSrc:
 			if !ok {
 				goto exit
 			}
-			v, loaded := cc.pending.Load(c.DeliveryTag)
-			if !loaded {
-				// 没有 pending：记录日志并继续
-				cc.logger.Warn(
-					fmt.Sprintf("confirm router: no pending for deliveryTag %d", c.DeliveryTag),
+			handled := cc.pending.ackLE(c.DeliveryTag, c.Ack)
+			if handled > 0 {
+				cc.logger.Info(
+					fmt.Sprintf("confirm router: batch confirm handled， deliveryTag: %d handledCount: %d ack: %t", c.DeliveryTag, handled, c.Ack),
 					zap.String("event", xmq.EventProducerConfirm),
 					zap.String("trace_id", xtrace.GetTraceID(ctx)),
 				)
+				if c.Ack {
+					atomic.StoreInt32(&cc.consecTO, 0)
+				}
 				continue
 			}
-			rec := v.(*pendingRec)
-			// 非阻塞写：若阻塞则 close rec.ch 以唤醒 publisher，并回收 channel
-			select {
-			case rec.ch <- c:
-				// success: ensure close once and delete
-				rec.once.Do(func() { close(rec.ch) })
-				cc.pending.Delete(c.DeliveryTag)
-			default:
-				// can't write without blocking -> wake publisher and recycle channel
-				rec.once.Do(func() { close(rec.ch) })
-				cc.pending.Delete(c.DeliveryTag)
-				atomic.StoreInt32(&cc.broken, 1)
-				cc.close(ctx)
-				cc.logger.Warn(
-					fmt.Sprintf("confirm router: pending write blocked, mark channel broken deliveryTag is %d", c.DeliveryTag),
-					zap.String("event", xmq.EventProducerConfirm),
-					zap.String("trace_id", xtrace.GetTraceID(ctx)),
-				)
-			}
+
+			// 若未找到任何 pending（可能是已经超时被清理），记录警告
+			cc.logger.Warn(
+				fmt.Sprintf("confirm router: no pending found for delivery_tag: %d ack: %t (maybe timedout or reclaimed)", c.DeliveryTag, c.Ack),
+				zap.String("event", xmq.EventProducerConfirm),
+				zap.String("trace_id", xtrace.GetTraceID(ctx)),
+			)
 		case <-cc.closeCh:
 			goto exit
 		}
 	}
 exit:
 	atomic.StoreInt32(&cc.closed, 1)
-	// close all pending
-	cc.pending.Range(func(k, v interface{}) bool {
-		if r, ok := v.(*pendingRec); ok {
-			r.once.Do(func() { close(r.ch) })
-			cc.pending.Delete(k)
-		}
-		return true
-	})
+	// 关闭并释放所有剩余 pending（标记为失败）
+	drained := cc.pending.drainAll()
+	if drained > 0 {
+		cc.logger.Warn(
+			fmt.Sprintf("confirm router: drained: %d remaining pending on channel close", drained),
+			zap.String("event", xmq.EventProducerConfirm),
+			zap.String("trace_id", xtrace.GetTraceID(ctx)),
+		)
+	}
 }
 
 // publishWithConfirm: 在 cc.mu 下保证 seq 与 publish 原子性
@@ -136,26 +281,66 @@ func (cc *confirmChannel) publishWithConfirm(ctx context.Context, exchange, rout
 		return fmt.Errorf("confirmChannel closed or broken")
 	}
 
+	// 若 pending 数量异常大，记录警告（防护；如需更强行为可在这里返回错误/阻塞）
+	if cc.pending.len() >= defaultMaxPendingPerChannel {
+		cc.logger.Warn(
+			fmt.Sprintf("publishWithConfirm: pending size %d exceeds threshold %d", cc.pending.len(), defaultMaxPendingPerChannel),
+			zap.String("event", xmq.EventProducerChannel),
+			zap.String("trace_id", xtrace.GetTraceID(ctx)),
+		)
+		// 这里不直接拒绝 publish，为了兼容你现有逻辑；若需要强回压可返回错误。
+	}
+
 	// lock to ensure seq/publish atomicity
 	cc.mu.Lock()
 	seq := cc.ch.GetNextPublishSeqNo()
 	if seq == 0 {
-		// seq==0: channel internal reset -> recycle and return error
 		cc.mu.Unlock()
 		atomic.StoreInt32(&cc.broken, 1)
 		cc.close(ctx)
 		return fmt.Errorf("confirmChannel invalid next seq 0")
 	}
-	rec := &pendingRec{ch: make(chan amqp.Confirmation, 1)}
-	cc.pending.Store(seq, rec)
 
-	// 加锁定执行发布操作，以避免 seq 和 publish 之间的竞争
+	// 若检测到 seq <= lastSeq（并且 lastSeq != 0），说明 channel 重置或 wrap
+	if cc.lastSeq != 0 && seq <= cc.lastSeq {
+		cc.mu.Unlock()
+		atomic.StoreInt32(&cc.broken, 1)
+		cc.close(ctx)
+		cc.logger.Warn(
+			fmt.Sprintf("confirmChannel detected sequence reset/wrap - marking channel broken，seq: %d last_seq: %d", seq, cc.lastSeq),
+			zap.String("event", xmq.EventProducerChannel),
+			zap.String("trace_id", xtrace.GetTraceID(ctx)),
+		)
+		return fmt.Errorf("confirmChannel sequence reset or wrap detected (seq=%d last=%d)", seq, cc.lastSeq)
+	}
+
+	// 正常，记录 lastSeq 并 append pending
+	cc.lastSeq = seq
+	rec := &pendingRec{ch: make(chan amqp.Confirmation, 1)}
+	cc.pending.add(seq, rec)
+	cc.lastSeqA.Store(seq) // 在 pending 已 append 后写入原子副本
+
+	// 执行发布（在 unlock 之前已把 pending 写入）
 	err := cc.ch.PublishWithContext(ctx, exchange, routingKey, false, false, pub)
 	cc.mu.Unlock()
 
 	if err != nil {
-		// 发布失败，标记为损坏，关闭通道
-		cc.pending.Delete(seq)
+		// 快速路径：原子副本对比，无锁判断
+		if cc.lastSeqA.Load() == seq {
+			if cc.pending.popTailIfMatch(seq) {
+				atomic.StoreInt32(&cc.broken, 1)
+				cc.close(ctx)
+				return fmt.Errorf("publish failed: %w", err)
+			}
+		}
+		// 有界反向扫描（极罕见）：尝试在尾部附近扫描有限元素
+		if cc.pending.removeTailNearby(seq, defaultTailScanLimit) {
+			atomic.StoreInt32(&cc.broken, 1)
+			cc.close(ctx)
+			return fmt.Errorf("publish failed: %w", err)
+		}
+
+		// 最后保险：没有命中 -> 标记 broken 并 close，confirmRouter 的 drainAll 会清理剩余 pending
 		atomic.StoreInt32(&cc.broken, 1)
 		cc.close(ctx)
 		return fmt.Errorf("publish failed: %w", err)
@@ -183,26 +368,40 @@ func (cc *confirmChannel) publishWithConfirm(ctx context.Context, exchange, rout
 	case <-timer.C:
 		// 确认是否超时：连续计数器加一，可能标记为失败
 		newCnt := atomic.AddInt32(&cc.consecTO, 1)
-		cc.pending.Delete(seq)
+		// 将该 seq 从 pending 中移除（避免内存泄露）
+		// 注意：此处我们不能高效地从任意位置删除（因为是 slice），
+		// 但通常超时的 seq 会是最小（按顺序），因此前缀删除将在 confirmRouter 中触发或超时处理。
+		// 为安全起见，尝试按前缀删除到 seq（可能会移除更多，属于容忍范围）
+		cc.pending.ackLE(seq, false)
+
 		if consecThreshold > 0 && newCnt >= consecThreshold {
 			atomic.StoreInt32(&cc.broken, 1)
 			cc.close(ctx)
 			cc.logger.Warn(
-				fmt.Sprintf("channel consecutive %d confirm timeout", newCnt),
+				fmt.Sprintf("channel consecutive %d confirm timeout reached deliveryTag: %d", newCnt, seq),
+				zap.String("event", xmq.EventProducerConfirm),
+				zap.String("trace_id", xtrace.GetTraceID(ctx)),
+			)
+		} else {
+			cc.logger.Warn(
+				fmt.Sprintf("confirm timeout (transient), consecutive %d confirm deliveryTag: %d", newCnt, seq),
 				zap.String("event", xmq.EventProducerConfirm),
 				zap.String("trace_id", xtrace.GetTraceID(ctx)),
 			)
 		}
 		return xmq.ErrPublishTimeout
 	case <-ctx.Done():
-		cc.pending.Delete(seq)
+		// publish ctx canceled：尝试将该 seq 从 pending 中移除
+		cc.pending.ackLE(seq, false)
 		return ctx.Err()
 	case <-cc.closeCh:
-		cc.pending.Delete(seq)
+		// channel 被关闭：从 pending 中移除 seq
+		cc.pending.ackLE(seq, false)
 		return fmt.Errorf("confirmChannel closed")
 	}
 }
 
+// close 安全关闭 confirmChannel
 func (cc *confirmChannel) close(_ context.Context) {
 	cc.closeOnce.Do(func() {
 		atomic.StoreInt32(&cc.closed, 1)
@@ -327,7 +526,6 @@ drained:
 }
 
 // GetProducerChannel  从池中获取一个可用 channel（跳过 closed/broken）
-// 注意：此方法只负责取出 channel；publish/inflight 管理由 Publish 方法完成，但是也提供给外部以兼容场景。
 func (m *producerConnManager) GetProducerChannel(ctx context.Context) (*confirmChannel, error) {
 	if atomic.LoadInt32(&m.closed) == 1 {
 		return nil, xmq.ErrClosed
@@ -369,13 +567,22 @@ func (m *producerConnManager) PutProducerChannel(ctx context.Context, cc *confir
 	// 尝试1次非阻塞放入
 	select {
 	case m.pool <- cc:
-		return
-	default:
-		m.logger.Warn(
-			"put producer channel is err: pool full, discard channel",
+		// 成功放回
+		m.logger.Info(
+			fmt.Sprintf("put producer channel returned to pool, pool_cap: %d pool_len: %d", cap(m.pool), len(m.pool)),
 			zap.String("event", xmq.EventProducerChannel),
 			zap.String("trace_id", xtrace.GetTraceID(ctx)),
 		)
+		return
+	default:
+		// 池已满 - 丢弃该 channel 并记录警告（可以改为等待 PutBackTimeout）
+		m.logger.Warn(
+			fmt.Sprintf("put producer channel: pool full, discard channel, pool_cap: %d pool_len: %d", cap(m.pool), len(m.pool)),
+			zap.String("event", xmq.EventProducerChannel),
+			zap.String("trace_id", xtrace.GetTraceID(ctx)),
+		)
+		cc.close(ctx)
+		return
 	}
 }
 
