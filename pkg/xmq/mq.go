@@ -14,7 +14,25 @@ var (
 	ErrPublishNack               = errors.New("mq publish nack from broker")
 	ErrNoConnection              = errors.New("mq no connection")
 	ErrGetChannelTimeout         = errors.New("mq get producer channel timeout")
-	ErrChannelExhausted          = errors.New("mq consumer channels exhausted")
+)
+
+const (
+	// EventProducerConnection Producer Connection & Channel & Confirm
+	EventProducerConnection      = "producer_connection"       // 生产者建立连接
+	EventProducerReconnection    = "producer_reconnection"     // 生产者重新建立连接
+	EventProducerCloseConnection = "producer_close_connection" // 生产者连接关闭
+	EventProducerChannel         = "producer_channel"          //  producer channel
+	EventProducerConfirm         = "producer_confirm"          // producer confirm
+
+	// EventPublish Publish
+	EventPublish = "publish_msg" // 发布消息
+
+	// EventConsumerConnection Consumer
+	EventConsumerConnection      = "consumer_connection"       // consumer建立连接
+	EventConsumerReconnection    = "consumer_reconnection"     // consumer重新建立连接
+	EventConsumerCloseConnection = "consumer_close_connection" // consumer连接关闭
+	EventConsumerChannel         = "consumer_channel"          //  consumer channel
+	EventConsumerConsume         = "consumer_Consume"          //  consumer consume
 )
 
 // Message 消息结构体

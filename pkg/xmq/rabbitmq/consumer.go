@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"snowgo/pkg/xmq"
+	"snowgo/pkg/xtrace"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -14,20 +15,20 @@ import (
 
 // 注册单元
 type consumerUnit struct {
-	topic   string
-	group   string
-	queue   string
-	handler xmq.Handler
-	meta    *consumerMeta
+	exchange   string
+	routingKey string
+	queue      string
+	handler    xmq.Handler
+	meta       *consumerMeta
 }
 
 type consumerMeta struct {
-	Prefetch   int
-	WorkerNum  int
-	RetryLimit int
+	Prefetch   int // Qos prefetch count，未ack消息上限，针对的是单个consumer，不是单个cannel
+	WorkerNum  int // 消费数量
+	RetryLimit int // 消费失败重试次数
 }
 
-func defaultMeta() *consumerMeta { return &consumerMeta{Prefetch: 16, WorkerNum: 4, RetryLimit: 3} }
+func defaultMeta() *consumerMeta { return &consumerMeta{Prefetch: 4, WorkerNum: 2, RetryLimit: 3} }
 
 // ConsumerOption 函数类型
 type ConsumerOption func(*consumerMeta)
@@ -60,6 +61,12 @@ func NewConsumer(ctx context.Context, cfg *ConsumerConnConfig) (*Consumer, error
 	}
 	cm := newConsumerConnManager(ctx, cfg)
 	if err := cm.Start(ctx); err != nil {
+		cm.logger.Error(
+			"consumer conn fail",
+			zap.String("event", xmq.EventConsumerConnection),
+			zap.Error(err),
+			zap.String("trace_id", xtrace.GetTraceID(ctx)),
+		)
 		return nil, fmt.Errorf("consumer start failed: %w", err)
 	}
 	return &Consumer{
@@ -107,9 +114,11 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 		// 获取独立 channel
 		ch, err := c.cm.GetConsumerChannel(ctx)
 		if err != nil {
-			if c.logger != nil {
-				c.logger.Warn("consumer get channel failed", zap.String("error", err.Error()))
-			}
+			c.logger.Warn(
+				fmt.Sprintf("consumer get channel failed, err is: %s", err),
+				zap.String("event", xmq.EventConsumerChannel),
+				zap.String("trace_id", xtrace.GetTraceID(ctx)),
+			)
 			time.Sleep(backoff)
 			backoff *= 2
 			if backoff > maxBackoff {
@@ -123,9 +132,11 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 		msgs, err := ch.Consume(queue, consumerTag, false, false, false, false, nil)
 		if err != nil {
 			_ = ch.Close()
-			if c.logger != nil {
-				c.logger.Warn("consumer start consume failed", zap.String("queue", queue), zap.String("error", err.Error()))
-			}
+			c.logger.Warn(
+				fmt.Sprintf("consumer start consume failed queue is %s, err is: %s", queue, err),
+				zap.String("event", xmq.EventConsumerConsume),
+				zap.String("trace_id", xtrace.GetTraceID(ctx)),
+			)
 			time.Sleep(backoff)
 			if backoff < maxBackoff {
 				backoff *= 2
@@ -152,9 +163,12 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 					defer func() {
 						if r := recover(); r != nil {
 							_ = d.Nack(false, true)
-							if c.logger != nil {
-								c.logger.Error("consumer handler panic", zap.Any("panic", r))
-							}
+							c.logger.Error(
+								fmt.Sprintf("consumer handler panic， queue: %s, workID: %d", queue, workerID),
+								zap.String("event", xmq.EventConsumerConsume),
+								zap.Any("error", r),
+								zap.String("trace_id", xtrace.GetTraceID(ctx)),
+							)
 						}
 					}()
 					hdrs := map[string]interface{}{}
@@ -212,7 +226,7 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 // Register 消费注册
 func (c *Consumer) Register(ctx context.Context, exchange, routingKey string, handler xmq.Handler, opts ...interface{}) error {
 	if exchange == "" || routingKey == "" || handler == nil {
-		return fmt.Errorf("Register: topic/group/handler must be non-empty")
+		return fmt.Errorf("register: exchange/routingKey/handler must be non-empty")
 	}
 	key := exchange + "|" + routingKey
 	meta := defaultMeta()
@@ -222,13 +236,13 @@ func (c *Consumer) Register(ctx context.Context, exchange, routingKey string, ha
 		}
 	}
 	if _, loaded := c.units.LoadOrStore(key, &consumerUnit{
-		topic:   exchange,
-		group:   routingKey,
-		queue:   fmt.Sprintf("%s.%s", exchange, routingKey),
-		handler: handler,
-		meta:    meta,
+		exchange:   exchange,
+		routingKey: routingKey,
+		queue:      fmt.Sprintf("%s.%s", exchange, routingKey),
+		handler:    handler,
+		meta:       meta,
 	}); loaded {
-		return fmt.Errorf("Register: duplicate handler for %s", key)
+		return fmt.Errorf("register: duplicate handler for %s", key)
 	}
 	return nil
 }

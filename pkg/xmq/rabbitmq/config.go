@@ -20,7 +20,6 @@ type ProducerConnConfig struct {
 	ProducerChannelPoolSize     int           // 生产者 channel 池大小，决定并发发布能力，默认 8
 	PublishGetTimeout           time.Duration // 获取可用 channel 的超时时间，超过返回 ErrGetChannelTimeout，默认 3s
 	ConfirmTimeout              time.Duration // 等待 broker confirm 的超时时间，每条消息等待 confirm 的最大时长，默认 5s
-	PutBackTimeout              time.Duration // 当消息处理完成后，channel放回池，如果池满返回的最大等待时间（阻塞等待），避免瞬时池满导致频繁 close/recreate，默认 800ms
 	ReconnectInitialDelay       time.Duration // 连接失败或断开后的初始重连延迟（指数回退），默认 500ms
 	ReconnectMaxDelay           time.Duration // 重连延迟的最大值（指数回退上限），默认 30s
 	ConsecutiveTimeoutThreshold int32         // 连续 confirm 超时计数阈值，达到后会标记 channel 为 broken 并回收，默认 3
@@ -38,7 +37,6 @@ func NewProducerConnConfig(url string, opts ...ProducerConnOption) *ProducerConn
 		ProducerChannelPoolSize:     8,
 		PublishGetTimeout:           3 * time.Second,
 		ConfirmTimeout:              5 * time.Second,
-		PutBackTimeout:              800 * time.Millisecond,
 		ReconnectInitialDelay:       500 * time.Millisecond,
 		ReconnectMaxDelay:           30 * time.Second,
 		ConsecutiveTimeoutThreshold: 3,
@@ -73,15 +71,6 @@ func WithConfirmTimeout(d time.Duration) ProducerConnOption {
 	return func(c *ProducerConnConfig) {
 		if d > 0 {
 			c.ConfirmTimeout = d
-		}
-	}
-}
-
-// WithPutBackTimeout 当消息处理完成后，channel放回池，如果池满channel 放回池的最大等待时间（阻塞等待）
-func WithPutBackTimeout(d time.Duration) ProducerConnOption {
-	return func(c *ProducerConnConfig) {
-		if d > 0 {
-			c.PutBackTimeout = d
 		}
 	}
 }
