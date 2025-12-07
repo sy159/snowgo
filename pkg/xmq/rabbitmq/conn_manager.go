@@ -132,6 +132,35 @@ func (l *pendingList) popTailIfMatch(wantTag uint64) bool {
 	return false
 }
 
+// removeByTag 在任意位置查找 wantTag 并移除（线性扫描，作为兜底）
+func (l *pendingList) removeByTag(wantTag uint64) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	n := len(l.list)
+	if n == 0 {
+		return false
+	}
+	for i := 0; i < n; i++ {
+		if l.list[i].tag == wantTag {
+			found := l.list[i]
+			// close via once.Do to avoid double close
+			if found.rec != nil {
+				found.rec.once.Do(func() { close(found.rec.ch) })
+			}
+			if i == n-1 {
+				l.list = l.list[:n-1]
+			} else {
+				copy(l.list[i:], l.list[i+1:])
+				l.list[len(l.list)-1] = pendingNode{}
+				l.list = l.list[:len(l.list)-1]
+			}
+			l.decCount(1)
+			return true
+		}
+	}
+	return false
+}
+
 // removeTailNearby: 从尾向前最多 scanLimit 个元素查找 wantTag，找到则移除该元素并返回 true
 // 注意：移除中间元素需要移动 slice（cost O(k)），但我们限制了 scanLimit 来控制最坏情况。
 // 只有在极罕见场景（回绕/异常）下才会触发此函数。
@@ -212,14 +241,31 @@ func newConfirmChannel(ctx context.Context, conn *amqp.Connection, logger xmq.Lo
 	// 监控 NotifyClose，保证 channel 被 broker 关闭时能正确回收并写日志
 	go func() {
 		closeC := ch.NotifyClose(make(chan *amqp.Error, 1))
-		if e := <-closeC; e != nil {
-			atomic.StoreInt32(&cc.broken, 1)
+		select {
+		case e, ok := <-closeC:
+			if !ok {
+				// notify channel closed - ensure cleanup
+				atomic.StoreInt32(&cc.broken, 1)
+				cc.close(ctx)
+				cc.logger.Warn(
+					"confirm channel notifyClose channel closed",
+					zap.String("event", xmq.EventProducerConfirm),
+					zap.String("trace_id", xtrace.GetTraceID(ctx)),
+				)
+				return
+			}
+			if e != nil {
+				atomic.StoreInt32(&cc.broken, 1)
+				cc.close(ctx)
+				cc.logger.Warn(
+					fmt.Sprintf("confirm channel closed by broker, err is: %s", e),
+					zap.String("event", xmq.EventProducerConfirm),
+					zap.String("trace_id", xtrace.GetTraceID(ctx)),
+				)
+			}
+		case <-ctx.Done():
+			// 上层取消，安全退出
 			cc.close(ctx)
-			cc.logger.Warn(
-				fmt.Sprintf("confirm channel closed by broker, err is: %s", e),
-				zap.String("event", xmq.EventProducerConfirm),
-				zap.String("trace_id", xtrace.GetTraceID(ctx)),
-			)
 		}
 	}()
 	return cc, nil
@@ -256,6 +302,8 @@ func (cc *confirmChannel) confirmRouter(ctx context.Context) {
 				zap.String("trace_id", xtrace.GetTraceID(ctx)),
 			)
 		case <-cc.closeCh:
+			goto exit
+		case <-ctx.Done():
 			goto exit
 		}
 	}
@@ -368,11 +416,24 @@ func (cc *confirmChannel) publishWithConfirm(ctx context.Context, exchange, rout
 	case <-timer.C:
 		// 确认是否超时：连续计数器加一，可能标记为失败
 		newCnt := atomic.AddInt32(&cc.consecTO, 1)
+		// 精确清理：优先尝试从尾部精确删除该 seq（常见情况），
+		// 如果失败再做有界反向扫描；避免使用 ackLE 吞掉前缀未超时的 pending。
+		if !cc.pending.popTailIfMatch(seq) && !cc.pending.removeTailNearby(seq, defaultTailScanLimit) {
+			if cc.pending.removeByTag(seq) {
+				// removed successfully
+			} else {
+				cc.logger.Warn(
+					fmt.Sprintf("confirm timeout: cleanup missed for seq %d (pending_len=%d)", seq, cc.pending.len()),
+					zap.String("event", xmq.EventProducerConfirm),
+					zap.String("trace_id", xtrace.GetTraceID(ctx)),
+				)
+			}
+		}
 		// 将该 seq 从 pending 中移除（避免内存泄露）
 		// 注意：此处我们不能高效地从任意位置删除（因为是 slice），
 		// 但通常超时的 seq 会是最小（按顺序），因此前缀删除将在 confirmRouter 中触发或超时处理。
 		// 为安全起见，尝试按前缀删除到 seq（可能会移除更多，属于容忍范围）
-		cc.pending.ackLE(seq, false)
+		// cc.pending.ackLE(seq, false)
 
 		if consecThreshold > 0 && newCnt >= consecThreshold {
 			atomic.StoreInt32(&cc.broken, 1)
@@ -391,12 +452,17 @@ func (cc *confirmChannel) publishWithConfirm(ctx context.Context, exchange, rout
 		}
 		return xmq.ErrPublishTimeout
 	case <-ctx.Done():
-		// publish ctx canceled：尝试将该 seq 从 pending 中移除
-		cc.pending.ackLE(seq, false)
+		// publish ctx canceled：精确清理该 seq，避免误杀前缀 pending
+		if !cc.pending.popTailIfMatch(seq) && !cc.pending.removeTailNearby(seq, defaultTailScanLimit) {
+			// 兜底线性删除（忽略返回值）
+			_ = cc.pending.removeByTag(seq)
+		}
 		return ctx.Err()
 	case <-cc.closeCh:
-		// channel 被关闭：从 pending 中移除 seq
-		cc.pending.ackLE(seq, false)
+		// channel 被关闭：尽量精确移除该 seq（drainAll 会在 confirmRouter 触发）
+		if !cc.pending.popTailIfMatch(seq) && !cc.pending.removeTailNearby(seq, defaultTailScanLimit) {
+			_ = cc.pending.removeByTag(seq)
+		}
 		return fmt.Errorf("confirmChannel closed")
 	}
 }
@@ -429,7 +495,9 @@ type producerConnManager struct {
 	closed int32
 	logger xmq.Logger
 
-	wg sync.WaitGroup
+	wg         sync.WaitGroup
+	stopCtx    context.Context
+	stopCancel context.CancelFunc
 }
 
 // newProducerConnManager 生产连接管理
@@ -447,6 +515,7 @@ func newProducerConnManager(_ context.Context, cfg *ProducerConnConfig) *produce
 		pool:   make(chan *confirmChannel, cfg.ProducerChannelPoolSize),
 		logger: l,
 	}
+	m.conn.Store((*amqp.Connection)(nil))
 	return m
 }
 
@@ -459,16 +528,25 @@ func (m *producerConnManager) Start(ctx context.Context) error {
 	if c := m.loadConn(ctx); c != nil && !c.IsClosed() {
 		return nil
 	}
+	m.stopCtx, m.stopCancel = context.WithCancel(context.Background())
+
 	// 创建连接
 	conn, err := amqp.Dial(m.cfg.URL)
 	if err != nil {
+		// prevent leak
+		if m.stopCancel != nil {
+			m.stopCancel()
+		}
 		return fmt.Errorf("dial: %w", err)
 	}
 	// 创建 confirm-channel 池
 	m.poolMu.Lock()
-	if err := m.refreshPool(ctx, conn); err != nil {
+	if err := m.refreshPool(m.stopCtx, conn); err != nil {
 		m.poolMu.Unlock()
 		_ = conn.Close()
+		if m.stopCancel != nil {
+			m.stopCancel()
+		}
 		return err
 	}
 	old := m.loadConn(ctx)
@@ -485,7 +563,7 @@ func (m *producerConnManager) Start(ctx context.Context) error {
 
 	// start reconnect watcher
 	m.wg.Add(1)
-	go m.reconnectWatcher(ctx)
+	go m.reconnectWatcher(m.stopCtx)
 
 	m.logger.Info(
 		"producer conn success",
@@ -523,6 +601,17 @@ drained:
 		m.pool <- c
 	}
 	return nil
+}
+
+// GetConnection 返回当前底层 *amqp.Connection，若无可用连接返回 ErrNoConnection
+// 注意：返回的 *amqp.Connection 是原始对象，调用方负责不要在并发上下文误用其 Channel() 的关闭等操作。
+// 推荐调用方使用 conn.Channel() 后立即 defer ch.Close()。
+func (m *producerConnManager) GetConnection(ctx context.Context) (*amqp.Connection, error) {
+	conn := m.loadConn(ctx)
+	if conn == nil || conn.IsClosed() {
+		return nil, xmq.ErrNoConnection
+	}
+	return conn, nil
 }
 
 // GetProducerChannel  从池中获取一个可用 channel（跳过 closed/broken）
@@ -568,21 +657,22 @@ func (m *producerConnManager) PutProducerChannel(ctx context.Context, cc *confir
 	select {
 	case m.pool <- cc:
 		// 成功放回
-		m.logger.Info(
-			fmt.Sprintf("put producer channel returned to pool, pool_cap: %d pool_len: %d", cap(m.pool), len(m.pool)),
-			zap.String("event", xmq.EventProducerChannel),
-			zap.String("trace_id", xtrace.GetTraceID(ctx)),
-		)
 		return
 	default:
 		// 池已满 - 丢弃该 channel 并记录警告（可以改为等待 PutBackTimeout）
-		m.logger.Warn(
-			fmt.Sprintf("put producer channel: pool full, discard channel, pool_cap: %d pool_len: %d", cap(m.pool), len(m.pool)),
-			zap.String("event", xmq.EventProducerChannel),
-			zap.String("trace_id", xtrace.GetTraceID(ctx)),
-		)
-		cc.close(ctx)
-		return
+		timer := time.NewTimer(500 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case m.pool <- cc:
+			return
+		case <-timer.C:
+			cc.close(ctx)
+			m.logger.Warn(
+				fmt.Sprintf("put producer channel: pool full after 500ms, discard channel, pool_cap: %d pool_len: %d", cap(m.pool), len(m.pool)),
+				zap.String("event", xmq.EventProducerChannel),
+				zap.String("trace_id", xtrace.GetTraceID(ctx)),
+			)
+		}
 	}
 }
 
@@ -616,12 +706,14 @@ func (m *producerConnManager) Publish(ctx context.Context, exchange, routingKey 
 // reconnectWatcher: deterministic exponential backoff, reconnect and refresh pool
 func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 	defer m.wg.Done()
-	backoff := m.cfg.ReconnectInitialDelay
-	if backoff <= 0 {
-		backoff = 500 * time.Millisecond
+	initDelay := m.cfg.ReconnectInitialDelay
+	if initDelay <= 0 {
+		initDelay = 500 * time.Millisecond
 	}
-	if m.cfg.ReconnectMaxDelay <= 0 {
-		m.cfg.ReconnectMaxDelay = 30 * time.Second
+	backoff := initDelay
+	maxDelay := m.cfg.ReconnectMaxDelay
+	if maxDelay <= 0 {
+		maxDelay = 30 * time.Second
 	}
 	for {
 		if atomic.LoadInt32(&m.closed) == 1 {
@@ -639,8 +731,8 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 				)
 				time.Sleep(backoff)
 				backoff *= 2
-				if backoff > m.cfg.ReconnectMaxDelay {
-					backoff = m.cfg.ReconnectMaxDelay
+				if backoff > maxDelay {
+					backoff = maxDelay
 				}
 				continue
 			}
@@ -651,8 +743,8 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 				_ = newConn.Close()
 				time.Sleep(backoff)
 				backoff *= 2
-				if backoff > m.cfg.ReconnectMaxDelay {
-					backoff = m.cfg.ReconnectMaxDelay
+				if backoff > maxDelay {
+					backoff = maxDelay
 				}
 				continue
 			}
@@ -666,7 +758,7 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 				}(old)
 			}
 			// reset backoff
-			backoff = m.cfg.ReconnectInitialDelay
+			backoff = initDelay
 			m.logger.Info(
 				"producer reconnected success",
 				zap.String("event", xmq.EventProducerReconnection),
@@ -676,14 +768,19 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 		}
 		// wait for close notification
 		closeCh := conn.NotifyClose(make(chan *amqp.Error, 1))
-		err := <-closeCh
-		if err != nil {
-			m.logger.Warn(
-				fmt.Sprintf("producer conn closed, err is: %s", err),
-				zap.String("event", xmq.EventProducerCloseConnection),
-				zap.String("trace_id", xtrace.GetTraceID(ctx)),
-			)
+		select {
+		case err := <-closeCh:
+			if err != nil {
+				m.logger.Warn(
+					fmt.Sprintf("producer conn closed, err is: %s", err),
+					zap.String("event", xmq.EventProducerCloseConnection),
+					zap.String("trace_id", xtrace.GetTraceID(ctx)),
+				)
+			}
+		case <-ctx.Done():
+			return
 		}
+
 		// nil the conn and loop to reconnect
 		m.storeConn(ctx, nil)
 	}
@@ -694,6 +791,10 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 func (m *producerConnManager) Close(ctx context.Context) error {
 	if !atomic.CompareAndSwapInt32(&m.closed, 0, 1) {
 		return nil
+	}
+	// cancel background goroutines
+	if m.stopCancel != nil {
+		m.stopCancel()
 	}
 	// drain pool
 	m.poolMu.Lock()
@@ -719,7 +820,7 @@ drained:
 		close(done)
 	}()
 	// wait for inflight -> 0 or timeout
-	timeout := time.After(10 * time.Second)
+	timeout := time.After(15 * time.Second)
 	tick := time.NewTicker(50 * time.Millisecond)
 	defer tick.Stop()
 	for {
@@ -766,10 +867,12 @@ func (m *producerConnManager) loadConn(_ context.Context) *amqp.Connection {
 func (m *producerConnManager) storeConn(_ context.Context, c *amqp.Connection) { m.conn.Store(c) }
 
 type consumerConnManager struct {
-	cfg    *ConsumerConnConfig
-	conn   atomic.Value // *amqp.Connection
-	closed int32
-	logger xmq.Logger
+	cfg        *ConsumerConnConfig
+	conn       atomic.Value // *amqp.Connection
+	closed     int32
+	logger     xmq.Logger
+	stopCtx    context.Context
+	stopCancel context.CancelFunc
 }
 
 func newConsumerConnManager(_ context.Context, cfg *ConsumerConnConfig) *consumerConnManager {
@@ -780,10 +883,12 @@ func newConsumerConnManager(_ context.Context, cfg *ConsumerConnConfig) *consume
 	if cfg.Logger != nil {
 		l = cfg.Logger
 	}
-	return &consumerConnManager{
+	m := &consumerConnManager{
 		cfg:    cfg,
 		logger: l,
 	}
+	m.conn.Store((*amqp.Connection)(nil))
+	return m
 }
 
 func (m *consumerConnManager) Start(ctx context.Context) error {
@@ -799,7 +904,8 @@ func (m *consumerConnManager) Start(ctx context.Context) error {
 	}
 	m.storeConn(ctx, conn)
 	// start reconnect watcher goroutine
-	go m.reconnectWatcher(ctx)
+	m.stopCtx, m.stopCancel = context.WithCancel(context.Background())
+	go m.reconnectWatcher(m.stopCtx)
 	m.logger.Info(
 		"consumer conn success",
 		zap.String("event", xmq.EventConsumerConnection),
@@ -808,13 +914,24 @@ func (m *consumerConnManager) Start(ctx context.Context) error {
 	return nil
 }
 
-func (m *consumerConnManager) reconnectWatcher(ctx context.Context) {
-	backoff := m.cfg.ReconnectInitialDelay
-	if backoff <= 0 {
-		backoff = 500 * time.Millisecond
+// GetConnection consumer side
+func (m *consumerConnManager) GetConnection(ctx context.Context) (*amqp.Connection, error) {
+	conn := m.loadConn(ctx)
+	if conn == nil || conn.IsClosed() {
+		return nil, xmq.ErrNoConnection
 	}
-	if m.cfg.ReconnectMaxDelay <= 0 {
-		m.cfg.ReconnectMaxDelay = 30 * time.Second
+	return conn, nil
+}
+
+func (m *consumerConnManager) reconnectWatcher(ctx context.Context) {
+	initDelay := m.cfg.ReconnectInitialDelay
+	if initDelay <= 0 {
+		initDelay = 500 * time.Millisecond
+	}
+	backoff := initDelay
+	maxDelay := m.cfg.ReconnectMaxDelay
+	if maxDelay <= 0 {
+		maxDelay = 30 * time.Second
 	}
 	for {
 		if atomic.LoadInt32(&m.closed) == 1 {
@@ -831,13 +948,13 @@ func (m *consumerConnManager) reconnectWatcher(ctx context.Context) {
 				)
 				time.Sleep(backoff)
 				backoff *= 2
-				if backoff > m.cfg.ReconnectMaxDelay {
-					backoff = m.cfg.ReconnectMaxDelay
+				if backoff > maxDelay {
+					backoff = maxDelay
 				}
 				continue
 			}
 			m.storeConn(ctx, newConn)
-			backoff = m.cfg.ReconnectInitialDelay
+			backoff = initDelay // reset to computed initDelay
 			m.logger.Info(
 				"consumer reconnected",
 				zap.String("event", xmq.EventConsumerReconnection),
@@ -847,13 +964,18 @@ func (m *consumerConnManager) reconnectWatcher(ctx context.Context) {
 		}
 		// wait for close
 		closeCh := conn.NotifyClose(make(chan *amqp.Error, 1))
-		err := <-closeCh
-		if err != nil {
-			m.logger.Warn(
-				fmt.Sprintf("consumer connection closed, err is: %s", err),
-				zap.String("event", xmq.EventConsumerReconnection),
-				zap.String("trace_id", xtrace.GetTraceID(ctx)),
-			)
+		select {
+		case err := <-closeCh:
+			if err != nil {
+				m.logger.Warn(
+					fmt.Sprintf("consumer connection closed, err is: %s", err),
+					zap.String("event", xmq.EventConsumerReconnection),
+					zap.String("trace_id", xtrace.GetTraceID(ctx)),
+				)
+			}
+		case <-ctx.Done():
+			// 上层取消，安全退出
+			return
 		}
 		m.storeConn(ctx, nil)
 	}
@@ -873,6 +995,10 @@ func (m *consumerConnManager) GetConsumerChannel(ctx context.Context) (*amqp.Cha
 }
 
 func (m *consumerConnManager) Close(ctx context.Context) {
+	// cancel background goroutine if any
+	if m.stopCancel != nil {
+		m.stopCancel()
+	}
 	if conn := m.loadConn(ctx); conn != nil {
 		_ = conn.Close()
 		m.logger.Info(

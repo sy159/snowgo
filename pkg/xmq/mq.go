@@ -35,6 +35,15 @@ const (
 	EventConsumerConsume         = "consumer_Consume"          //  consumer consume
 )
 
+type ExchangeType string
+
+const (
+	DirectExchange  ExchangeType = "direct"
+	TopicExchange   ExchangeType = "topic"
+	FanoutExchange  ExchangeType = "fanout"
+	DelayedExchange ExchangeType = "x-delayed-message" // 插件
+)
+
 // Message 消息结构体
 type Message struct {
 	Body      []byte                 // 业务数据

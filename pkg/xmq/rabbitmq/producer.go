@@ -87,11 +87,11 @@ func (p *Producer) Publish(ctx context.Context, exchange, routingKey string, msg
 }
 
 // PublishDelayed 发布延迟消息，优先使用 x-delayed-message
-// 如果失败降级为 TTL+DLX
 func (p *Producer) PublishDelayed(ctx context.Context, delayedExchange, routingKey string, msg *xmq.Message, delayMillis int64) error {
 	if msg == nil {
 		return fmt.Errorf("nil message")
 	}
+	// 先尝试插件方案（x-delay）,rabbitmq已经安装rabbitmq_delayed_message_exchange插件，可直接实现延时
 	if msg.Headers == nil {
 		msg.Headers = make(map[string]interface{})
 	}
@@ -99,16 +99,20 @@ func (p *Producer) PublishDelayed(ctx context.Context, delayedExchange, routingK
 
 	// 尝试首选 publish
 	err := p.Publish(ctx, delayedExchange, routingKey, msg)
-	if err == nil {
-		return nil
-	}
 
-	// 降级 TTL+DLX
-	delete(msg.Headers, "x-delay")
-	delete(msg.Headers, "expiration")
-	msg.Headers["expiration"] = fmt.Sprintf("%d", delayMillis)
-
-	return p.Publish(ctx, delayedExchange, routingKey, msg)
+	// 记录所有发送的业务消息
+	p.log.Info("publish delayed msg",
+		zap.String("event", xmq.EventPublish),
+		zap.String("exchange", delayedExchange),
+		zap.String("routing_key", routingKey),
+		zap.String("message_id", msg.MessageId),
+		zap.String("message_body", string(msg.Body)),
+		zap.Any("message_headers", msg.Headers),
+		zap.Error(err),
+		zap.String("trace_id", xtrace.GetTraceID(ctx)),
+	)
+	return err
+	// 降级 TTL+DLX，根据情况实现
 }
 
 // Close 优雅关闭 producer
