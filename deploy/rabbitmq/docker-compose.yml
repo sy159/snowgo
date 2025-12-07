@@ -1,0 +1,45 @@
+version: "3.8"
+# 插件地址：https://www.rabbitmq.com/community-plugins
+
+services:
+  rabbitmq:
+#    image: rabbitmq:4.1.6-management-alpine
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    container_name: rabbitmq
+    hostname: rabbit
+    restart: unless-stopped
+    ports:
+      - "5672:5672"    # AMQP (consider firewalling)
+      - "15672:15672"  # management UI (restrict access in prod)
+    volumes:
+      - ./data:/var/lib/rabbitmq
+      - ./plugins:/usr/lib/rabbitmq/plugins
+      - ./config/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - ./config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./config/definitions.json:/etc/rabbitmq/definitions.json:ro
+    logging:
+      options:
+        max-size: '10m'
+        max-file: '5'
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "check_running" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - rabbitmq_network
+
+networks:
+  rabbitmq_network:
+    driver: bridge

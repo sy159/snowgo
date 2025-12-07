@@ -1,0 +1,68 @@
+{
+  "users": [
+    {
+      "name": "admin",
+      "password": "zx.123",
+      "tags": "administrator"
+    },
+    {
+      "name": "snow_dev",
+      "password": "zx.123",
+      "tags": "management"
+    },
+    {
+      "name": "snow_uat",
+      "password": "zx.123",
+      "tags": "management"
+    },
+    {
+      "name": "snow_prod",
+      "password": "zx.123",
+      "tags": "management"
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "/"
+    },
+    {
+      "name": "dev"
+    },
+    {
+      "name": "uat"
+    },
+    {
+      "name": "prod"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "admin",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "snow_dev",
+      "vhost": "dev",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "snow_uat",
+      "vhost": "uat",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "snow_prod",
+      "vhost": "prod",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ]
+}
