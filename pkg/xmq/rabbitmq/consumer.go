@@ -14,27 +14,38 @@ import (
 
 // 注册单元
 type consumerUnit struct {
-	exchange   string
-	routingKey string
-	queue      string
-	handler    xmq.Handler
-	meta       *consumerMeta
+	queue   string
+	handler xmq.Handler
+	meta    *consumerMeta
 }
 
 type consumerMeta struct {
-	Prefetch   int // Qos prefetch count，未ack消息上限，针对的是单个consumer，不是单个cannel
-	WorkerNum  int // 消费数量
-	RetryLimit int // 消费失败重试次数
+	Prefetch       int           // Qos prefetch count，未ack消息上限，针对的是单个consumer，不是单个cancel
+	WorkerNum      int           // 消费数量
+	RetryLimit     int           // 消费失败重试次数
+	HandlerTimeout time.Duration // handler超时,防止一直阻塞
 }
 
-func defaultMeta() *consumerMeta { return &consumerMeta{Prefetch: 4, WorkerNum: 2, RetryLimit: 3} }
+func defaultMeta() *consumerMeta {
+	return &consumerMeta{Prefetch: 4, WorkerNum: 4, RetryLimit: 3, HandlerTimeout: 60 * time.Second}
+}
 
 // ConsumerOption 函数类型
 type ConsumerOption func(*consumerMeta)
 
-func WithPrefetch(n int) ConsumerOption   { return func(m *consumerMeta) { m.Prefetch = n } }
-func WithWorkerNum(n int) ConsumerOption  { return func(m *consumerMeta) { m.WorkerNum = n } }
+// WithPrefetch 设置 Qos prefetch count
+func WithPrefetch(n int) ConsumerOption { return func(m *consumerMeta) { m.Prefetch = n } }
+
+// WithWorkerNum 设置消费者的工作协程数量
+func WithWorkerNum(n int) ConsumerOption { return func(m *consumerMeta) { m.WorkerNum = n } }
+
+// WithRetryLimit 设置消费失败重试次数
 func WithRetryLimit(n int) ConsumerOption { return func(m *consumerMeta) { m.RetryLimit = n } }
+
+// WithHandlerTimeout 设置handler超时
+func WithHandlerTimeout(n time.Duration) ConsumerOption {
+	return func(m *consumerMeta) { m.HandlerTimeout = n }
+}
 
 // Consumer 封装 consumerConnManager 和 worker 管理
 type Consumer struct {
@@ -78,19 +89,19 @@ func NewConsumer(ctx context.Context, cfg *ConsumerConnConfig) (*Consumer, error
 // StartWorker 启动 workerCount 个 worker，每个 worker 拥有独立 channel。
 // prefetch: Qos prefetch count
 // handler: 业务函数，返回 error 则触发受控重试
-func (c *Consumer) startWorker(ctx context.Context, queue string, prefetch int, workerCount int, retryLimit int, handler xmq.Handler) error {
+func (c *Consumer) startWorker(ctx context.Context, queue string, prefetch int, workerCount int, retryLimit int, handlerTimeout time.Duration, handler xmq.Handler) error {
 	if c == nil || c.cm == nil {
 		return fmt.Errorf("consumer not initialized")
 	}
 	for i := 0; i < workerCount; i++ {
 		c.wg.Add(1)
-		go c.workerLoop(ctx, queue, prefetch, i, retryLimit, handler)
+		go c.workerLoop(ctx, queue, prefetch, i, retryLimit, handlerTimeout, handler)
 	}
 	return nil
 }
 
 // workerLoop 每个 worker 的执行体
-func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, workerID, retryLimit int, handler xmq.Handler) {
+func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, workerID, retryLimit int, handlerTimeout time.Duration, handler xmq.Handler) {
 	defer c.wg.Done()
 
 	backoff := c.cfg.ConsumerBackoffBase
@@ -126,7 +137,20 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 			continue
 		}
 
-		_ = ch.Qos(prefetch, 0, false)
+		// 设置Qos
+		if err := ch.Qos(prefetch, 0, false); err != nil {
+			_ = ch.Close()
+			c.logger.Warn(
+				ctx,
+				fmt.Sprintf("ch.Qos failed queue=%s err=%v", queue, err),
+				zap.String("event", xmq.EventConsumerChannel),
+			)
+			time.Sleep(backoff)
+			if backoff < maxBackoff {
+				backoff *= 2
+			}
+			continue
+		}
 		consumerTag := fmt.Sprintf("%s-%d", queue, workerID)
 		msgs, err := ch.Consume(queue, consumerTag, false, false, false, false, nil)
 		if err != nil {
@@ -181,7 +205,9 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 						MessageId: d.MessageId,
 					}
 
-					err := handler(ctx, m)
+					handlerCtx, cancel := context.WithTimeout(ctx, handlerTimeout)
+					err := handler(handlerCtx, m)
+					cancel()
 					if err != nil {
 						// 处理受控重试
 						retry := 0
@@ -223,25 +249,22 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 }
 
 // Register 消费注册
-func (c *Consumer) Register(ctx context.Context, exchange, routingKey string, handler xmq.Handler, opts ...interface{}) error {
-	if exchange == "" || routingKey == "" || handler == nil {
-		return fmt.Errorf("register: exchange/routingKey/handler must be non-empty")
+func (c *Consumer) Register(ctx context.Context, queue string, handler xmq.Handler, opts ...interface{}) error {
+	if queue == "" || handler == nil {
+		return fmt.Errorf("register: queue/handler must be non-empty")
 	}
-	key := exchange + "|" + routingKey
 	meta := defaultMeta()
 	for _, o := range opts {
 		if fn, ok := o.(ConsumerOption); ok {
 			fn(meta)
 		}
 	}
-	if _, loaded := c.units.LoadOrStore(key, &consumerUnit{
-		exchange:   exchange,
-		routingKey: routingKey,
-		queue:      fmt.Sprintf("%s.%s", exchange, routingKey),
-		handler:    handler,
-		meta:       meta,
+	if _, loaded := c.units.LoadOrStore(queue, &consumerUnit{
+		queue:   queue,
+		handler: handler,
+		meta:    meta,
 	}); loaded {
-		return fmt.Errorf("register: duplicate handler for %s", key)
+		return fmt.Errorf("register: duplicate handler for %s", queue)
 	}
 	return nil
 }
@@ -251,7 +274,7 @@ func (c *Consumer) Start(ctx context.Context) error {
 	var err error
 	c.units.Range(func(_, v interface{}) bool {
 		u := v.(*consumerUnit)
-		if e := c.startWorker(ctx, u.queue, u.meta.Prefetch, u.meta.WorkerNum, u.meta.RetryLimit, u.handler); e != nil {
+		if e := c.startWorker(ctx, u.queue, u.meta.Prefetch, u.meta.WorkerNum, u.meta.RetryLimit, u.meta.HandlerTimeout, u.handler); e != nil {
 			err = e
 			return false
 		}

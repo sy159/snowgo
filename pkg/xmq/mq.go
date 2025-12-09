@@ -75,7 +75,7 @@ type Handler func(ctx context.Context, msg Message) error
 
 // Consumer 业务注册 Handler，框架负责 ACK/重试
 type Consumer interface {
-	Register(ctx context.Context, exchange string, routingKey string, handler Handler, opts ...interface{}) error
+	Register(ctx context.Context, queue string, handler Handler, opts ...interface{}) error
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
 }
