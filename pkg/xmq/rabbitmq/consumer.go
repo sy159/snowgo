@@ -3,8 +3,10 @@ package rabbitmq
 import (
 	"context"
 	"fmt"
+	"os"
 	"snowgo/pkg/xmq"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -53,9 +55,10 @@ type Consumer struct {
 	cfg    *ConsumerConnConfig
 	logger xmq.Logger
 
-	stopped int32
-	wg      sync.WaitGroup
-	units   sync.Map
+	stopped    int32
+	wg         sync.WaitGroup
+	units      sync.Map
+	instanceID string // 实例ID
 }
 
 // NewConsumer 使用 ConsumerConfig 创建 Consumer 实例
@@ -79,10 +82,13 @@ func NewConsumer(ctx context.Context, cfg *ConsumerConnConfig) (*Consumer, error
 		)
 		return nil, fmt.Errorf("consumer start failed: %w", err)
 	}
+	hn, _ := os.Hostname() // 忽略错误，若错误可退回 uuid
+	instanceID := fmt.Sprintf("%s_%d", hn, os.Getpid())
 	return &Consumer{
-		cm:     cm,
-		cfg:    cfg,
-		logger: cfg.Logger,
+		cm:         cm,
+		cfg:        cfg,
+		logger:     cfg.Logger,
+		instanceID: instanceID,
 	}, nil
 }
 
@@ -94,8 +100,11 @@ func (c *Consumer) startWorker(ctx context.Context, queue string, prefetch int, 
 		return fmt.Errorf("consumer not initialized")
 	}
 	for i := 0; i < workerCount; i++ {
-		c.wg.Add(1)
-		go c.workerLoop(ctx, queue, prefetch, i, retryLimit, handlerTimeout, handler)
+		go func(idx int) {
+			c.wg.Add(1)
+			defer c.wg.Done()
+			c.workerLoop(ctx, queue, prefetch, idx, retryLimit, handlerTimeout, handler)
+		}(i)
 	}
 	return nil
 }
@@ -151,7 +160,7 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 			}
 			continue
 		}
-		consumerTag := fmt.Sprintf("%s-%d", queue, workerID)
+		consumerTag := fmt.Sprintf("%s-%d-%s", queue, workerID, c.instanceID)
 		msgs, err := ch.Consume(queue, consumerTag, false, false, false, false, nil)
 		if err != nil {
 			_ = ch.Close()
@@ -206,8 +215,8 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 					}
 
 					handlerCtx, cancel := context.WithTimeout(ctx, handlerTimeout)
+					defer cancel()
 					err := handler(handlerCtx, m)
-					cancel()
 					if err != nil {
 						// 处理受控重试
 						retry := 0
@@ -226,11 +235,14 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 							}
 						}
 						retry++
-						// 写回 header
-						d.Headers["x-retry-count"] = retry
-
 						if retry <= retryLimit {
-							_ = d.Nack(false, true)
+							if nackErr := d.Nack(false, true); nackErr != nil {
+								c.logger.Warn(
+									handlerCtx,
+									fmt.Sprintf("d.Nack failed queue=%s message_id=%s err=%v", queue, d.MessageId, nackErr),
+									zap.String("event", xmq.EventConsumerConsume),
+								)
+							}
 							time.Sleep(100 * time.Millisecond) // 避免 tight loop
 						} else {
 							_ = d.Nack(false, false) // 超过限制交由 broker DLX 或丢弃
@@ -270,24 +282,47 @@ func (c *Consumer) Register(ctx context.Context, queue string, handler xmq.Handl
 }
 
 // Start 统一启动所有注册组（阻塞直到 ctx 取消）
+// 若任一队列启动失败，已启动的 workers 会被尝试停止（优雅回滚），然后返回 error
 func (c *Consumer) Start(ctx context.Context) error {
-	var err error
-	c.units.Range(func(_, v interface{}) bool {
+	var (
+		err         error
+		startedKeys []string
+	)
+
+	// iterate registrations and start workers; if any fails, break and stop started ones
+	c.units.Range(func(k, v interface{}) bool {
 		u := v.(*consumerUnit)
-		if e := c.startWorker(ctx, u.queue, u.meta.Prefetch, u.meta.WorkerNum, u.meta.RetryLimit, u.meta.HandlerTimeout, u.handler); e != nil {
-			err = e
+		if e := c.startWorker(ctx, u.queue, u.meta.Prefetch, u.meta.WorkerNum, u.meta.RetryLimit,
+			u.meta.HandlerTimeout, u.handler); e != nil {
+			err = fmt.Errorf("start worker for queue %s failed: %w", u.queue, e)
 			return false
+		}
+		// record started key for potential rollback
+		if ks, ok := k.(string); ok {
+			startedKeys = append(startedKeys, ks)
 		}
 		return true
 	})
+
 	if err != nil {
+		// 如果有消费启动失败，则尝试停止已启动的 worker
+		c.logger.Warn(
+			ctx,
+			fmt.Sprintf("start consumer error %s, rolling back %d started queues: %s",
+				err, len(startedKeys), strings.Join(startedKeys, ", ")),
+			zap.String("event", xmq.EventConsumerConnection),
+		)
+		// Use a short timeout context for rollback to avoid blocking forever
+		rollbackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = c.Stop(rollbackCtx)
 		return err
 	}
 	<-ctx.Done()
 	return nil
 }
 
-// Stop 优雅停止：关闭连接管理，并等待 worker goroutine 完全退出
+// Stop 优雅停止：关闭连接管理，并等待 worker goroutine 完全退出 当ctx 被取消时，会等待一个短暂的时间让wg归零后再返回（尽可能清理资源）
 func (c *Consumer) Stop(ctx context.Context) error {
 	if c == nil {
 		return nil
@@ -295,17 +330,30 @@ func (c *Consumer) Stop(ctx context.Context) error {
 	if !atomic.CompareAndSwapInt32(&c.stopped, 0, 1) {
 		return nil
 	}
-	// 关闭 consumerConnManager
+
+	// 关闭 consumerConnManager（触发 channel/connection close）
 	c.cm.Close(ctx)
+
+	// 等待 wg 或 ctx.Done；当 ctx.Done 触发时，仍然尝试再等待一个 gracePeriod
 	done := make(chan struct{})
 	go func() {
 		c.wg.Wait()
 		close(done)
 	}()
+
 	select {
-	case <-ctx.Done():
-		return ctx.Err()
 	case <-done:
 		return nil
+	case <-ctx.Done():
+		// ctx cancelled; still wait up to 5s for cleanup
+		timer := time.NewTimer(5 * time.Second)
+		select {
+		case <-done:
+			timer.Stop()
+			return nil
+		case <-timer.C:
+			// timed out waiting for wg after ctx cancelled
+			return ctx.Err()
+		}
 	}
 }
