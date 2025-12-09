@@ -5,7 +5,6 @@ import (
 	"fmt"
 	common "snowgo/pkg"
 	"snowgo/pkg/xmq"
-	"snowgo/pkg/xtrace"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -33,10 +32,10 @@ func NewProducer(ctx context.Context, cfg *ProducerConnConfig) (*Producer, error
 	cm := newProducerConnManager(ctx, cfg)
 	if err := cm.Start(ctx); err != nil {
 		cm.logger.Error(
+			ctx,
 			"producer conn fail",
 			zap.String("event", xmq.EventProducerConnection),
 			zap.Error(err),
-			zap.String("trace_id", xtrace.GetTraceID(ctx)),
 		)
 		return nil, fmt.Errorf("producer start failed: %w", err)
 	}
@@ -72,7 +71,9 @@ func (p *Producer) Publish(ctx context.Context, exchange, routingKey string, msg
 	// Publish 内部已经管理 inflight
 	err := p.cm.Publish(ctx, exchange, routingKey, pub)
 	// 记录所有发送的业务消息
-	p.log.Info("publish msg",
+	p.log.Info(
+		ctx,
+		"publish msg",
 		zap.String("event", xmq.EventPublish),
 		zap.String("exchange", exchange),
 		zap.String("routing_key", routingKey),
@@ -80,7 +81,6 @@ func (p *Producer) Publish(ctx context.Context, exchange, routingKey string, msg
 		zap.String("message_body", string(msg.Body)),
 		zap.Any("message_headers", msg.Headers),
 		zap.Error(err),
-		zap.String("trace_id", xtrace.GetTraceID(ctx)),
 	)
 
 	return err
@@ -101,7 +101,9 @@ func (p *Producer) PublishDelayed(ctx context.Context, delayedExchange, routingK
 	err := p.Publish(ctx, delayedExchange, routingKey, msg)
 
 	// 记录所有发送的业务消息
-	p.log.Info("publish delayed msg",
+	p.log.Info(
+		ctx,
+		"publish delayed msg",
 		zap.String("event", xmq.EventPublish),
 		zap.String("exchange", delayedExchange),
 		zap.String("routing_key", routingKey),
@@ -109,7 +111,6 @@ func (p *Producer) PublishDelayed(ctx context.Context, delayedExchange, routingK
 		zap.String("message_body", string(msg.Body)),
 		zap.Any("message_headers", msg.Headers),
 		zap.Error(err),
-		zap.String("trace_id", xtrace.GetTraceID(ctx)),
 	)
 	return err
 	// 降级 TTL+DLX，根据情况实现

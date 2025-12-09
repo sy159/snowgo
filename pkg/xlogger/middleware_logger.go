@@ -1,6 +1,7 @@
 package xlogger
 
 import (
+	"context"
 	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -105,18 +106,21 @@ func getMiddlewareJsonEncoder() zapcore.Encoder {
 }
 
 // Warn 警告日志
-func (l *MiddlewareLogger) Warn(msg string, fields ...zap.Field) {
-	l.logger.Warn(msg, fields...)
+func (l *MiddlewareLogger) Warn(ctx context.Context, msg string, fields ...zap.Field) {
+	all := mergeFieldsWithTrace(ctx, fields)
+	l.logger.With(all...).Warn(msg, fields...)
 }
 
 // Info 记录信息日志
-func (l *MiddlewareLogger) Info(msg string, fields ...zap.Field) {
-	l.logger.Info(msg, fields...)
+func (l *MiddlewareLogger) Info(ctx context.Context, msg string, fields ...zap.Field) {
+	all := mergeFieldsWithTrace(ctx, fields)
+	l.logger.With(all...).Info(msg, fields...)
 }
 
 // Error 错误日志
-func (l *MiddlewareLogger) Error(msg string, fields ...zap.Field) {
-	l.logger.Error(msg, fields...)
+func (l *MiddlewareLogger) Error(ctx context.Context, msg string, fields ...zap.Field) {
+	all := mergeFieldsWithTrace(ctx, fields)
+	l.logger.With(all...).Error(msg, fields...)
 }
 
 // Sync 确保日志写入文件或控制台

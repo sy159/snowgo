@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"snowgo/pkg/xmq"
-	"snowgo/pkg/xtrace"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -248,9 +247,9 @@ func newConfirmChannel(ctx context.Context, conn *amqp.Connection, logger xmq.Lo
 				atomic.StoreInt32(&cc.broken, 1)
 				cc.close(ctx)
 				cc.logger.Warn(
+					ctx,
 					"confirm channel notifyClose channel closed",
 					zap.String("event", xmq.EventProducerConfirm),
-					zap.String("trace_id", xtrace.GetTraceID(ctx)),
 				)
 				return
 			}
@@ -258,9 +257,9 @@ func newConfirmChannel(ctx context.Context, conn *amqp.Connection, logger xmq.Lo
 				atomic.StoreInt32(&cc.broken, 1)
 				cc.close(ctx)
 				cc.logger.Warn(
+					ctx,
 					fmt.Sprintf("confirm channel closed by broker, err is: %s", e),
 					zap.String("event", xmq.EventProducerConfirm),
-					zap.String("trace_id", xtrace.GetTraceID(ctx)),
 				)
 			}
 		case <-ctx.Done():
@@ -285,9 +284,9 @@ func (cc *confirmChannel) confirmRouter(ctx context.Context) {
 			handled := cc.pending.ackLE(c.DeliveryTag, c.Ack)
 			if handled > 0 {
 				cc.logger.Info(
+					ctx,
 					fmt.Sprintf("confirm router: batch confirm handled， deliveryTag: %d handledCount: %d ack: %t", c.DeliveryTag, handled, c.Ack),
 					zap.String("event", xmq.EventProducerConfirm),
-					zap.String("trace_id", xtrace.GetTraceID(ctx)),
 				)
 				if c.Ack {
 					atomic.StoreInt32(&cc.consecTO, 0)
@@ -297,9 +296,9 @@ func (cc *confirmChannel) confirmRouter(ctx context.Context) {
 
 			// 若未找到任何 pending（可能是已经超时被清理），记录警告
 			cc.logger.Warn(
+				ctx,
 				fmt.Sprintf("confirm router: no pending found for delivery_tag: %d ack: %t (maybe timedout or reclaimed)", c.DeliveryTag, c.Ack),
 				zap.String("event", xmq.EventProducerConfirm),
-				zap.String("trace_id", xtrace.GetTraceID(ctx)),
 			)
 		case <-cc.closeCh:
 			goto exit
@@ -313,9 +312,9 @@ exit:
 	drained := cc.pending.drainAll()
 	if drained > 0 {
 		cc.logger.Warn(
+			ctx,
 			fmt.Sprintf("confirm router: drained: %d remaining pending on channel close", drained),
 			zap.String("event", xmq.EventProducerConfirm),
-			zap.String("trace_id", xtrace.GetTraceID(ctx)),
 		)
 	}
 }
@@ -332,9 +331,9 @@ func (cc *confirmChannel) publishWithConfirm(ctx context.Context, exchange, rout
 	// 若 pending 数量异常大，记录警告（防护；如需更强行为可在这里返回错误/阻塞）
 	if cc.pending.len() >= defaultMaxPendingPerChannel {
 		cc.logger.Warn(
+			ctx,
 			fmt.Sprintf("publishWithConfirm: pending size %d exceeds threshold %d", cc.pending.len(), defaultMaxPendingPerChannel),
 			zap.String("event", xmq.EventProducerChannel),
-			zap.String("trace_id", xtrace.GetTraceID(ctx)),
 		)
 		// 这里不直接拒绝 publish，为了兼容你现有逻辑；若需要强回压可返回错误。
 	}
@@ -355,9 +354,9 @@ func (cc *confirmChannel) publishWithConfirm(ctx context.Context, exchange, rout
 		atomic.StoreInt32(&cc.broken, 1)
 		cc.close(ctx)
 		cc.logger.Warn(
+			ctx,
 			fmt.Sprintf("confirmChannel detected sequence reset/wrap - marking channel broken，seq: %d last_seq: %d", seq, cc.lastSeq),
 			zap.String("event", xmq.EventProducerChannel),
-			zap.String("trace_id", xtrace.GetTraceID(ctx)),
 		)
 		return fmt.Errorf("confirmChannel sequence reset or wrap detected (seq=%d last=%d)", seq, cc.lastSeq)
 	}
@@ -423,9 +422,9 @@ func (cc *confirmChannel) publishWithConfirm(ctx context.Context, exchange, rout
 				// removed successfully
 			} else {
 				cc.logger.Warn(
+					ctx,
 					fmt.Sprintf("confirm timeout: cleanup missed for seq %d (pending_len=%d)", seq, cc.pending.len()),
 					zap.String("event", xmq.EventProducerConfirm),
-					zap.String("trace_id", xtrace.GetTraceID(ctx)),
 				)
 			}
 		}
@@ -439,15 +438,15 @@ func (cc *confirmChannel) publishWithConfirm(ctx context.Context, exchange, rout
 			atomic.StoreInt32(&cc.broken, 1)
 			cc.close(ctx)
 			cc.logger.Warn(
+				ctx,
 				fmt.Sprintf("channel consecutive %d confirm timeout reached deliveryTag: %d", newCnt, seq),
 				zap.String("event", xmq.EventProducerConfirm),
-				zap.String("trace_id", xtrace.GetTraceID(ctx)),
 			)
 		} else {
 			cc.logger.Warn(
+				ctx,
 				fmt.Sprintf("confirm timeout (transient), consecutive %d confirm deliveryTag: %d", newCnt, seq),
 				zap.String("event", xmq.EventProducerConfirm),
-				zap.String("trace_id", xtrace.GetTraceID(ctx)),
 			)
 		}
 		return xmq.ErrPublishTimeout
@@ -566,9 +565,9 @@ func (m *producerConnManager) Start(ctx context.Context) error {
 	go m.reconnectWatcher(m.stopCtx)
 
 	m.logger.Info(
+		ctx,
 		"producer conn success",
 		zap.String("event", xmq.EventProducerConnection),
-		zap.String("trace_id", xtrace.GetTraceID(ctx)),
 	)
 	return nil
 }
@@ -668,9 +667,9 @@ func (m *producerConnManager) PutProducerChannel(ctx context.Context, cc *confir
 		case <-timer.C:
 			cc.close(ctx)
 			m.logger.Warn(
+				ctx,
 				fmt.Sprintf("put producer channel: pool full after 500ms, discard channel, pool_cap: %d pool_len: %d", cap(m.pool), len(m.pool)),
 				zap.String("event", xmq.EventProducerChannel),
-				zap.String("trace_id", xtrace.GetTraceID(ctx)),
 			)
 		}
 	}
@@ -725,9 +724,9 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 			newConn, err := amqp.Dial(m.cfg.URL)
 			if err != nil {
 				m.logger.Warn(
+					ctx,
 					fmt.Sprintf("producer reconnect fail, err is: %s", err),
 					zap.String("event", xmq.EventProducerReconnection),
-					zap.String("trace_id", xtrace.GetTraceID(ctx)),
 				)
 				time.Sleep(backoff)
 				backoff *= 2
@@ -760,9 +759,9 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 			// reset backoff
 			backoff = initDelay
 			m.logger.Info(
+				ctx,
 				"producer reconnected success",
 				zap.String("event", xmq.EventProducerReconnection),
-				zap.String("trace_id", xtrace.GetTraceID(ctx)),
 			)
 			continue
 		}
@@ -772,9 +771,9 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 		case err := <-closeCh:
 			if err != nil {
 				m.logger.Warn(
+					ctx,
 					fmt.Sprintf("producer conn closed, err is: %s", err),
 					zap.String("event", xmq.EventProducerCloseConnection),
-					zap.String("trace_id", xtrace.GetTraceID(ctx)),
 				)
 			}
 		case <-ctx.Done():
@@ -831,10 +830,10 @@ drained:
 		case <-timeout:
 			// force return, some inflight didn't finish
 			m.logger.Error(
+				ctx,
 				"producer conn close timeout waiting inflight",
 				zap.String("event", xmq.EventProducerCloseConnection),
 				zap.String("error", fmt.Sprintf("producer conn close,inflight(%d) didn't finish", m.inflight)),
-				zap.String("trace_id", xtrace.GetTraceID(ctx)),
 			)
 			goto closeConn
 		case <-tick.C:
@@ -847,9 +846,9 @@ closeConn:
 	case <-time.After(2 * time.Second):
 	}
 	m.logger.Info(
+		ctx,
 		"producer conn close success",
 		zap.String("event", xmq.EventProducerCloseConnection),
-		zap.String("trace_id", xtrace.GetTraceID(ctx)),
 	)
 	return nil
 }
@@ -907,9 +906,9 @@ func (m *consumerConnManager) Start(ctx context.Context) error {
 	m.stopCtx, m.stopCancel = context.WithCancel(context.Background())
 	go m.reconnectWatcher(m.stopCtx)
 	m.logger.Info(
+		ctx,
 		"consumer conn success",
 		zap.String("event", xmq.EventConsumerConnection),
-		zap.String("trace_id", xtrace.GetTraceID(ctx)),
 	)
 	return nil
 }
@@ -942,9 +941,9 @@ func (m *consumerConnManager) reconnectWatcher(ctx context.Context) {
 			newConn, err := amqp.Dial(m.cfg.URL)
 			if err != nil {
 				m.logger.Warn(
+					ctx,
 					fmt.Sprintf("consumer reconnect dial failed, err is: %s", err),
 					zap.String("event", xmq.EventConsumerReconnection),
-					zap.String("trace_id", xtrace.GetTraceID(ctx)),
 				)
 				time.Sleep(backoff)
 				backoff *= 2
@@ -956,9 +955,9 @@ func (m *consumerConnManager) reconnectWatcher(ctx context.Context) {
 			m.storeConn(ctx, newConn)
 			backoff = initDelay // reset to computed initDelay
 			m.logger.Info(
+				ctx,
 				"consumer reconnected",
 				zap.String("event", xmq.EventConsumerReconnection),
-				zap.String("trace_id", xtrace.GetTraceID(ctx)),
 			)
 			continue
 		}
@@ -968,9 +967,9 @@ func (m *consumerConnManager) reconnectWatcher(ctx context.Context) {
 		case err := <-closeCh:
 			if err != nil {
 				m.logger.Warn(
+					ctx,
 					fmt.Sprintf("consumer connection closed, err is: %s", err),
 					zap.String("event", xmq.EventConsumerReconnection),
-					zap.String("trace_id", xtrace.GetTraceID(ctx)),
 				)
 			}
 		case <-ctx.Done():
@@ -1002,9 +1001,9 @@ func (m *consumerConnManager) Close(ctx context.Context) {
 	if conn := m.loadConn(ctx); conn != nil {
 		_ = conn.Close()
 		m.logger.Info(
+			ctx,
 			"consumer conn close success",
 			zap.String("event", xmq.EventConsumerCloseConnection),
-			zap.String("trace_id", xtrace.GetTraceID(ctx)),
 		)
 		m.storeConn(ctx, nil)
 	}

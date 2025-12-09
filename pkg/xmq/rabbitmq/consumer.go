@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"snowgo/pkg/xmq"
-	"snowgo/pkg/xtrace"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -62,10 +61,10 @@ func NewConsumer(ctx context.Context, cfg *ConsumerConnConfig) (*Consumer, error
 	cm := newConsumerConnManager(ctx, cfg)
 	if err := cm.Start(ctx); err != nil {
 		cm.logger.Error(
+			ctx,
 			"consumer conn fail",
 			zap.String("event", xmq.EventConsumerConnection),
 			zap.Error(err),
-			zap.String("trace_id", xtrace.GetTraceID(ctx)),
 		)
 		return nil, fmt.Errorf("consumer start failed: %w", err)
 	}
@@ -115,9 +114,9 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 		ch, err := c.cm.GetConsumerChannel(ctx)
 		if err != nil {
 			c.logger.Warn(
+				ctx,
 				fmt.Sprintf("consumer get channel failed, err is: %s", err),
 				zap.String("event", xmq.EventConsumerChannel),
-				zap.String("trace_id", xtrace.GetTraceID(ctx)),
 			)
 			time.Sleep(backoff)
 			backoff *= 2
@@ -133,9 +132,9 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 		if err != nil {
 			_ = ch.Close()
 			c.logger.Warn(
+				ctx,
 				fmt.Sprintf("consumer start consume failed queue is %s, err is: %s", queue, err),
 				zap.String("event", xmq.EventConsumerConsume),
-				zap.String("trace_id", xtrace.GetTraceID(ctx)),
 			)
 			time.Sleep(backoff)
 			if backoff < maxBackoff {
@@ -164,10 +163,10 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, worke
 						if r := recover(); r != nil {
 							_ = d.Nack(false, true)
 							c.logger.Error(
+								ctx,
 								fmt.Sprintf("consumer handler panic， queue: %s, workID: %d", queue, workerID),
 								zap.String("event", xmq.EventConsumerConsume),
 								zap.Any("error", r),
-								zap.String("trace_id", xtrace.GetTraceID(ctx)),
 							)
 						}
 					}()

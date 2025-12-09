@@ -1,6 +1,7 @@
 package rabbitmq
 
 import (
+	"context"
 	"snowgo/pkg/xmq"
 	"time"
 
@@ -10,9 +11,9 @@ import (
 // 内置 nopLogger：实现 xmq.Logger，默认不输出，避免外层未传 logger 导致 nil panic
 type nopLogger struct{}
 
-func (n *nopLogger) Info(msg string, fields ...zap.Field)  {}
-func (n *nopLogger) Warn(msg string, fields ...zap.Field)  {}
-func (n *nopLogger) Error(msg string, fields ...zap.Field) {}
+func (n *nopLogger) Info(ctx context.Context, msg string, fields ...zap.Field)  {}
+func (n *nopLogger) Warn(ctx context.Context, msg string, fields ...zap.Field)  {}
+func (n *nopLogger) Error(ctx context.Context, msg string, fields ...zap.Field) {}
 
 // ProducerConnConfig producer链接 的配置（url 必传）
 type ProducerConnConfig struct {

@@ -53,9 +53,9 @@ type Message struct {
 }
 
 type Logger interface {
-	Info(msg string, fields ...zap.Field)
-	Warn(msg string, fields ...zap.Field)
-	Error(msg string, fields ...zap.Field)
+	Info(ctx context.Context, msg string, fields ...zap.Field)
+	Warn(ctx context.Context, msg string, fields ...zap.Field)
+	Error(ctx context.Context, msg string, fields ...zap.Field)
 }
 
 // Producer 生产者
