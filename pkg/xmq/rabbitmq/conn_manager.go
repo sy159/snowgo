@@ -283,11 +283,11 @@ func (cc *confirmChannel) confirmRouter(ctx context.Context) {
 			}
 			handled := cc.pending.ackLE(c.DeliveryTag, c.Ack)
 			if handled > 0 {
-				cc.logger.Info(
-					ctx,
-					fmt.Sprintf("confirm router: batch confirm handled， deliveryTag: %d handledCount: %d ack: %t", c.DeliveryTag, handled, c.Ack),
-					zap.String("event", xmq.EventProducerConfirm),
-				)
+				//cc.logger.Info(
+				//	ctx,
+				//	fmt.Sprintf("confirm router: batch confirm handled， deliveryTag: %d handledCount: %d ack: %t", c.DeliveryTag, handled, c.Ack),
+				//	zap.String("event", xmq.EventProducerConfirm),
+				//)
 				if c.Ack {
 					atomic.StoreInt32(&cc.consecTO, 0)
 				}

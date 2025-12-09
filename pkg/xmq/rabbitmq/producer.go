@@ -79,7 +79,7 @@ func (p *Producer) Publish(ctx context.Context, exchange, routingKey string, msg
 		zap.String("routing_key", routingKey),
 		zap.String("message_id", msg.MessageId),
 		zap.String("message_body", string(msg.Body)),
-		zap.Any("message_headers", msg.Headers),
+		zap.Any("message_header", msg.Headers),
 		zap.Error(err),
 	)
 
@@ -99,19 +99,6 @@ func (p *Producer) PublishDelayed(ctx context.Context, delayedExchange, routingK
 
 	// 尝试首选 publish
 	err := p.Publish(ctx, delayedExchange, routingKey, msg)
-
-	// 记录所有发送的业务消息
-	p.log.Info(
-		ctx,
-		"publish delayed msg",
-		zap.String("event", xmq.EventPublish),
-		zap.String("exchange", delayedExchange),
-		zap.String("routing_key", routingKey),
-		zap.String("message_id", msg.MessageId),
-		zap.String("message_body", string(msg.Body)),
-		zap.Any("message_headers", msg.Headers),
-		zap.Error(err),
-	)
 	return err
 	// 降级 TTL+DLX，根据情况实现
 }
