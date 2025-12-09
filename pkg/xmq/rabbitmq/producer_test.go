@@ -79,9 +79,9 @@ func TestProducer_Publish(t *testing.T) {
 func BenchmarkProducerPublish(b *testing.B) {
 	exchange := "snow_test.exchange"
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	conn := mustDialOrSkip(&testing.T{})
 	defer conn.Close()
-	defer cancel()
 
 	reg := rabbitmq.NewRegistry(conn).
 		Add(rabbitmq.MQDeclare{

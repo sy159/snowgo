@@ -1,15 +1,18 @@
 package xlogger
 
 import (
+	"context"
 	"go.uber.org/zap"
 	"testing"
 )
 
 func TestLog(t *testing.T) {
+	ctx := context.Background()
 	t.Run("producer log", func(t *testing.T) {
 		logger := NewLogger("../../logs", "pulsar-producer")
 		for i := 0; i < 10; i++ {
 			logger.Info(
+				ctx,
 				" producer test",
 				zap.String("topic", "test-topic"),
 				zap.Int("msgId", i),
@@ -21,6 +24,7 @@ func TestLog(t *testing.T) {
 		logger := NewLogger("../../logs", "pulsar-consumer")
 		for i := 0; i < 10; i++ {
 			logger.Info(
+				ctx,
 				" consumer test",
 				zap.String("topic", "test-topic"),
 				zap.Int("msgId", i),
@@ -30,10 +34,12 @@ func TestLog(t *testing.T) {
 }
 
 func TestConsoleLog(t *testing.T) {
+	ctx := context.Background()
 	t.Run("producer log", func(t *testing.T) {
 		logger := NewLogger("../../logs", "pulsar-producer", WithConsoleOutput(true), WithFileMaxAgeDays(3))
 		for i := 0; i < 10; i++ {
 			logger.Info(
+				ctx,
 				" producer test",
 				zap.String("topic", "test-topic"),
 				zap.Int("msgId", i),
@@ -45,6 +51,7 @@ func TestConsoleLog(t *testing.T) {
 		logger := NewLogger("../logs", "pulsar-consumer", WithConsoleOutput(true), WithFileMaxAgeDays(3))
 		for i := 0; i < 10; i++ {
 			logger.Info(
+				ctx,
 				" consumer test",
 				zap.String("topic", "test-topic"),
 				zap.Int("msgId", i),
