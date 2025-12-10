@@ -74,9 +74,16 @@ type Producer interface {
 // Handler 业务唯一需要实现的函数。 返回 nil 表示成功，框架自动 ACK；返回error框架自动 NACK 并重试。
 type Handler func(ctx context.Context, msg Message) error
 
+type ConsumerMeta struct {
+	Prefetch       int           // Qos prefetch count
+	WorkerNum      int           // 并发 worker 数
+	RetryLimit     int           // 同步重试次数（包括第一次尝试）
+	HandlerTimeout time.Duration // handler 超时时间
+}
+
 // Consumer 业务注册 Handler，框架负责 ACK/重试
 type Consumer interface {
-	Register(ctx context.Context, queue string, handler Handler, opts ...interface{}) error
+	Register(ctx context.Context, queue string, handler Handler, consumerMeta *ConsumerMeta) error
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
 }

@@ -18,34 +18,17 @@ import (
 type consumerUnit struct {
 	queue         string
 	handler       xmq.Handler
-	meta          *consumerMeta
+	meta          *xmq.ConsumerMeta
 	notFoundCount int32 // 连续 404 / 队列不存在计数
 }
 
-type consumerMeta struct {
-	Prefetch       int           // Qos prefetch count
-	WorkerNum      int           // 并发 worker 数
-	RetryLimit     int           // 同步重试次数（包括第一次尝试）
-	HandlerTimeout time.Duration // handler 超时时间
-}
-
-func defaultMeta() *consumerMeta {
-	return &consumerMeta{
+func defaultMeta() *xmq.ConsumerMeta {
+	return &xmq.ConsumerMeta{
 		Prefetch:       4,
 		WorkerNum:      4,
 		RetryLimit:     2,
 		HandlerTimeout: 60 * time.Second,
 	}
-}
-
-// ConsumerOption 类型
-type ConsumerOption func(*consumerMeta)
-
-func WithPrefetch(n int) ConsumerOption   { return func(m *consumerMeta) { m.Prefetch = n } }
-func WithWorkerNum(n int) ConsumerOption  { return func(m *consumerMeta) { m.WorkerNum = n } }
-func WithRetryLimit(n int) ConsumerOption { return func(m *consumerMeta) { m.RetryLimit = n } }
-func WithHandlerTimeout(d time.Duration) ConsumerOption {
-	return func(m *consumerMeta) { m.HandlerTimeout = d }
 }
 
 // Consumer 结构
@@ -116,17 +99,33 @@ func (c *Consumer) startWorker(ctx context.Context, u *consumerUnit) error {
 	}
 	for i := 0; i < u.meta.WorkerNum; i++ {
 		idx := i
-		go func(unit *consumerUnit) {
-			c.wg.Add(1)
+		// add BEFORE launching goroutine => 避免 wg race
+		c.wg.Add(1)
+		go func(unit *consumerUnit, workerIdx int) {
 			defer c.wg.Done()
-			c.workerLoop(ctx, unit, idx)
-		}(u)
+			c.workerLoop(ctx, unit, workerIdx)
+		}(u, idx)
 	}
 	return nil
 }
 
+func sleepWithContext(ctx context.Context, d time.Duration) {
+	if d <= 0 {
+		return
+	}
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(d):
+	}
+}
+
 // workerLoop
 func (c *Consumer) workerLoop(ctx context.Context, unit *consumerUnit, workerID int) {
+	c.logger.Info(ctx,
+		fmt.Sprintf("queue %s consumer work %d is start...", unit.queue, workerID),
+		zap.String("event", xmq.EventConsumerConsume),
+	)
 	meta := unit.meta
 
 	initialBackoff := c.cfg.ConsumerBackoffBase
@@ -153,7 +152,8 @@ func (c *Consumer) workerLoop(ctx context.Context, unit *consumerUnit, workerID 
 				fmt.Sprintf("consumer get channel failed err=%v", err),
 				zap.String("event", xmq.EventConsumerChannel),
 			)
-			time.Sleep(backoff)
+			//time.Sleep(backoff)
+			sleepWithContext(ctx, backoff)
 			backoff = growBackoff(backoff, maxBackoff)
 			continue
 		}
@@ -165,7 +165,8 @@ func (c *Consumer) workerLoop(ctx context.Context, unit *consumerUnit, workerID 
 				fmt.Sprintf("ch set qos failed queue=%s err=%v", unit.queue, err),
 				zap.String("event", xmq.EventConsumerChannel),
 			)
-			time.Sleep(backoff)
+			//time.Sleep(backoff)
+			sleepWithContext(ctx, backoff)
 			backoff = growBackoff(backoff, maxBackoff)
 			continue
 		}
@@ -181,26 +182,32 @@ func (c *Consumer) workerLoop(ctx context.Context, unit *consumerUnit, workerID 
 			_ = ch.Close()
 			errStr := strings.ToLower(err.Error())
 			if strings.Contains(errStr, "not found") || strings.Contains(errStr, "404") {
-				// 队列未找到
+				// 队列未找到，增加计数
 				n := atomic.AddInt32(&unit.notFoundCount, 1)
 				if n >= defaultMaxNotFound {
 					c.logger.Warn(ctx,
-						fmt.Sprintf("queue not found: %s consecutive404=%d err=%v", unit.queue, n, err),
+						fmt.Sprintf("%d times queue not found: %s, worker exiting", n, err),
 						zap.String("event", xmq.EventConsumerChannel),
 					)
-					time.Sleep(30 * time.Second)
+					return // 达到上限，退出当前 worker
 				} else {
-					time.Sleep(backoff)
+					// 等待一段时间再重试
+					//time.Sleep(backoff)
+					sleepWithContext(ctx, backoff)
+					backoff = growBackoff(backoff, maxBackoff)
+					continue
 				}
 			} else {
+				// 其他错误，继续做 exponential backoff
 				c.logger.Warn(ctx,
 					fmt.Sprintf("consumer start consume failed queue=%s err=%v", unit.queue, err),
 					zap.String("event", xmq.EventConsumerConsume),
 				)
-				time.Sleep(backoff)
+				//time.Sleep(backoff)
+				sleepWithContext(ctx, backoff)
+				backoff = growBackoff(backoff, maxBackoff)
+				continue
 			}
-			backoff = growBackoff(backoff, maxBackoff)
-			continue
 		}
 
 		// consume 成功，reset notFoundCount 与 backoff
@@ -212,6 +219,10 @@ func (c *Consumer) workerLoop(ctx context.Context, unit *consumerUnit, workerID 
 		for {
 			select {
 			case <-ctx.Done():
+				c.logger.Info(ctx,
+					fmt.Sprintf("ctx down queue %s consumer tag %s is end...", unit.queue, consumerTag),
+					zap.String("event", xmq.EventConsumerConsume),
+				)
 				_ = ch.Close()
 				return
 			case d, ok := <-consumerMessages:
@@ -242,7 +253,12 @@ func (c *Consumer) workerLoop(ctx context.Context, unit *consumerUnit, workerID 
 		}
 
 		_ = ch.Close()
-		time.Sleep(1 * time.Second)
+		//time.Sleep(1 * time.Second)
+		sleepWithContext(ctx, 1*time.Second)
+		c.logger.Info(ctx,
+			fmt.Sprintf("queue %s consumer tag %s is end...", unit.queue, consumerTag),
+			zap.String("event", xmq.EventConsumerConsume),
+		)
 	}
 }
 
@@ -283,9 +299,18 @@ func (c *Consumer) handleDeliveryInProcess(parentCtx context.Context, ch *amqp.C
 		lastErr = unit.handler(handlerCtx, msg)
 		cancel()
 		duration := time.Since(startTime)
-		status := "fail"
 		if lastErr == nil {
-			status = "success"
+			c.logger.Info(handlerCtx,
+				"consumer msg success",
+				zap.String("event", xmq.EventConsumerConsume),
+				zap.String("queue", unit.queue),
+				zap.String("message_id", d.MessageId),
+				zap.String("message_body", ""),
+				zap.Any("message_header", ""),
+				zap.Duration("duration", duration),
+				zap.String("status", "success"),
+				zap.Int("attempt", attempt+1),
+			)
 			if ackErr := d.Ack(false); ackErr != nil {
 				c.logger.Warn(handlerCtx,
 					fmt.Sprintf("ack failed queue=%s message_id=%s err=%v", unit.queue, d.MessageId, ackErr),
@@ -293,21 +318,24 @@ func (c *Consumer) handleDeliveryInProcess(parentCtx context.Context, ch *amqp.C
 				)
 			}
 			return
+		} else {
+			// 错误也需要记录
+			c.logger.Info(handlerCtx,
+				"consumer msg fail",
+				zap.String("event", xmq.EventConsumerConsume),
+				zap.String("queue", unit.queue),
+				zap.String("message_id", d.MessageId),
+				zap.String("message_body", string(d.Body)),
+				zap.Any("message_header", d.Headers),
+				zap.Duration("duration", duration),
+				zap.String("status", "fail"),
+				zap.Int("attempt", attempt+1),
+				zap.Error(lastErr),
+			)
 		}
-		c.logger.Info(handlerCtx,
-			"consumer msg",
-			zap.String("event", xmq.EventConsumerConsume),
-			zap.String("queue", unit.queue),
-			zap.String("message_id", d.MessageId),
-			zap.String("message_body", string(d.Body)),
-			zap.Any("message_header", d.Headers),
-			zap.Duration("duration", duration),
-			zap.String("status", status),
-			zap.Int("attempt", attempt+1),
-			zap.Error(lastErr),
-		)
 		// short backoff between in-process attempts
-		time.Sleep(time.Duration(attempt+1) * 100 * time.Millisecond)
+		//time.Sleep(time.Duration(attempt+1) * 100 * time.Millisecond)
+		sleepWithContext(handlerCtx, time.Duration(attempt+1)*100*time.Millisecond)
 	}
 
 	// 超过重试次数 -> 如果需要，可把未消费消息发送死信队列
@@ -324,15 +352,12 @@ func (c *Consumer) handleDeliveryInProcess(parentCtx context.Context, ch *amqp.C
 }
 
 // Register 注册消费
-func (c *Consumer) Register(ctx context.Context, queue string, handler xmq.Handler, opts ...interface{}) error {
+func (c *Consumer) Register(ctx context.Context, queue string, handler xmq.Handler, meta *xmq.ConsumerMeta) error {
 	if queue == "" || handler == nil {
 		return fmt.Errorf("register: queue/handler must be non-empty")
 	}
-	meta := defaultMeta()
-	for _, o := range opts {
-		if fn, ok := o.(ConsumerOption); ok {
-			fn(meta)
-		}
+	if meta == nil {
+		meta = defaultMeta()
 	}
 
 	u := &consumerUnit{
