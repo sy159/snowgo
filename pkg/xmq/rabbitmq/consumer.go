@@ -5,51 +5,50 @@ import (
 	"fmt"
 	"os"
 	"snowgo/pkg/xmq"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
 
-// 注册单元
+// consumerUnit 表示注册的队列消费单元
 type consumerUnit struct {
-	queue   string
-	handler xmq.Handler
-	meta    *consumerMeta
+	queue         string
+	handler       xmq.Handler
+	meta          *consumerMeta
+	notFoundCount int32 // 连续 404 / 队列不存在计数
 }
 
 type consumerMeta struct {
-	Prefetch       int           // Qos prefetch count，未ack消息上限，针对的是单个consumer，不是单个cancel
-	WorkerNum      int           // 消费数量
-	RetryLimit     int           // 消费失败重试次数
-	HandlerTimeout time.Duration // handler超时,防止一直阻塞
+	Prefetch       int           // Qos prefetch count
+	WorkerNum      int           // 并发 worker 数
+	RetryLimit     int           // 同步重试次数（包括第一次尝试）
+	HandlerTimeout time.Duration // handler 超时时间
 }
 
 func defaultMeta() *consumerMeta {
-	return &consumerMeta{Prefetch: 4, WorkerNum: 4, RetryLimit: 3, HandlerTimeout: 60 * time.Second}
+	return &consumerMeta{
+		Prefetch:       4,
+		WorkerNum:      4,
+		RetryLimit:     2,
+		HandlerTimeout: 60 * time.Second,
+	}
 }
 
-// ConsumerOption 函数类型
+// ConsumerOption 类型
 type ConsumerOption func(*consumerMeta)
 
-// WithPrefetch 设置 Qos prefetch count
-func WithPrefetch(n int) ConsumerOption { return func(m *consumerMeta) { m.Prefetch = n } }
-
-// WithWorkerNum 设置消费者的工作协程数量
-func WithWorkerNum(n int) ConsumerOption { return func(m *consumerMeta) { m.WorkerNum = n } }
-
-// WithRetryLimit 设置消费失败重试次数
+func WithPrefetch(n int) ConsumerOption   { return func(m *consumerMeta) { m.Prefetch = n } }
+func WithWorkerNum(n int) ConsumerOption  { return func(m *consumerMeta) { m.WorkerNum = n } }
 func WithRetryLimit(n int) ConsumerOption { return func(m *consumerMeta) { m.RetryLimit = n } }
-
-// WithHandlerTimeout 设置handler超时
-func WithHandlerTimeout(n time.Duration) ConsumerOption {
-	return func(m *consumerMeta) { m.HandlerTimeout = n }
+func WithHandlerTimeout(d time.Duration) ConsumerOption {
+	return func(m *consumerMeta) { m.HandlerTimeout = d }
 }
 
-// Consumer 封装 consumerConnManager 和 worker 管理
+// Consumer 结构
 type Consumer struct {
 	cm     *consumerConnManager
 	cfg    *ConsumerConnConfig
@@ -57,11 +56,30 @@ type Consumer struct {
 
 	stopped    int32
 	wg         sync.WaitGroup
-	units      sync.Map
-	instanceID string // 实例ID
+	units      sync.Map // key: queue string -> *consumerUnit
+	instanceID string
+
+	stopCtx    context.Context
+	stopCancel context.CancelFunc
 }
 
-// NewConsumer 使用 ConsumerConfig 创建 Consumer 实例
+const (
+	defaultMaxNotFound = 5
+	maxConsumerTagLen  = 250 // AMQP限制最多255
+	defaultBackoff     = 1 * time.Second
+	defaultMaxBackoff  = 30 * time.Second
+)
+
+// sanitizeInstanceID 简单清洗
+func sanitizeInstanceID(s string) string {
+	s = strings.ReplaceAll(s, ":", "_")
+	s = strings.ReplaceAll(s, "/", "_")
+	s = strings.ReplaceAll(s, "\\", "_")
+	s = strings.ReplaceAll(s, " ", "_")
+	return s
+}
+
+// NewConsumer 创建
 func NewConsumer(ctx context.Context, cfg *ConsumerConnConfig) (*Consumer, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("consumer config is nil")
@@ -74,16 +92,15 @@ func NewConsumer(ctx context.Context, cfg *ConsumerConnConfig) (*Consumer, error
 	}
 	cm := newConsumerConnManager(ctx, cfg)
 	if err := cm.Start(ctx); err != nil {
-		cm.logger.Error(
-			ctx,
+		cm.logger.Error(ctx,
 			"consumer conn fail",
 			zap.String("event", xmq.EventConsumerConnection),
 			zap.Error(err),
 		)
 		return nil, fmt.Errorf("consumer start failed: %w", err)
 	}
-	hn, _ := os.Hostname() // 忽略错误，若错误可退回 uuid
-	instanceID := fmt.Sprintf("%s_%d", hn, os.Getpid())
+	hn, _ := os.Hostname()
+	instanceID := sanitizeInstanceID(fmt.Sprintf("%s_%d", hn, os.Getpid()))
 	return &Consumer{
 		cm:         cm,
 		cfg:        cfg,
@@ -92,175 +109,221 @@ func NewConsumer(ctx context.Context, cfg *ConsumerConnConfig) (*Consumer, error
 	}, nil
 }
 
-// StartWorker 启动 workerCount 个 worker，每个 worker 拥有独立 channel。
-// prefetch: Qos prefetch count
-// handler: 业务函数，返回 error 则触发受控重试
-func (c *Consumer) startWorker(ctx context.Context, queue string, prefetch int, workerCount int, retryLimit int, handlerTimeout time.Duration, handler xmq.Handler) error {
+// startWorker spawn worker goroutine
+func (c *Consumer) startWorker(ctx context.Context, u *consumerUnit) error {
 	if c == nil || c.cm == nil {
 		return fmt.Errorf("consumer not initialized")
 	}
-	for i := 0; i < workerCount; i++ {
-		go func(idx int) {
+	for i := 0; i < u.meta.WorkerNum; i++ {
+		idx := i
+		go func(unit *consumerUnit) {
 			c.wg.Add(1)
 			defer c.wg.Done()
-			c.workerLoop(ctx, queue, prefetch, idx, retryLimit, handlerTimeout, handler)
-		}(i)
+			c.workerLoop(ctx, unit, idx)
+		}(u)
 	}
 	return nil
 }
 
-// workerLoop 每个 worker 的执行体
-func (c *Consumer) workerLoop(ctx context.Context, queue string, prefetch, workerID, retryLimit int, handlerTimeout time.Duration, handler xmq.Handler) {
-	defer c.wg.Done()
+// workerLoop
+func (c *Consumer) workerLoop(ctx context.Context, unit *consumerUnit, workerID int) {
+	meta := unit.meta
 
-	backoff := c.cfg.ConsumerBackoffBase
-	if backoff <= 0 {
-		backoff = 1 * time.Second
+	initialBackoff := c.cfg.ConsumerBackoffBase
+	if initialBackoff <= 0 {
+		initialBackoff = defaultBackoff
 	}
+	backoff := initialBackoff
 	maxBackoff := c.cfg.ReconnectMaxDelay
 	if maxBackoff <= 0 {
-		maxBackoff = 30 * time.Second
+		maxBackoff = defaultMaxBackoff
 	}
 
 	for {
-		// stop check
+		// stop
 		select {
 		case <-ctx.Done():
 			return
 		default:
 		}
 
-		// 获取独立 channel
 		ch, err := c.cm.GetConsumerChannel(ctx)
 		if err != nil {
-			c.logger.Warn(
-				ctx,
-				fmt.Sprintf("consumer get channel failed, err is: %s", err),
+			c.logger.Warn(ctx,
+				fmt.Sprintf("consumer get channel failed err=%v", err),
 				zap.String("event", xmq.EventConsumerChannel),
 			)
 			time.Sleep(backoff)
-			backoff *= 2
-			if backoff > maxBackoff {
-				backoff = maxBackoff
-			}
+			backoff = growBackoff(backoff, maxBackoff)
 			continue
 		}
 
-		// 设置Qos
-		if err := ch.Qos(prefetch, 0, false); err != nil {
+		// Qos
+		if err := ch.Qos(meta.Prefetch, 0, false); err != nil {
 			_ = ch.Close()
-			c.logger.Warn(
-				ctx,
-				fmt.Sprintf("ch.Qos failed queue=%s err=%v", queue, err),
+			c.logger.Warn(ctx,
+				fmt.Sprintf("ch set qos failed queue=%s err=%v", unit.queue, err),
 				zap.String("event", xmq.EventConsumerChannel),
 			)
 			time.Sleep(backoff)
-			if backoff < maxBackoff {
-				backoff *= 2
-			}
+			backoff = growBackoff(backoff, maxBackoff)
 			continue
 		}
-		consumerTag := fmt.Sprintf("%s-%d-%s", queue, workerID, c.instanceID)
-		msgs, err := ch.Consume(queue, consumerTag, false, false, false, false, nil)
+
+		// consumerTag sanitize + truncate
+		consumerTag := fmt.Sprintf("c-%s-%d-%s", unit.queue, workerID, c.instanceID)
+		if len(consumerTag) > maxConsumerTagLen {
+			consumerTag = consumerTag[:maxConsumerTagLen]
+		}
+
+		consumerMessages, err := ch.Consume(unit.queue, consumerTag, false, false, false, false, nil)
 		if err != nil {
 			_ = ch.Close()
-			c.logger.Warn(
-				ctx,
-				fmt.Sprintf("consumer start consume failed queue is %s, err is: %s", queue, err),
-				zap.String("event", xmq.EventConsumerConsume),
-			)
-			time.Sleep(backoff)
-			if backoff < maxBackoff {
-				backoff *= 2
+			errStr := strings.ToLower(err.Error())
+			if strings.Contains(errStr, "not found") || strings.Contains(errStr, "404") {
+				// 队列未找到
+				n := atomic.AddInt32(&unit.notFoundCount, 1)
+				if n >= defaultMaxNotFound {
+					c.logger.Warn(ctx,
+						fmt.Sprintf("queue not found: %s consecutive404=%d err=%v", unit.queue, n, err),
+						zap.String("event", xmq.EventConsumerChannel),
+					)
+					time.Sleep(30 * time.Second)
+				} else {
+					time.Sleep(backoff)
+				}
+			} else {
+				c.logger.Warn(ctx,
+					fmt.Sprintf("consumer start consume failed queue=%s err=%v", unit.queue, err),
+					zap.String("event", xmq.EventConsumerConsume),
+				)
+				time.Sleep(backoff)
 			}
+			backoff = growBackoff(backoff, maxBackoff)
 			continue
 		}
 
-		// 成功进入消费循环，重置 backoff
-		backoff = c.cfg.ConsumerBackoffBase
+		// consume 成功，reset notFoundCount 与 backoff
+		atomic.StoreInt32(&unit.notFoundCount, 0)
+		backoff = initialBackoff
 
-	consumerLoop:
+		// 消费循环
+	consumeLoop:
 		for {
 			select {
 			case <-ctx.Done():
 				_ = ch.Close()
 				return
-			case d, ok := <-msgs:
+			case d, ok := <-consumerMessages:
 				if !ok {
 					_ = ch.Close()
-					break consumerLoop
+					break consumeLoop
 				}
-
-				func() {
+				// process with panic capture (panic -> Nack(false,false) to avoid tight-loop)
+				func(delivery amqp.Delivery) {
 					defer func() {
 						if r := recover(); r != nil {
-							_ = d.Nack(false, true)
-							c.logger.Error(
-								ctx,
-								fmt.Sprintf("consumer handler panic， queue: %s, workID: %d", queue, workerID),
+							if ne := delivery.Nack(false, false); ne != nil {
+								c.logger.Warn(ctx,
+									fmt.Sprintf("d.Nack(false,false) failed after panic queue=%s message_id=%s err=%v", unit.queue, delivery.MessageId, ne),
+									zap.String("event", xmq.EventConsumerConsumeACk),
+								)
+							}
+							c.logger.Error(ctx,
+								fmt.Sprintf("consumer handler panic recovered queue=%s message_id=%s", unit.queue, delivery.MessageId),
 								zap.String("event", xmq.EventConsumerConsume),
 								zap.Any("error", r),
 							)
 						}
 					}()
-					hdrs := map[string]interface{}{}
-					for k, v := range d.Headers {
-						hdrs[k] = v
-					}
-					m := xmq.Message{
-						Body:      d.Body,
-						Headers:   hdrs,
-						Timestamp: d.Timestamp,
-						MessageId: d.MessageId,
-					}
-
-					handlerCtx, cancel := context.WithTimeout(ctx, handlerTimeout)
-					defer cancel()
-					err := handler(handlerCtx, m)
-					if err != nil {
-						// 处理受控重试
-						retry := 0
-						if v, ok := d.Headers["x-retry-count"]; ok {
-							switch vv := v.(type) {
-							case int:
-								retry = vv
-							case int32:
-								retry = int(vv)
-							case int64:
-								retry = int(vv)
-							case string:
-								if n, e := strconv.Atoi(vv); e == nil {
-									retry = n
-								}
-							}
-						}
-						retry++
-						if retry <= retryLimit {
-							if nackErr := d.Nack(false, true); nackErr != nil {
-								c.logger.Warn(
-									handlerCtx,
-									fmt.Sprintf("d.Nack failed queue=%s message_id=%s err=%v", queue, d.MessageId, nackErr),
-									zap.String("event", xmq.EventConsumerConsume),
-								)
-							}
-							time.Sleep(100 * time.Millisecond) // 避免 tight loop
-						} else {
-							_ = d.Nack(false, false) // 超过限制交由 broker DLX 或丢弃
-						}
-					} else {
-						_ = d.Ack(false)
-					}
-				}()
+					c.handleDeliveryInProcess(ctx, ch, unit, delivery)
+				}(d)
 			}
 		}
 
-		// channel 出现问题，关闭并短暂等待后循环重建
 		_ = ch.Close()
 		time.Sleep(1 * time.Second)
 	}
 }
 
-// Register 消费注册
+// handleDeliveryInProcess: 在进程内重试，失败后记录错误日志
+func (c *Consumer) handleDeliveryInProcess(parentCtx context.Context, ch *amqp.Channel, unit *consumerUnit, d amqp.Delivery) {
+	meta := unit.meta
+	// 处理异常情况
+	if meta.Prefetch <= 0 {
+		meta.Prefetch = 1
+	}
+	if meta.WorkerNum <= 0 {
+		meta.WorkerNum = 1
+	}
+	if meta.RetryLimit <= 0 {
+		meta.RetryLimit = 1
+	}
+	if meta.HandlerTimeout <= 0 {
+		meta.HandlerTimeout = 60 * time.Second
+	}
+
+	// prepare message
+	headers := map[string]interface{}{}
+	for k, v := range d.Headers {
+		headers[k] = v
+	}
+	msg := xmq.Message{
+		Body:      d.Body,
+		Headers:   headers,
+		Timestamp: d.Timestamp,
+		MessageId: d.MessageId,
+	}
+
+	var lastErr error
+	for attempt := 0; attempt < meta.RetryLimit; attempt++ {
+		// 重试消费
+		handlerCtx, cancel := context.WithTimeout(parentCtx, meta.HandlerTimeout)
+		startTime := time.Now()
+		lastErr = unit.handler(handlerCtx, msg)
+		cancel()
+		duration := time.Since(startTime)
+		status := "fail"
+		if lastErr == nil {
+			status = "success"
+			if ackErr := d.Ack(false); ackErr != nil {
+				c.logger.Warn(handlerCtx,
+					fmt.Sprintf("ack failed queue=%s message_id=%s err=%v", unit.queue, d.MessageId, ackErr),
+					zap.String("event", xmq.EventConsumerConsumeACk),
+				)
+			}
+			return
+		}
+		c.logger.Info(handlerCtx,
+			"consumer msg",
+			zap.String("event", xmq.EventConsumerConsume),
+			zap.String("queue", unit.queue),
+			zap.String("message_id", d.MessageId),
+			zap.String("message_body", string(d.Body)),
+			zap.Any("message_header", d.Headers),
+			zap.Duration("duration", duration),
+			zap.String("status", status),
+			zap.Int("attempt", attempt+1),
+			zap.Error(lastErr),
+		)
+		// short backoff between in-process attempts
+		time.Sleep(time.Duration(attempt+1) * 100 * time.Millisecond)
+	}
+
+	// 超过重试次数 -> 如果需要，可把未消费消息发送死信队列
+
+	// Ack 原消息，避免无限重试 / redelivery（因为我们已记录失败）
+	ackCtx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	defer cancel()
+	if ackErr := d.Ack(false); ackErr != nil {
+		c.logger.Warn(ackCtx,
+			fmt.Sprintf("ack failed queue=%s message_id=%s err=%v", unit.queue, d.MessageId, ackErr),
+			zap.String("event", xmq.EventConsumerConsumeACk),
+		)
+	}
+}
+
+// Register 注册消费
 func (c *Consumer) Register(ctx context.Context, queue string, handler xmq.Handler, opts ...interface{}) error {
 	if queue == "" || handler == nil {
 		return fmt.Errorf("register: queue/handler must be non-empty")
@@ -271,58 +334,53 @@ func (c *Consumer) Register(ctx context.Context, queue string, handler xmq.Handl
 			fn(meta)
 		}
 	}
-	if _, loaded := c.units.LoadOrStore(queue, &consumerUnit{
+
+	u := &consumerUnit{
 		queue:   queue,
 		handler: handler,
 		meta:    meta,
-	}); loaded {
+	}
+	if _, loaded := c.units.LoadOrStore(queue, u); loaded {
 		return fmt.Errorf("register: duplicate handler for %s", queue)
 	}
 	return nil
 }
 
-// Start 统一启动所有注册组（阻塞直到 ctx 取消）
-// 若任一队列启动失败，已启动的 workers 会被尝试停止（优雅回滚），然后返回 error
+// Start 启动所有注册的消费者（创建内部 stopCtx）
 func (c *Consumer) Start(ctx context.Context) error {
-	var (
-		err         error
-		startedKeys []string
-	)
+	c.stopCtx, c.stopCancel = context.WithCancel(ctx)
 
-	// iterate registrations and start workers; if any fails, break and stop started ones
-	c.units.Range(func(k, v interface{}) bool {
+	var err error
+	c.units.Range(func(_, v interface{}) bool {
 		u := v.(*consumerUnit)
-		if e := c.startWorker(ctx, u.queue, u.meta.Prefetch, u.meta.WorkerNum, u.meta.RetryLimit,
-			u.meta.HandlerTimeout, u.handler); e != nil {
+		if e := c.startWorker(c.stopCtx, u); e != nil {
 			err = fmt.Errorf("start worker for queue %s failed: %w", u.queue, e)
 			return false
 		}
-		// record started key for potential rollback
-		if ks, ok := k.(string); ok {
-			startedKeys = append(startedKeys, ks)
-		}
 		return true
 	})
-
 	if err != nil {
-		// 如果有消费启动失败，则尝试停止已启动的 worker
-		c.logger.Warn(
-			ctx,
-			fmt.Sprintf("start consumer error %s, rolling back %d started queues: %s",
-				err, len(startedKeys), strings.Join(startedKeys, ", ")),
+		c.logger.Warn(ctx,
+			fmt.Sprintf("start worker error: %v", err),
 			zap.String("event", xmq.EventConsumerConnection),
 		)
-		// Use a short timeout context for rollback to avoid blocking forever
-		rollbackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = c.Stop(rollbackCtx)
+		_ = c.Stop(context.Background())
 		return err
 	}
+
 	<-ctx.Done()
 	return nil
 }
 
-// Stop 优雅停止：关闭连接管理，并等待 worker goroutine 完全退出 当ctx 被取消时，会等待一个短暂的时间让wg归零后再返回（尽可能清理资源）
+func growBackoff(curr, max time.Duration) time.Duration {
+	curr *= 2
+	if curr > max {
+		return max
+	}
+	return curr
+}
+
+// Stop 优雅停止，关闭连接管理，并等待 worker goroutine 完全退出 当ctx 被取消时，会等待一个短暂的时间让wg归零后再返回（尽可能清理资源）
 func (c *Consumer) Stop(ctx context.Context) error {
 	if c == nil {
 		return nil
@@ -331,10 +389,15 @@ func (c *Consumer) Stop(ctx context.Context) error {
 		return nil
 	}
 
-	// 关闭 consumerConnManager（触发 channel/connection close）
+	// cancel internal stop ctx
+	if c.stopCancel != nil {
+		c.stopCancel()
+	}
+
+	// close conn manager
 	c.cm.Close(ctx)
 
-	// 等待 wg 或 ctx.Done；当 ctx.Done 触发时，仍然尝试再等待一个 gracePeriod
+	// 等待 wg 或 ctx.Done；当 ctx.Done 触发时，仍然尝试再等待3s
 	done := make(chan struct{})
 	go func() {
 		c.wg.Wait()
@@ -345,14 +408,13 @@ func (c *Consumer) Stop(ctx context.Context) error {
 	case <-done:
 		return nil
 	case <-ctx.Done():
-		// ctx cancelled; still wait up to 5s for cleanup
-		timer := time.NewTimer(5 * time.Second)
+		// ctx cancelled; still wait up to 3s for cleanup
+		timer := time.NewTimer(3 * time.Second)
 		select {
 		case <-done:
 			timer.Stop()
 			return nil
 		case <-timer.C:
-			// timed out waiting for wg after ctx cancelled
 			return ctx.Err()
 		}
 	}

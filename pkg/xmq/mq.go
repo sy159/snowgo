@@ -33,6 +33,7 @@ const (
 	EventConsumerCloseConnection = "consumer_close_connection" // consumer连接关闭
 	EventConsumerChannel         = "consumer_channel"          //  consumer channel
 	EventConsumerConsume         = "consumer_Consume"          //  consumer consume
+	EventConsumerConsumeACk      = "consumer_Consume_ack"      //  consumer consume ack
 )
 
 type ExchangeType string

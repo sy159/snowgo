@@ -70,6 +70,11 @@ func (p *Producer) Publish(ctx context.Context, exchange, routingKey string, msg
 
 	// Publish 内部已经管理 inflight
 	err := p.cm.Publish(ctx, exchange, routingKey, pub)
+
+	status := "success"
+	if err != nil {
+		status = "fail"
+	}
 	// 记录所有发送的业务消息
 	p.log.Info(
 		ctx,
@@ -80,6 +85,7 @@ func (p *Producer) Publish(ctx context.Context, exchange, routingKey string, msg
 		zap.String("message_id", msg.MessageId),
 		zap.String("message_body", string(msg.Body)),
 		zap.Any("message_header", msg.Headers),
+		zap.Any("status", status),
 		zap.Error(err),
 	)
 
