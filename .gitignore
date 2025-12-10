@@ -1,5 +1,28 @@
 !.gitkeep
 *.log
 /logs/
-/.idea/
 /config/*.prod.yaml
+
+# IDE / Editor settings
+.idea/
+.vscode/
+*.sublime*
+*.iml
+
+# OS system files
+.DS_Store
+Thumbs.db
+
+# Editor swap / backup files
+*~
+*.swp
+*.swo
+*.bak
+
+# Go build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out

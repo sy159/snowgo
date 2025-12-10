@@ -1,4 +1,29 @@
 .git
-.idea
 logs
 deploy
+
+# IDE / Editor files
+.idea/
+.vscode/
+*.iml
+
+# temp files
+tmp/
+.cache/
+
+# Git files
+.git/
+.gitignore
+
+# Build outputs
+bin/
+dist/
+*.out
+*.test
+
+# OS system files
+.DS_Store
+Thumbs.db
+
+# Go module cache (避免意外复制宿主缓存)
+go.sum.tmp
