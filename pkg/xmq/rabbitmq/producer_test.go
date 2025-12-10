@@ -107,9 +107,9 @@ func BenchmarkProducerPublish(b *testing.B) {
 	var fail uint64
 
 	b.ResetTimer()
-	benchMsg := &xmq.Message{Body: []byte("bench-message")}
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
+			benchMsg := &xmq.Message{Body: []byte("bench-message")}
 			if err := p.Publish(ctx, exchange, "user.delete", benchMsg); err != nil {
 				atomic.AddUint64(&fail, 1)
 			} else {
