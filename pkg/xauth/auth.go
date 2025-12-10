@@ -6,13 +6,15 @@ import (
 	e "snowgo/pkg/xerror"
 )
 
+type contextKey string
+
 const (
-	XTraceId   = "X-Trace-Id"
-	XIp        = "X-Client-Ip"
-	XUserAgent = "X-User-Agent"
-	XUserId    = "X-User-Id"
-	XUserName  = "X-User-Name"
-	XSessionId = "X-Session-Id"
+	XTraceId   contextKey = "X-Trace-Id"
+	XIp        contextKey = "X-Client-Ip"
+	XUserAgent contextKey = "X-User-Agent"
+	XUserId    contextKey = "X-User-Id"
+	XUserName  contextKey = "X-User-Name"
+	XSessionId contextKey = "X-Session-Id"
 )
 
 type Context struct {
