@@ -85,7 +85,7 @@ func (p *Producer) Publish(ctx context.Context, exchange, routingKey string, msg
 		zap.String("message_id", msg.MessageId),
 		zap.String("message_body", string(msg.Body)),
 		zap.Any("message_header", msg.Headers),
-		zap.Any("status", status),
+		zap.String("status", status),
 		zap.Error(err),
 	)
 

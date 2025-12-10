@@ -306,7 +306,6 @@ func (c *Consumer) handleDeliveryInProcess(parentCtx context.Context, ch *amqp.C
 				zap.String("queue", unit.queue),
 				zap.String("message_id", d.MessageId),
 				zap.String("message_body", ""),
-				zap.Any("message_header", ""),
 				zap.Duration("duration", duration),
 				zap.String("status", "success"),
 				zap.Int("attempt", attempt+1),
@@ -326,16 +325,15 @@ func (c *Consumer) handleDeliveryInProcess(parentCtx context.Context, ch *amqp.C
 				zap.String("queue", unit.queue),
 				zap.String("message_id", d.MessageId),
 				zap.String("message_body", string(d.Body)),
-				zap.Any("message_header", d.Headers),
 				zap.Duration("duration", duration),
 				zap.String("status", "fail"),
 				zap.Int("attempt", attempt+1),
 				zap.Error(lastErr),
 			)
+			// short backoff between in-process attempts
+			sleepWithContext(handlerCtx, time.Duration(attempt+1)*100*time.Millisecond)
+			continue
 		}
-		// short backoff between in-process attempts
-		//time.Sleep(time.Duration(attempt+1) * 100 * time.Millisecond)
-		sleepWithContext(handlerCtx, time.Duration(attempt+1)*100*time.Millisecond)
 	}
 
 	// 超过重试次数 -> 如果需要，可把未消费消息发送死信队列

@@ -2,6 +2,7 @@ package rabbitmq_test
 
 import (
 	"context"
+	"fmt"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xmq"
 	"snowgo/pkg/xmq/rabbitmq"
@@ -71,7 +72,7 @@ func TestProducer_Publish(t *testing.T) {
 	assert.NoError(t, producer.Publish(ctx, "snow_test.exchange", "user.create1", msg))
 
 	// 延迟消息
-	dmsg := &xmq.Message{Body: []byte("hello-delayed")}
+	dmsg := &xmq.Message{Body: []byte("hello-delayed"), Headers: map[string]interface{}{"k": "d"}}
 	assert.NoError(t, producer.PublishDelayed(ctx, "snow_test.delayed.exchange", "order.pay", dmsg, 1000))
 }
 
@@ -109,7 +110,7 @@ func BenchmarkProducerPublish(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			benchMsg := &xmq.Message{Body: []byte("bench-message")}
+			benchMsg := &xmq.Message{Body: []byte(fmt.Sprintf("bench-message-%d", success)), Headers: map[string]interface{}{"k": "b"}}
 			if err := p.Publish(ctx, exchange, "user.delete", benchMsg); err != nil {
 				atomic.AddUint64(&fail, 1)
 			} else {

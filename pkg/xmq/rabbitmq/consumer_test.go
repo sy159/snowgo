@@ -79,7 +79,7 @@ func TestConsumer_ProcessMessage_WhenQueueExists(t *testing.T) {
 	require.NoError(t, consumer.Register(context.Background(), queue, handler, &xmq.ConsumerMeta{
 		Prefetch:       4,
 		WorkerNum:      2,
-		RetryLimit:     1,
+		RetryLimit:     2,
 		HandlerTimeout: 10 * time.Second,
 	}))
 

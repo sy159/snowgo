@@ -108,19 +108,19 @@ func getMiddlewareJsonEncoder() zapcore.Encoder {
 // Warn 警告日志
 func (l *MiddlewareLogger) Warn(ctx context.Context, msg string, fields ...zap.Field) {
 	all := mergeFieldsWithTrace(ctx, fields)
-	l.logger.With(all...).Warn(msg, fields...)
+	l.logger.With(all...).Warn(msg)
 }
 
 // Info 记录信息日志
 func (l *MiddlewareLogger) Info(ctx context.Context, msg string, fields ...zap.Field) {
 	all := mergeFieldsWithTrace(ctx, fields)
-	l.logger.With(all...).Info(msg, fields...)
+	l.logger.With(all...).Info(msg)
 }
 
 // Error 错误日志
 func (l *MiddlewareLogger) Error(ctx context.Context, msg string, fields ...zap.Field) {
 	all := mergeFieldsWithTrace(ctx, fields)
-	l.logger.With(all...).Error(msg, fields...)
+	l.logger.With(all...).Error(msg)
 }
 
 // Sync 确保日志写入文件或控制台
