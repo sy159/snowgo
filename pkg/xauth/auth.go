@@ -9,12 +9,13 @@ import (
 type contextKey string
 
 const (
-	XTraceId   contextKey = "X-Trace-Id"
-	XIp        contextKey = "X-Client-Ip"
-	XUserAgent contextKey = "X-User-Agent"
-	XUserId    contextKey = "X-User-Id"
-	XUserName  contextKey = "X-User-Name"
-	XSessionId contextKey = "X-Session-Id"
+	XTraceId       contextKey = "X-Trace-Id"
+	XTraceIDHeader string     = "X-Trace-Id"
+	XIp            contextKey = "X-Client-Ip"
+	XUserAgent     contextKey = "X-User-Agent"
+	XUserId        contextKey = "X-User-Id"
+	XUserName      contextKey = "X-User-Name"
+	XSessionId     contextKey = "X-Session-Id"
 )
 
 type Context struct {

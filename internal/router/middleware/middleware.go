@@ -315,15 +315,15 @@ func TraceMiddleware() gin.HandlerFunc {
 		// OTEL span 有效则取
 		if span := trace.SpanFromContext(c.Request.Context()); span.SpanContext().IsValid() {
 			traceID = span.SpanContext().TraceID().String()
-		} else if tid := c.GetHeader(xauth.XTraceId); tid != "" {
+		} else if tid := c.GetHeader(xauth.XTraceIDHeader); tid != "" {
 			traceID = tid
 		} else {
 			traceID = strings.ReplaceAll(uuid.New().String(), "-", "")
 		}
 
 		c.Set(xauth.XTraceId, traceID)
-		if c.Writer.Header().Get(xauth.XTraceId) == "" {
-			c.Writer.Header().Set(xauth.XTraceId, traceID)
+		if c.Writer.Header().Get(xauth.XTraceIDHeader) == "" {
+			c.Writer.Header().Set(xauth.XTraceIDHeader, traceID)
 		}
 		c.Request = c.Request.WithContext(xtrace.NewContextWithTrace(c.Request.Context(), traceID))
 
