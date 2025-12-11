@@ -36,7 +36,6 @@ type Container struct {
 	JwtManager *jwt.Manager
 	Lock       xlock.Lock
 	Producer   xmq.Producer
-	Consumer   xmq.Consumer
 
 	// 这里只提供对api使用的service，不提供dao操作
 	AccountContainer
@@ -106,14 +105,6 @@ func BuildProducer(cfg *rabbitmq.ProducerConnConfig) (xmq.Producer, error) {
 		return nil, errors.New("Please initialize producer first")
 	}
 	return rabbitmq.NewProducer(context.Background(), cfg)
-}
-
-// BuildConsumer 构建mq消费者
-func BuildConsumer(cfg *rabbitmq.ConsumerConnConfig) (xmq.Consumer, error) {
-	if cfg == nil {
-		return nil, errors.New("Please initialize consumer first")
-	}
-	return rabbitmq.NewConsumer(context.Background(), cfg)
 }
 
 // NewContainer 构造所有依赖，注意参数传递的顺序

@@ -16,7 +16,6 @@ type containerOptions struct {
 	otherDBCfg   *config.OtherDBConfig
 	redisCfg     *config.RedisConfig
 	producerCfg  *rabbitmq.ProducerConnConfig
-	consumerCfg  *rabbitmq.ConsumerConnConfig
 	closeTimeout time.Duration
 }
 
@@ -43,10 +42,6 @@ func WithRedis(redisCfg config.RedisConfig) Option {
 
 func WithProducer(cfg *rabbitmq.ProducerConnConfig) Option {
 	return func(o *containerOptions) { o.producerCfg = cfg }
-}
-
-func WithConsumer(cfg *rabbitmq.ConsumerConnConfig) Option {
-	return func(o *containerOptions) { o.consumerCfg = cfg }
 }
 
 func WithCloseTimeout(d time.Duration) Option {
