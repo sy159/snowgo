@@ -30,8 +30,8 @@ type Token struct {
 type Config struct {
 	JwtSecret             string
 	Issuer                string
-	AccessExpirationTime  int // 单位：分钟
-	RefreshExpirationTime int // 单位：分钟
+	AccessExpirationTime  time.Duration
+	RefreshExpirationTime time.Duration
 }
 
 type Manager struct {
@@ -67,7 +67,7 @@ type Claims struct {
 // GenerateAccessToken 创建 access token
 func (m *Manager) GenerateAccessToken(userId int32, username, refreshJti string) (string, time.Time, error) {
 	now := time.Now().UTC()
-	exp := now.Add(time.Duration(m.jwtConf.AccessExpirationTime) * time.Minute)
+	exp := now.Add(m.jwtConf.AccessExpirationTime)
 	exp = time.Unix(exp.Unix(), 0) // 去除纳秒
 	accessClaims := Claims{
 		GrantType: accessType,
@@ -91,7 +91,7 @@ func (m *Manager) GenerateAccessToken(userId int32, username, refreshJti string)
 // GenerateRefreshToken 创建 refresh token
 func (m *Manager) GenerateRefreshToken(userId int32, username string) (string, string, time.Time, error) {
 	now := time.Now().UTC()
-	exp := now.Add(time.Duration(m.jwtConf.RefreshExpirationTime) * time.Minute)
+	exp := now.Add(m.jwtConf.RefreshExpirationTime)
 	exp = time.Unix(exp.Unix(), 0) // 去除纳秒
 	jti := uuid.New().String()
 	refreshClaims := Claims{

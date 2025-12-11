@@ -55,8 +55,8 @@ func Init(basePath string) {
 	cfg := config.Get()
 	logEncoder := cfg.Log.LogEncoder
 	accountEncoderConf := cfg.Log.AccessEncoder
-	logMaxAge := cfg.Log.LogFileMaxAgeDay
-	accountMaxAge := cfg.Log.AccessFileMaxAgeDay
+	logMaxAge := cfg.Log.LogFileMaxAgeDays
+	accountMaxAge := cfg.Log.AccessFileMaxAgeDays
 	writer := cfg.Log.Output
 
 	// 设置日志输出格式

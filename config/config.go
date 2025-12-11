@@ -2,8 +2,8 @@ package config
 
 import (
 	"fmt"
-	"runtime"
 	"sync/atomic"
+	"time"
 
 	"github.com/spf13/viper"
 	"snowgo/pkg/xenv"
@@ -34,67 +34,78 @@ type Config struct {
 
 // ApplicationConfig 应用基础配置
 type ApplicationConfig struct {
-	EnableAccessLog bool         `mapstructure:"enableAccessLog"`
-	EnablePprof     bool         `mapstructure:"enablePprof"`
-	EnableTrace     bool         `mapstructure:"enableTrace"`
-	TempoEndpoint   string       `mapstructure:"tempoEndpoint"`
+	EnableAccessLog bool         `mapstructure:"enable_access_log"`
+	EnablePprof     bool         `mapstructure:"enable_pprof"`
+	EnableTrace     bool         `mapstructure:"enable_trace"`
+	TempoEndpoint   string       `mapstructure:"tempo_endpoint"`
 	Server          ServerConfig `mapstructure:"server"`
 }
 
 // ServerConfig 服务配置
 type ServerConfig struct {
-	Name         string `mapstructure:"name"`
-	Version      string `mapstructure:"version"`
-	Addr         string `mapstructure:"addr"`
-	Port         uint32 `mapstructure:"port"`
-	ReadTimeout  uint32 `mapstructure:"readTimeout"`
-	WriteTimeout uint32 `mapstructure:"writeTimeout"`
-	MaxHeaderMB  int    `mapstructure:"maxHeaderMB"`
+	Name         string        `mapstructure:"name"`
+	Version      string        `mapstructure:"version"`
+	Addr         string        `mapstructure:"addr"`
+	Port         uint32        `mapstructure:"port"`
+	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout time.Duration `mapstructure:"write_timeout"`
+	MaxHeaderMB  int           `mapstructure:"max_header_mb"`
 }
 
 // LogConfig 日志配置
 type LogConfig struct {
-	Output              string `mapstructure:"output"`
-	AccessEncoder       string `mapstructure:"accessEncoder"`
-	LogEncoder          string `mapstructure:"logEncoder"`
-	AccessFileMaxAgeDay uint32 `mapstructure:"accessFileMaxAgeDay"`
-	LogFileMaxAgeDay    uint32 `mapstructure:"logFileMaxAgeDay"`
+	Output               string `mapstructure:"output"`
+	AccessEncoder        string `mapstructure:"access_encoder"`
+	LogEncoder           string `mapstructure:"log_encoder"`
+	AccessFileMaxAgeDays uint32 `mapstructure:"access_file_max_age_days"`
+	LogFileMaxAgeDays    uint32 `mapstructure:"log_file_max_age_days"`
 }
 
 // RedisConfig Redis配置
 type RedisConfig struct {
-	Addr         string `mapstructure:"addr"`
-	Password     string `mapstructure:"password"`
-	DB           int    `mapstructure:"db"`
-	DialTimeout  int    `mapstructure:"dialTimeout"`
-	ReadTimeout  int    `mapstructure:"readTimeout"`
-	WriteTimeout int    `mapstructure:"writeTimeout"`
-	MinIdleConns int    `mapstructure:"minIdleConns"`
-	IdleTimeout  int    `mapstructure:"idleTimeout"`
-	PoolSize     int    `mapstructure:"poolSize"`
+	Addr         string        `mapstructure:"addr"`
+	Password     string        `mapstructure:"password"`
+	DB           int           `mapstructure:"db"`
+	DialTimeout  time.Duration `mapstructure:"dial_timeout"`
+	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout time.Duration `mapstructure:"write_timeout"`
+	IdleTimeout  time.Duration `mapstructure:"idle_timeout"`
+	MinIdleConns int           `mapstructure:"min_idle_conns"`
+	PoolSize     int           `mapstructure:"pool_size"`
 }
 
 // MysqlConfig MySQL配置
 type MysqlConfig struct {
-	SeparationRW      bool     `mapstructure:"separationRW"`
-	DSN               string   `mapstructure:"dsn"`
-	TablePre          string   `mapstructure:"table_pre"`
-	MaxIdleConns      int      `mapstructure:"maxIdleConns"`
-	MaxOpenConns      int      `mapstructure:"maxOpenConns"`
-	ConnMaxIdleTime   int      `mapstructure:"connMaxIdleTime"`
-	ConnMaxLifeTime   int      `mapstructure:"connMaxLifeTime"`
-	PrintSqlLog       bool     `mapstructure:"printSqlLog"`
-	SlowThresholdTime int      `mapstructure:"slowThresholdTime"`
-	MainsDSN          []string `mapstructure:"mainsDSN"`
-	SlavesDSN         []string `mapstructure:"slavesDSN"`
+	EnableReadWriteSeparation bool          `mapstructure:"enable_read_write_separation"`
+	DSN                       string        `mapstructure:"dsn"`
+	TablePrefix               string        `mapstructure:"table_prefix"`
+	MaxIdleConns              int           `mapstructure:"max_idle_conns"`
+	MaxOpenConns              int           `mapstructure:"max_open_conns"`
+	ConnMaxIdleTime           time.Duration `mapstructure:"conn_max_idle_time"`
+	ConnMaxLifeTime           time.Duration `mapstructure:"conn_max_life_time"`
+	EnableSqlLog              bool          `mapstructure:"enable_sql_log"`
+	SlowSqlThresholdTime      time.Duration `mapstructure:"slow_sql_threshold_time"`
+	MainsDSN                  []string      `mapstructure:"mains_dsn"`
+	SlavesDSN                 []string      `mapstructure:"slaves_dsn"`
 }
 
 // JwtConfig JWT配置
 type JwtConfig struct {
-	Issuer                string `mapstructure:"issuer"`
-	JwtSecret             string `mapstructure:"jwtSecret"`
-	AccessExpirationTime  int    `mapstructure:"accessExpirationTime"`
-	RefreshExpirationTime int    `mapstructure:"refreshExpirationTime"`
+	Issuer                string        `mapstructure:"issuer"`
+	JwtSecret             string        `mapstructure:"jwt_secret"`
+	AccessExpirationTime  time.Duration `mapstructure:"access_expiration_time"`
+	RefreshExpirationTime time.Duration `mapstructure:"refresh_expiration_time"`
+}
+
+// RabbitMQProducerConfig rabbitmq配置
+type RabbitMQProducerConfig struct {
+	URL                            string        `mapstructure:"url"`
+	ChannelPoolSize                int           `mapstructure:"channel_pool_size"`
+	ChannelAcquireTimeout          time.Duration `mapstructure:"channel_acquire_timeout"`
+	ChannelConfirmTimeoutThreshold int           `mapstructure:"channel_confirm_timeout_threshold"`
+	MessageConfirmTimeout          time.Duration `mapstructure:"message_confirm_timeout"`
+	ReconnectInitialDelayTime      time.Duration `mapstructure:"reconnect_initial_delay_time"`
+	ReconnectMaxDelayTime          time.Duration `mapstructure:"reconnect_max_delay_time"`
 }
 
 // OtherDBConfig 其他数据库配置
@@ -167,35 +178,3 @@ func initViper(configName, configPath string) *viper.Viper {
 //		fmt.Println("config: configuration reloaded successfully")
 //	})
 //}
-
-// GetMaxOpenConn 最大打开连接数
-func (m MysqlConfig) GetMaxOpenConn() int {
-	if m.MaxOpenConns <= 0 {
-		return 100
-	}
-	return m.MaxOpenConns
-}
-
-// GetMaxIdleConn 最大空闲连接数
-func (m MysqlConfig) GetMaxIdleConn() int {
-	if m.MaxIdleConns <= 0 {
-		return runtime.NumCPU()*2 + 1
-	}
-	return m.MaxIdleConns
-}
-
-// GetConnMaxIdleTime  链接最大等待时间
-func (m MysqlConfig) GetConnMaxIdleTime() int {
-	if m.ConnMaxIdleTime <= 0 {
-		return 30
-	}
-	return m.ConnMaxIdleTime
-}
-
-// GetConnMaxLifeTime 连接最多使用时间
-func (m MysqlConfig) GetConnMaxLifeTime() int {
-	if m.ConnMaxLifeTime <= 0 {
-		return 180
-	}
-	return m.ConnMaxLifeTime
-}

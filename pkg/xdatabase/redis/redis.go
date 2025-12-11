@@ -2,26 +2,24 @@ package redis
 
 import (
 	"context"
+	"github.com/go-redis/redis/v8"
 	"github.com/pkg/errors"
 	"snowgo/config"
-	"time"
-
-	"github.com/go-redis/redis/v8"
 )
 
 // NewRedis 创建一个新的 redis 实例（不影响全局 RDB）
 func NewRedis(cfg config.RedisConfig) (*redis.Client, error) {
-	dialTimeout := time.Duration(cfg.DialTimeout) * time.Second
+	dialTimeout := cfg.DialTimeout
 	rdb := redis.NewClient(&redis.Options{
 		Addr:         cfg.Addr,
 		Password:     cfg.Password,
 		DB:           cfg.DB,
 		DialTimeout:  dialTimeout,
-		ReadTimeout:  time.Duration(cfg.ReadTimeout) * time.Second,
-		WriteTimeout: time.Duration(cfg.WriteTimeout) * time.Second,
+		ReadTimeout:  cfg.ReadTimeout,
+		WriteTimeout: cfg.WriteTimeout,
 		PoolSize:     cfg.PoolSize,
 		MinIdleConns: cfg.MinIdleConns,
-		IdleTimeout:  time.Duration(cfg.IdleTimeout) * time.Second,
+		IdleTimeout:  cfg.IdleTimeout,
 	})
 
 	// 使用超时上下文验证连接

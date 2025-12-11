@@ -60,14 +60,14 @@ func processConfig(cfg config.MysqlConfig) config.MysqlConfig {
 		processCfg.MaxIdleConns = processCfg.MaxOpenConns
 	}
 	if processCfg.ConnMaxLifeTime <= 0 {
-		processCfg.ConnMaxLifeTime = 180 // 单位分钟
+		processCfg.ConnMaxLifeTime = 60 * time.Minute
 	}
 	if processCfg.ConnMaxIdleTime <= 0 {
-		processCfg.ConnMaxIdleTime = 30 // 单位分钟
+		processCfg.ConnMaxIdleTime = 10 * time.Minute
 	}
 
-	if processCfg.SlowThresholdTime <= 0 {
-		processCfg.SlowThresholdTime = 2000 // 单位毫秒
+	if processCfg.SlowSqlThresholdTime <= 0 {
+		processCfg.SlowSqlThresholdTime = 2 * time.Second
 	}
 	return processCfg
 }
@@ -94,14 +94,14 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 	// 连接额外配置信息
 	gormConfig := &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
-			TablePrefix:   mysqlConfig.TablePre, // 表前缀
-			SingularTable: true,                 // 使用单数表名，启用该选项时，`User` 的表名应该是 `user`而不是users
+			TablePrefix:   mysqlConfig.TablePrefix, // 表前缀
+			SingularTable: true,                    // 使用单数表名，启用该选项时，`User` 的表名应该是 `user`而不是users
 		},
 		SkipDefaultTransaction: true,
 	}
 
 	// 打印SQL设置
-	if mysqlConfig.PrintSqlLog {
+	if mysqlConfig.EnableSqlLog {
 		cfg := config.Get()
 		loggerNew := logger.New(
 			log.New(
@@ -113,9 +113,9 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 				log.LstdFlags,
 			),
 			logger.Config{
-				SlowThreshold:             time.Duration(mysqlConfig.SlowThresholdTime) * time.Millisecond, //慢SQL阈值
-				LogLevel:                  logger.Info,                                                     // info表示所有都打印，warn值打印慢sql
-				Colorful:                  true,                                                            // 彩色打印开启
+				SlowThreshold:             mysqlConfig.SlowSqlThresholdTime, //慢SQL阈值
+				LogLevel:                  logger.Info,                      // info表示所有都打印，warn值打印慢sql
+				Colorful:                  true,                             // 彩色打印开启
 				IgnoreRecordNotFoundError: true,
 			})
 		gormConfig.Logger = loggerNew
@@ -138,11 +138,11 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 	// 设置打开数据库连接的最大数量 默认值为0表示不限制，可以避免并发太高导致连接mysql出现too many connections的错误。
 	sqlDB.SetMaxOpenConns(mysqlConfig.MaxOpenConns)
 	// 设置了连接可复用的最大时间。单位min
-	sqlDB.SetConnMaxLifetime(time.Duration(mysqlConfig.ConnMaxLifeTime) * time.Minute)
-	sqlDB.SetConnMaxIdleTime(time.Duration(mysqlConfig.ConnMaxIdleTime) * time.Minute)
+	sqlDB.SetConnMaxLifetime(mysqlConfig.ConnMaxLifeTime)
+	sqlDB.SetConnMaxIdleTime(mysqlConfig.ConnMaxIdleTime)
 
 	// 未开启读写分离配置
-	if !mysqlConfig.SeparationRW {
+	if !mysqlConfig.EnableReadWriteSeparation {
 		return db, nil
 	} else {
 		if len(mysqlConfig.MainsDSN) == 0 {
@@ -174,8 +174,8 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 		Policy:   dbresolver.RandomPolicy{}, // RoundRobinPolicy 轮询； RandomPolicy 随机； WeightedPolicy 权重
 	}).SetMaxOpenConns(mysqlConfig.MaxOpenConns).
 		SetMaxIdleConns(mysqlConfig.MaxIdleConns).
-		SetConnMaxIdleTime(time.Duration(mysqlConfig.ConnMaxIdleTime) * time.Minute).
-		SetConnMaxLifetime(time.Duration(mysqlConfig.ConnMaxLifeTime) * time.Minute))
+		SetConnMaxIdleTime(mysqlConfig.ConnMaxIdleTime).
+		SetConnMaxLifetime(mysqlConfig.ConnMaxLifeTime))
 	if err != nil {
 		return nil, err
 	}

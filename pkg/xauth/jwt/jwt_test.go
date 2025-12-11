@@ -16,8 +16,8 @@ func TestJwt(t *testing.T) {
 	jwtManager, _ := jwt.NewJwtManager(&jwt.Config{
 		JwtSecret:             "Tphdi%Aapi5iXsX67F7MX5ZRJxZF*6wK",
 		Issuer:                "test-snow",
-		AccessExpirationTime:  10,
-		RefreshExpirationTime: 30,
+		AccessExpirationTime:  10 * time.Minute,
+		RefreshExpirationTime: 30 * time.Minute,
 	})
 
 	t.Run("generate and parse tokens", func(t *testing.T) {
