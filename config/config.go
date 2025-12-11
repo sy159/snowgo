@@ -24,12 +24,13 @@ var (
 
 // Config 全局配置结构体
 type Config struct {
-	Application ApplicationConfig `mapstructure:"application"`
-	Log         LogConfig         `mapstructure:"log"`
-	Redis       RedisConfig       `mapstructure:"redis"`
-	Mysql       MysqlConfig       `mapstructure:"mysql"`
-	Jwt         JwtConfig         `mapstructure:"jwt"`
-	OtherDB     OtherDBConfig     `mapstructure:"dbMap"`
+	Application ApplicationConfig      `mapstructure:"application"`
+	Log         LogConfig              `mapstructure:"log"`
+	Redis       RedisConfig            `mapstructure:"redis"`
+	Mysql       MysqlConfig            `mapstructure:"mysql"`
+	Jwt         JwtConfig              `mapstructure:"jwt"`
+	OtherDB     OtherDBConfig          `mapstructure:"dbMap"`
+	RabbitMQ    RabbitMQProducerConfig `mapstructure:"rabbitmq"`
 }
 
 // ApplicationConfig 应用基础配置
@@ -102,7 +103,7 @@ type RabbitMQProducerConfig struct {
 	URL                            string        `mapstructure:"url"`
 	ChannelPoolSize                int           `mapstructure:"channel_pool_size"`
 	ChannelAcquireTimeout          time.Duration `mapstructure:"channel_acquire_timeout"`
-	ChannelConfirmTimeoutThreshold int           `mapstructure:"channel_confirm_timeout_threshold"`
+	ChannelConfirmTimeoutThreshold int32         `mapstructure:"channel_confirm_timeout_threshold"`
 	MessageConfirmTimeout          time.Duration `mapstructure:"message_confirm_timeout"`
 	ReconnectInitialDelayTime      time.Duration `mapstructure:"reconnect_initial_delay_time"`
 	ReconnectMaxDelayTime          time.Duration `mapstructure:"reconnect_max_delay_time"`
