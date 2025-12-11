@@ -3,6 +3,7 @@ package di
 import (
 	"errors"
 	"snowgo/config"
+	"snowgo/pkg/xmq/rabbitmq"
 	"sync"
 	"time"
 )
@@ -14,6 +15,8 @@ type containerOptions struct {
 	mysqlCfg     *config.MysqlConfig
 	otherDBCfg   *config.OtherDBConfig
 	redisCfg     *config.RedisConfig
+	producerCfg  *rabbitmq.ProducerConnConfig
+	consumerCfg  *rabbitmq.ConsumerConnConfig
 	closeTimeout time.Duration
 }
 
@@ -36,6 +39,14 @@ func WithMySQL(mysqlCfg config.MysqlConfig, otherCfg config.OtherDBConfig) Optio
 
 func WithRedis(redisCfg config.RedisConfig) Option {
 	return func(o *containerOptions) { o.redisCfg = &redisCfg }
+}
+
+func WithProducer(cfg *rabbitmq.ProducerConnConfig) Option {
+	return func(o *containerOptions) { o.producerCfg = cfg }
+}
+
+func WithConsumer(cfg *rabbitmq.ConsumerConnConfig) Option {
+	return func(o *containerOptions) { o.consumerCfg = cfg }
 }
 
 func WithCloseTimeout(d time.Duration) Option {

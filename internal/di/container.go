@@ -19,6 +19,8 @@ import (
 	"snowgo/pkg/xdatabase/mysql"
 	xredis "snowgo/pkg/xdatabase/redis"
 	"snowgo/pkg/xlock"
+	"snowgo/pkg/xmq"
+	"snowgo/pkg/xmq/rabbitmq"
 	"sync"
 	"time"
 )
@@ -33,6 +35,8 @@ type Container struct {
 	Cache      xcache.Cache
 	JwtManager *jwt.Manager
 	Lock       xlock.Lock
+	Producer   xmq.Producer
+	Consumer   xmq.Consumer
 
 	// 这里只提供对api使用的service，不提供dao操作
 	AccountContainer
@@ -96,6 +100,22 @@ func BuildLock(rdb *redis.Client, logger xlock.Logger) (xlock.Lock, error) {
 	return xlock.NewRedisLock(rdb, logger), nil
 }
 
+// BuildProducer 构建mq生产者
+func BuildProducer(cfg *rabbitmq.ProducerConnConfig) (xmq.Producer, error) {
+	if cfg == nil {
+		return nil, errors.New("Please initialize producer first")
+	}
+	return rabbitmq.NewProducer(context.Background(), cfg)
+}
+
+// BuildConsumer 构建mq消费者
+func BuildConsumer(cfg *rabbitmq.ConsumerConnConfig) (xmq.Consumer, error) {
+	if cfg == nil {
+		return nil, errors.New("Please initialize consumer first")
+	}
+	return rabbitmq.NewConsumer(context.Background(), cfg)
+}
+
 // NewContainer 构造所有依赖，注意参数传递的顺序
 func NewContainer(opts ...Option) (container *Container, err error) {
 	opt := defaultOpts()
@@ -145,6 +165,15 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 		}
 		container.JwtManager = jwtManager
 	}
+
+	//if opt.producerCfg != nil {
+	//	producer, err := BuildProducer(opt.producerCfg)
+	//	if err != nil {
+	//		return nil, errors.WithMessage(err, "producer init err")
+	//	}
+	//	container.Producer = producer
+	//	container.closeMgr.Register(producer) // 自动注册关闭 清理资源
+	//}
 
 	// 构造db、redis操作
 	repository, err := BuildRepository(myDB.DB, myDB.DbMap)
