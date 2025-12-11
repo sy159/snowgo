@@ -129,7 +129,13 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 	defer func() {
 		// 当init 失败，释放资源
 		if err != nil && container != nil && container.closeMgr != nil {
-			_ = container.closeMgr.CloseAll()
+			timeout := opt.closeTimeout
+			if timeout <= 0 {
+				timeout = 5 * time.Second
+			}
+			timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+			_ = container.closeMgr.CloseAll(timeoutCtx)
 		}
 	}()
 
@@ -157,14 +163,14 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 		container.JwtManager = jwtManager
 	}
 
-	//if opt.producerCfg != nil {
-	//	producer, err := BuildProducer(opt.producerCfg)
-	//	if err != nil {
-	//		return nil, errors.WithMessage(err, "producer init err")
-	//	}
-	//	container.Producer = producer
-	//	container.closeMgr.Register(producer) // 自动注册关闭 清理资源
-	//}
+	if opt.producerCfg != nil {
+		producer, err := BuildProducer(opt.producerCfg)
+		if err != nil {
+			return nil, errors.WithMessage(err, "producer init err")
+		}
+		container.Producer = producer
+		container.closeMgr.RegisterCtx(producer) // 自动注册关闭 清理资源
+	}
 
 	// 构造db、redis操作
 	repository, err := BuildRepository(myDB.DB, myDB.DbMap)
@@ -225,7 +231,7 @@ func (c *Container) CloseWithContext(ctx context.Context) error {
 		var closeErr error
 		go func() {
 			if c.closeMgr != nil {
-				closeErr = c.closeMgr.CloseAll()
+				closeErr = c.closeMgr.CloseAll(timeoutCtx)
 			}
 			close(done)
 		}()
