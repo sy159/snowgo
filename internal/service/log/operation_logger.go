@@ -93,7 +93,7 @@ func (o *OperationLogService) CreateOperationLog(ctx context.Context, tx *query.
 		}
 	}
 
-	log := &model.OperationLog{
+	operationLog := &model.OperationLog{
 		OperatorID:   input.OperatorID,
 		OperatorName: input.OperatorName,
 		OperatorType: &input.OperatorType,
@@ -107,7 +107,7 @@ func (o *OperationLogService) CreateOperationLog(ctx context.Context, tx *query.
 		IP:           &input.IP,
 	}
 
-	_, err := o.operationLogDao.TransactionCreate(ctx, tx, log)
+	_, err := o.operationLogDao.TransactionCreate(ctx, tx, operationLog)
 	return err
 }
 

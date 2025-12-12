@@ -38,8 +38,9 @@ func GetOperationLogList(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
+	ctx := c.Request.Context()
 
-	xlogger.InfofCtx(c, "get operation log list: %+v", logListReq)
+	xlogger.InfofCtx(ctx, "get operation log list: %+v", logListReq)
 	if logListReq.Offset < 0 {
 		xresponse.FailByError(c, e.OffsetErrorRequests)
 		return
@@ -52,9 +53,9 @@ func GetOperationLogList(c *gin.Context) {
 	}
 
 	container := di.GetSystemContainer(c)
-	res, err := container.OperationLogService.GetOperationLogList(c, &logListReq)
+	res, err := container.OperationLogService.GetOperationLogList(ctx, &logListReq)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "get operation log list is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "get operation log list is err: %v", err)
 		xresponse.Fail(c, e.HttpInternalServerError.GetErrCode(), err.Error())
 		return
 	}

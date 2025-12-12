@@ -102,15 +102,16 @@ func CreateUser(c *gin.Context) {
 		xresponse.FailByError(c, e.PwdError)
 		return
 	}
+	ctx := c.Request.Context()
 
 	container := di.GetContainer(c)
-	userId, err := container.UserService.CreateUser(c, &user)
+	userId, err := container.UserService.CreateUser(ctx, &user)
 	if err != nil {
 		if err.Error() == e.UserNameTelExistError.GetErrMsg() {
 			xresponse.FailByError(c, e.UserNameTelExistError)
 			return
 		}
-		xlogger.ErrorfCtx(c, "create user info is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "create user info is err: %v", err)
 		xresponse.Fail(c, e.UserCreateError.GetErrCode(), err.Error())
 		return
 	}
@@ -124,15 +125,16 @@ func UpdateUser(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
+	ctx := c.Request.Context()
 
 	container := di.GetContainer(c)
-	userId, err := container.UserService.UpdateUser(c, &user)
+	userId, err := container.UserService.UpdateUser(ctx, &user)
 	if err != nil {
 		if err.Error() == e.UserNameTelExistError.GetErrMsg() {
 			xresponse.FailByError(c, e.UserNameTelExistError)
 			return
 		}
-		xlogger.ErrorfCtx(c, "update user info is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "update user info is err: %v", err)
 		xresponse.Fail(c, e.UserUpdateError.GetErrCode(), err.Error())
 		return
 	}
@@ -148,11 +150,12 @@ func GetUserInfo(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
+	ctx := c.Request.Context()
 
 	container := di.GetContainer(c)
-	user, err := container.UserService.GetUserById(c, param.ID)
+	user, err := container.UserService.GetUserById(ctx, param.ID)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "get user info is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "get user info is err: %v", err)
 		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
 		return
 	}
@@ -194,11 +197,12 @@ func GetUserList(c *gin.Context) {
 	} else if userListReq.Limit == 0 {
 		userListReq.Limit = constant.DefaultLimit
 	}
+	ctx := c.Request.Context()
 
 	container := di.GetContainer(c)
-	res, err := container.UserService.GetUserList(c, &userListReq)
+	res, err := container.UserService.GetUserList(ctx, &userListReq)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "get user list is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "get user list is err: %v", err)
 		xresponse.Fail(c, e.HttpInternalServerError.GetErrCode(), err.Error())
 		return
 	}
@@ -231,10 +235,11 @@ func DeleteUserById(c *gin.Context) {
 		xresponse.FailByError(c, e.UserNotFound)
 		return
 	}
+	ctx := c.Request.Context()
 	container := di.GetContainer(c)
-	err := container.UserService.DeleteById(c, user.ID)
+	err := container.UserService.DeleteById(ctx, user.ID)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "delete user is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "delete user is err: %v", err)
 		xresponse.Fail(c, e.UserDeleteError.GetErrCode(), err.Error())
 		return
 	}
@@ -255,16 +260,17 @@ func ResetPwdById(c *gin.Context) {
 		xresponse.FailByError(c, e.PwdError)
 		return
 	}
+	ctx := c.Request.Context()
 
-	xlogger.InfofCtx(c, "reset user pwd by id: %v", param.ID)
+	xlogger.InfofCtx(ctx, "reset user pwd by id: %v", param.ID)
 	if param.ID < 1 {
 		xresponse.FailByError(c, e.UserNotFound)
 		return
 	}
 	container := di.GetContainer(c)
-	err := container.UserService.ResetPwdById(c, param.ID, param.Password)
+	err := container.UserService.ResetPwdById(ctx, param.ID, param.Password)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "delete user is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "delete user is err: %v", err)
 		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
 		return
 	}
@@ -274,15 +280,16 @@ func ResetPwdById(c *gin.Context) {
 // GetUserPermission 用户权限信息
 func GetUserPermission(c *gin.Context) {
 	// 获取登录ctx
-	userContext, err := xauth.GetUserContext(c)
+	ctx := c.Request.Context()
+	userContext, err := xauth.GetUserContext(ctx)
 	if err != nil {
 		xresponse.FailByError(c, e.HttpForbidden)
 		return
 	}
 	container := di.GetContainer(c)
-	user, err := container.UserService.GetUserPermissionById(c, userContext.UserId)
+	user, err := container.UserService.GetUserPermissionById(ctx, userContext.UserId)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "get user permission is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "get user permission is err: %v", err)
 		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
 		return
 	}

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"github.com/pkg/errors"
 	"snowgo/internal/di"
 	"snowgo/pkg/xauth"
@@ -56,6 +57,13 @@ func JWTAuth() func(c *gin.Context) {
 		c.Set(xauth.XUserId, mc.UserId)
 		c.Set(xauth.XUserName, mc.Username)
 		c.Set(xauth.XSessionId, mc.SessionId)
+		// 标准 context.Context 注入用户信息，用于后续GetUserContext获取
+		ctx := context.WithValue(c.Request.Context(), xauth.XUserId, mc.UserId)
+		ctx = context.WithValue(ctx, xauth.XUserName, mc.Username)
+		ctx = context.WithValue(ctx, xauth.XSessionId, mc.SessionId)
+
+		// 更新请求的 Context
+		c.Request = c.Request.WithContext(ctx)
 		c.Next() // 后续的处理函数可以用过c.Get("userId")来获取当前请求的用户信息
 	}
 }

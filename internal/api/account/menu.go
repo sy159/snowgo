@@ -31,11 +31,12 @@ func CreateMenu(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
+	ctx := c.Request.Context()
 
 	container := di.GetAccountContainer(c)
-	menuId, err := container.MenuService.CreateMenu(c, &menuParam)
+	menuId, err := container.MenuService.CreateMenu(ctx, &menuParam)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "create menu is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "create menu is err: %v", err)
 		xresponse.Fail(c, e.MenuCreateError.GetErrCode(), err.Error())
 		return
 	}
@@ -49,11 +50,12 @@ func UpdateMenu(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
+	ctx := c.Request.Context()
 
 	container := di.GetAccountContainer(c)
-	err := container.MenuService.UpdateMenu(c, &menuParam)
+	err := container.MenuService.UpdateMenu(ctx, &menuParam)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "update menu is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "update menu is err: %v", err)
 		xresponse.Fail(c, e.MenuUpdateError.GetErrCode(), err.Error())
 		return
 	}
@@ -63,9 +65,10 @@ func UpdateMenu(c *gin.Context) {
 // GetMenuList 菜单信息列表
 func GetMenuList(c *gin.Context) {
 	container := di.GetAccountContainer(c)
-	res, err := container.MenuService.GetMenuTree(c)
+	ctx := c.Request.Context()
+	res, err := container.MenuService.GetMenuTree(ctx)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "get user list is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "get user list is err: %v", err)
 		xresponse.FailByError(c, e.HttpInternalServerError)
 		return
 	}
@@ -83,10 +86,11 @@ func DeleteMenuById(c *gin.Context) {
 		xresponse.FailByError(c, e.MenuNotFound)
 		return
 	}
+	ctx := c.Request.Context()
 	container := di.GetAccountContainer(c)
-	err := container.MenuService.DeleteMenuById(c, menuParam.ID)
+	err := container.MenuService.DeleteMenuById(ctx, menuParam.ID)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "delete menu is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "delete menu is err: %v", err)
 		xresponse.Fail(c, e.MenuNotFound.GetErrCode(), err.Error())
 		return
 	}

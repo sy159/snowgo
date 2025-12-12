@@ -17,11 +17,12 @@ func CreateRole(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
+	ctx := c.Request.Context()
 
 	container := di.GetAccountContainer(c)
-	roleID, err := container.RoleService.CreateRole(c, &param)
+	roleID, err := container.RoleService.CreateRole(ctx, &param)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "create role is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "create role is err: %v", err)
 		xresponse.Fail(c, e.RoleCreateError.GetErrCode(), err.Error())
 		return
 	}
@@ -35,11 +36,12 @@ func UpdateRole(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
+	ctx := c.Request.Context()
 
 	container := di.GetAccountContainer(c)
-	err := container.RoleService.UpdateRole(c, &param)
+	err := container.RoleService.UpdateRole(ctx, &param)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "update role is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "update role is err: %v", err)
 		xresponse.Fail(c, e.RoleUpdateError.GetErrCode(), err.Error())
 		return
 	}
@@ -55,11 +57,12 @@ func DeleteRole(c *gin.Context) {
 		xresponse.FailByError(c, e.HttpBadRequest)
 		return
 	}
+	ctx := c.Request.Context()
 
 	container := di.GetAccountContainer(c)
-	err := container.RoleService.DeleteRole(c, param.ID)
+	err := container.RoleService.DeleteRole(ctx, param.ID)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "delete role is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "delete role is err: %v", err)
 		xresponse.Fail(c, e.RoleDeleteError.GetErrCode(), err.Error())
 		return
 	}
@@ -83,11 +86,12 @@ func GetRoleList(c *gin.Context) {
 	} else if cond.Limit == 0 {
 		cond.Limit = constant.DefaultLimit
 	}
+	ctx := c.Request.Context()
 
 	container := di.GetAccountContainer(c)
-	list, err := container.RoleService.ListRoles(c, &cond)
+	list, err := container.RoleService.ListRoles(ctx, &cond)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "get role list is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "get role list is err: %v", err)
 		xresponse.FailByError(c, e.HttpInternalServerError)
 		return
 	}
@@ -103,11 +107,12 @@ func GetRoleById(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
+	ctx := c.Request.Context()
 
 	container := di.GetAccountContainer(c)
-	role, err := container.RoleService.GetRoleById(c, param.ID)
+	role, err := container.RoleService.GetRoleById(ctx, param.ID)
 	if err != nil {
-		xlogger.ErrorfCtx(c, "get role by id is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "get role by id is err: %v", err)
 		xresponse.Fail(c, e.RoleNotFound.GetErrCode(), err.Error())
 		return
 	}
