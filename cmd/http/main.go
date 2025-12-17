@@ -9,6 +9,7 @@ import (
 	"snowgo/internal/server"
 	"snowgo/pkg/xenv"
 	"snowgo/pkg/xlogger"
+	"snowgo/pkg/xmq/rabbitmq"
 	"snowgo/pkg/xtrace"
 	"syscall"
 	"time"
@@ -54,6 +55,16 @@ func main() {
 		di.WithJWT(cfg.Jwt),
 		di.WithMySQL(cfg.Mysql, cfg.OtherDB),
 		di.WithRedis(cfg.Redis),
+		di.WithProducer(&rabbitmq.ProducerConnConfig{
+			URL:                         cfg.RabbitMQ.URL,
+			ProducerChannelPoolSize:     cfg.RabbitMQ.ChannelPoolSize,
+			PublishGetTimeout:           cfg.RabbitMQ.ChannelAcquireTimeout,
+			ConsecutiveTimeoutThreshold: cfg.RabbitMQ.ChannelConfirmTimeoutThreshold,
+			ConfirmTimeout:              cfg.RabbitMQ.MessageConfirmTimeout,
+			ReconnectInitialDelay:       cfg.RabbitMQ.ReconnectInitialDelayTime,
+			ReconnectMaxDelay:           cfg.RabbitMQ.ReconnectMaxDelayTime,
+			Logger:                      xlogger.NewLogger("./logs", "rabbitmq-producer", xlogger.WithFileMaxAgeDays(30)),
+		}),
 	)
 	if err != nil {
 		xlogger.Fatalf("new container failed: %v", err)
