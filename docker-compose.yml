@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   snowgo-nginx:
     image: nginx:1.26
@@ -64,7 +62,10 @@ services:
       retries: 3
 
   snowgo-service:
-    image: ${SERVICE_IMAGE_NAME:-snowgo}:${SERVICE_IMAGE_VERSION:-v1.0.0}
+    #image: ${SERVICE_IMAGE_NAME:-snowgo}:${SERVICE_IMAGE_VERSION:-v1.0.0}
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: snowgo-service
     restart: always
     logging:
@@ -86,7 +87,10 @@ services:
       - snowgo-redis
 
   snowgo-service2:
-    image: ${SERVICE_IMAGE_NAME:-snowgo}:${SERVICE_IMAGE_VERSION:-v1.0.0}
+    #image: ${SERVICE_IMAGE_NAME:-snowgo}:${SERVICE_IMAGE_VERSION:-v1.0.0}
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: snowgo-service2
     restart: always
     logging:

@@ -25,6 +25,7 @@ snowgo
 ├── .github  github cicd
 ├── assets  静态文件
 ├── config  配置文件
+├── cmd  项目启动入口(http、worker等)
 ├── depoly
 │   ├── elk  elk部署
 │   └── monitor 监控部署
@@ -55,6 +56,7 @@ snowgo
 │   │   └── query_model.go  需要生成的model列表
 │   ├── server  服务相关
 │   │   └── http_server.go  http服务启动，关闭
+│   ├── worker  消费任务
 │   └── service 业务处理层
 ├── logs  日志
 ├── test  测试用例
@@ -86,8 +88,7 @@ snowgo
 ├── Makefile
 ├── Dockerfile
 ├── go.mod
-├── go.sum
-└── main.go  项目启动入口
+└── go.sum
 ```
 
 ------------

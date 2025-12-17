@@ -1,4 +1,4 @@
-FROM golang:1.23.8 AS builder
+FROM golang:1.24.10 AS builder
 
 # private repository
 # RUN go env -w GOPRIVATE=github.com/sy159
@@ -11,7 +11,7 @@ COPY go.mod go.sum ./
 COPY . .
 
 RUN go mod download && \
-    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /go/bin/app main.go
+    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /go/bin/app ./cmd/http
 
 
 FROM alpine:latest
