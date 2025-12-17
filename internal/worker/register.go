@@ -2,25 +2,28 @@ package worker
 
 import (
 	"context"
-	"snowgo/internal/di"
 	worker "snowgo/internal/worker/handler"
 	"snowgo/pkg/xmq"
 	"snowgo/pkg/xmq/rabbitmq"
 	"time"
 )
 
-func RegisterAll(ctx context.Context, consumer *rabbitmq.Consumer, logger xmq.Logger, container *di.Container) error {
+type Deps struct {
+	Logger xmq.Logger
+}
 
-	// 示例
+func RegisterAll(ctx context.Context, consumer *rabbitmq.Consumer, deps *Deps) error {
+
+	// 示例消费
 	if err := consumer.Register(
 		ctx,
 		"user.delete.queue",
-		worker.NewExampleHandler(logger).ExampleHandle,
+		worker.NewExampleHandler(deps.Logger).ExampleHandle,
 		&xmq.ConsumerMeta{
-			Prefetch:       4,
-			WorkerNum:      2,
-			RetryLimit:     2,
-			HandlerTimeout: 10 * time.Second,
+			Prefetch:       4,                // Qos prefetch count
+			WorkerNum:      2,                // 并发 worker 数
+			RetryLimit:     2,                // 同步重试次数（包括第一次尝试）
+			HandlerTimeout: 10 * time.Second, // handler 超时时间
 		}); err != nil {
 		return err
 	}

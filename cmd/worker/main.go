@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"snowgo/config"
-	"snowgo/internal/di"
 	"snowgo/internal/worker"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xmq/rabbitmq"
@@ -31,13 +30,13 @@ func main() {
 	cfg := config.Get()
 	logger := xlogger.NewLogger(logPath, "rabbitmq-consumer", xlogger.WithFileMaxAgeDays(30))
 
-	container, err := di.NewContainer(
-		di.WithMySQL(cfg.Mysql, cfg.OtherDB),
-		di.WithRedis(cfg.Redis),
-	)
-	if err != nil {
-		xlogger.Fatalf("new container failed: %v", err)
-	}
+	//container, err := di.NewContainer(
+	//	di.WithMySQL(cfg.Mysql, cfg.OtherDB),
+	//	di.WithRedis(cfg.Redis),
+	//)
+	//if err != nil {
+	//	xlogger.Fatalf("new container failed: %v", err)
+	//}
 
 	consumerCfg := rabbitmq.NewConsumerConnConfig(
 		cfg.RabbitMQ.URL,
@@ -51,7 +50,9 @@ func main() {
 	}
 
 	// 注册所有队列
-	if err := worker.RegisterAll(context.Background(), consumer, logger, container); err != nil {
+	if err := worker.RegisterAll(context.Background(), consumer, &worker.Deps{
+		Logger: logger,
+	}); err != nil {
 		panic(err)
 	}
 
@@ -73,8 +74,8 @@ func main() {
 		logger.Error(shutdownCtx, "consumer stop fail", zap.Error(err))
 	}
 	// 注入关闭
-	if err := container.Close(); err != nil {
-		xlogger.Errorf("container close error: %v", err)
-	}
+	//if err := container.Close(); err != nil {
+	//	xlogger.Errorf("container close error: %v", err)
+	//}
 	logger.Info(shutdownCtx, "worker exit")
 }
