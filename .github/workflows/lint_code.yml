@@ -4,14 +4,18 @@ on:
   push:
     branches:
       - 'main'
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
   pull_request:
     branches:
       - 'main'
+  workflow_dispatch:
 
 jobs:
   lint:
     runs-on: ubuntu-22.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -27,10 +31,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: go.sum
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
           version: v1.64.5
-          only-new-issues: true
+          only-new-issues: ${{ github.event_name == 'pull_request' }}
           args: --out-format=colored-line-number --timeout=5m

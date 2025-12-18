@@ -74,7 +74,7 @@ jobs:
 
       - name: Install Gosec (pinned)
         run: |
-          GOSEC_VERSION=v2.26.0
+          GOSEC_VERSION=v2.22.10
           go install github.com/securego/gosec/v2/cmd/gosec@${GOSEC_VERSION}
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
           gosec version
