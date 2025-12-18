@@ -1,3 +1,4 @@
+SET NAMES utf8mb4;
 # 创建user表
 DROP TABLE IF EXISTS `user`;
 CREATE TABLE `user`

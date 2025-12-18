@@ -31,6 +31,7 @@ services:
       - ../data/mysql/data:/var/lib/mysql
       - ../data/mysql/logs:/var/log/mysql
       - ./config/mysql/my.cnf:/etc/mysql/my.cnf
+      - ./docs/sql/init.sql:/docker-entrypoint-initdb.d/init.sql  # 映射初始化SQL
     restart: always
     networks:
       - snowgo_network
