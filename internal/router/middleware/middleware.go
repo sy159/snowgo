@@ -113,7 +113,7 @@ func AccessLogger() gin.HandlerFunc {
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
 		method := c.Request.Method
-		traceId := xtrace.GetTraceID(c)
+		traceId := xtrace.GetTraceID(c.Request.Context())
 
 		// 将请求 ID 存储到 Gin 上下文中
 		c.Set(xauth.XIp, c.ClientIP())
@@ -245,7 +245,7 @@ func Recovery() gin.HandlerFunc {
 					zap.String("path", c.Request.URL.Path),
 					zap.String("query", c.Request.URL.RawQuery),
 					zap.String("ip", c.ClientIP()),
-					zap.String("trace_id", xtrace.GetTraceID(c)),
+					zap.String("trace_id", xtrace.GetTraceID(c.Request.Context())),
 					zap.String("user_agent", c.Request.UserAgent()),
 					zap.ByteString("request", httpRequest),
 				}
