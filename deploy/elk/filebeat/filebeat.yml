@@ -2,11 +2,11 @@
 
 filebeat.inputs:
 - type: filestream
-  id: pulsar-producer
+  id: rabbitmq-producer
   enabled: true
   take_over: true
   paths:
-    - /var/logs/pulsar-producer/pulsar-producer-*.log  # 如果是写入有分隔，建议监听除了access.log以外的其他文件（/var/logs/access/access-*.log）
+    - /var/logs/rabbitmq-producer/rabbitmq-producer-*.log  # 如果是写入有分隔，建议监听除了access.log以外的其他文件（/var/logs/access/access-*.log）
   # json配置
   parsers:
     - ndjson:
@@ -25,15 +25,15 @@ filebeat.inputs:
 
   fields_under_root: true  # 自定义字段将作为顶级字段存储在输出文档中，而不是分组到fields子词典下。如果自定义字段名称与Filebeat添加的其他字段名称冲突，则自定义字段将覆盖其他字段。
   fields:
-    from_source: pulsar-producer
+    from_source: rabbitmq-producer
     env: dev
 
 - type: filestream
-  id: pulsar-consumer
+  id: rabbitmq-consumer
   enabled: true
   take_over: true
   paths:
-    - /var/logs/pulsar-consumer/pulsar-consumer-*.log
+    - /var/logs/rabbitmq-consumer/rabbitmq-consumer-*.log
   parsers:
     - ndjson:
         target: ''
@@ -50,7 +50,80 @@ filebeat.inputs:
 
   fields_under_root: true
   fields:
-    from_source: pulsar-consumer
+    from_source: rabbitmq-consumer
+    env: dev
+
+- type: filestream
+  id: access-log
+  enabled: true
+  take_over: true
+  paths:
+    - /var/logs/access/access-*.log
+  parsers:
+    - ndjson:
+        target: ''
+        add_error_key: true
+        overwrite_keys: true
+        expand_keys: false
+  processors:
+    - timestamp:
+        field: "time"
+        target_field: "@timestamp"
+        layouts:
+          - '2006-01-02 15:04:05.999'
+        timezone: "Asia/Shanghai"
+
+  fields_under_root: true
+  fields:
+    from_source: access-log
+    env: dev
+- type: filestream
+  id: info-log
+  enabled: true
+  take_over: true
+  paths:
+    - /var/logs/info/info-*.log
+  parsers:
+    - ndjson:
+        target: ''
+        add_error_key: true
+        overwrite_keys: true
+        expand_keys: false
+  processors:
+    - timestamp:
+        field: "time"
+        target_field: "@timestamp"
+        layouts:
+          - '2006-01-02 15:04:05.999'
+        timezone: "Asia/Shanghai"
+
+  fields_under_root: true
+  fields:
+    from_source: info-log
+    env: dev
+- type: filestream
+  id: error-log
+  enabled: true
+  take_over: true
+  paths:
+    - /var/logs/error/error-*.log
+  parsers:
+    - ndjson:
+        target: ''
+        add_error_key: true
+        overwrite_keys: true
+        expand_keys: false
+  processors:
+    - timestamp:
+        field: "time"
+        target_field: "@timestamp"
+        layouts:
+          - '2006-01-02 15:04:05.999'
+        timezone: "Asia/Shanghai"
+
+  fields_under_root: true
+  fields:
+    from_source: error-log
     env: dev
 
 # 定义模板的相关信息，可以确保所有索引都有一致的设置和映射。（启动以后同步的是数据流，不启动是到索引）
@@ -71,13 +144,22 @@ output.elasticsearch:
   username: "elastic"
   password: "zx.123"
   indices:
-    - index: "dev-pulsar-consumer-%{+yyyy.MM.dd}"  # 是否需要根据时间分割%{+yyyy.MM.dd}
+    - index: "dev-rabbitmq-consumer-%{+yyyy.MM.dd}"  # 是否需要根据时间分割%{+yyyy.MM.dd}
       when.equals:
-        from_source: "pulsar-consumer"
-    - index: "dev-pulsar-producer-%{+yyyy.MM.dd}"
+        from_source: "rabbitmq-consumer"
+    - index: "dev-rabbitmq-producer-%{+yyyy.MM.dd}"
       when.equals:
 #        fields.source: "error"
-        from_source: "pulsar-producer"
+        from_source: "rabbitmq-producer"
+    - index: "dev-access-log-%{+yyyy.MM.dd}"
+      when.equals:
+        from_source: "access-log"
+    - index: "dev-info-log-%{+yyyy.MM.dd}"
+      when.equals:
+        from_source: "info-log"
+    - index: "dev-error-log-%{+yyyy.MM.dd}"
+      when.equals:
+        from_source: "error-log"
 
 processors:
   - drop_fields:

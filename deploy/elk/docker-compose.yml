@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   elasticsearch:
-    image: elasticsearch:8.14.2
+    image: elasticsearch:8.19.8
     container_name: elasticsearch
     ports:
       - ${ES_PORT:-9200}:9200
@@ -38,7 +36,7 @@ services:
       timeout: 3s
 
   kibana:
-    image: kibana:8.14.2
+    image: kibana:8.19.8
     container_name: kibana
     ports:
       - ${KIBANA_PORT:-5601}:5601
@@ -63,7 +61,7 @@ services:
       - elk_network
 
   filebeat:
-    image: docker.elastic.co/beats/filebeat:8.14.2
+    image: docker.elastic.co/beats/filebeat:8.19.8
     container_name: filebeat
     logging:
       options:
@@ -74,7 +72,7 @@ services:
       - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml
       - ./filebeat/data:/usr/share/filebeat/data
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /Users/snow/Desktop/snow/projects/snowgo/logs:/var/logs   # 把外部日志挂载到内部，实现日志收集监听(这里禁用做测试，根据情况修改为自己的日志路径)
+      - ../../logs:/var/logs:ro   # 把外部日志挂载到内部，实现日志收集监听(这里禁用做测试，根据情况修改为自己的日志路径)
     restart: always
     depends_on:
       elasticsearch:
