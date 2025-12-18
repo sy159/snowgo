@@ -83,6 +83,13 @@ jobs:
         run: |
           gosec -fmt=sarif -out=gosec.sarif -stdout -quiet \
                 -exclude-generated -exclude=G115,G404 ./...
+      - name: Ensure SARIF file exists
+        if: always()
+        run: |
+          if [ ! -f gosec.sarif ] || [ ! -s gosec.sarif ]; then
+            echo "Creating empty SARIF file..."
+            echo '{"version": "2.1.0", "runs": []}' > gosec.sarif
+          fi
 
       - name: Upload Gosec SARIF
         uses: github/codeql-action/upload-sarif@v4
