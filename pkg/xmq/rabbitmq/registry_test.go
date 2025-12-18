@@ -2,6 +2,7 @@ package rabbitmq_test
 
 import (
 	"context"
+	"snowgo/internal/constant"
 	"snowgo/pkg/xmq"
 	"snowgo/pkg/xmq/rabbitmq"
 	"testing"
@@ -22,18 +23,17 @@ func TestRegistry(t *testing.T) {
 	// 2. 构造 Registry 并注册
 	reg := rabbitmq.NewRegistry(conn).
 		Add(rabbitmq.MQDeclare{
-			Name: "snow_test.exchange",
+			Name: constant.NormalExchange,
 			Type: xmq.DirectExchange,
 			Queues: []rabbitmq.QueueDeclare{
-				{Name: "user.create.queue", RoutingKeys: []string{"user.create1", "user.create2"}},
-				{Name: "user.delete.queue", RoutingKeys: []string{"user.delete"}},
+				{Name: constant.ExampleNormalQueue, RoutingKeys: []string{constant.ExampleNormalRoutingKey}},
 			},
 		}).
 		Add(rabbitmq.MQDeclare{
-			Name: "snow_test.delayed.exchange",
+			Name: constant.DelayedExchange,
 			Type: xmq.DelayedExchange,
 			Queues: []rabbitmq.QueueDeclare{
-				{Name: "order.pay.queue", RoutingKeys: []string{"order.pay"}},
+				{Name: constant.ExampleDelayedQueue, RoutingKeys: []string{constant.ExampleDelayedRoutingKey}},
 			},
 		})
 
@@ -46,7 +46,7 @@ func TestRegistry(t *testing.T) {
 	defer ch.Close()
 
 	// 队列存在性检查
-	queues := []string{"user.create.queue", "user.delete.queue", "order.pay.queue"}
+	queues := []string{constant.ExampleNormalQueue, constant.ExampleDelayedQueue}
 	for _, q := range queues {
 		_, err := ch.QueueDeclarePassive(q, true, false, false, false, nil)
 		assert.NoError(t, err)
@@ -54,8 +54,8 @@ func TestRegistry(t *testing.T) {
 
 	// Exchange 被动声明检查
 	exchanges := map[string]string{
-		"snow_test.exchange":         "direct",
-		"snow_test.delayed.exchange": "x-delayed-message",
+		constant.NormalExchange:  "direct",
+		constant.DelayedExchange: "x-delayed-message",
 	}
 	for name, kind := range exchanges {
 		err := ch.ExchangeDeclarePassive(name, kind, true, false, false, false, nil)

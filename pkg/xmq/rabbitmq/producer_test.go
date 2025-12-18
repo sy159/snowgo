@@ -3,6 +3,7 @@ package rabbitmq_test
 import (
 	"context"
 	"fmt"
+	"snowgo/internal/constant"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xmq"
 	"snowgo/pkg/xmq/rabbitmq"
@@ -38,18 +39,17 @@ func TestProducer_Publish(t *testing.T) {
 
 	reg := rabbitmq.NewRegistry(conn).
 		Add(rabbitmq.MQDeclare{
-			Name: "snow_test.exchange",
+			Name: constant.NormalExchange,
 			Type: xmq.DirectExchange,
 			Queues: []rabbitmq.QueueDeclare{
-				{Name: "user.create.queue", RoutingKeys: []string{"user.create1", "user.create2"}},
-				{Name: "user.delete.queue", RoutingKeys: []string{"user.delete"}},
+				{Name: constant.ExampleNormalQueue, RoutingKeys: []string{constant.ExampleNormalRoutingKey}},
 			},
 		}).
 		Add(rabbitmq.MQDeclare{
-			Name: "snow_test.delayed.exchange",
+			Name: constant.DelayedExchange,
 			Type: xmq.DelayedExchange,
 			Queues: []rabbitmq.QueueDeclare{
-				{Name: "order.pay.queue", RoutingKeys: []string{"order.pay"}},
+				{Name: constant.ExampleDelayedQueue, RoutingKeys: []string{constant.ExampleDelayedRoutingKey}},
 			},
 		})
 
@@ -69,16 +69,16 @@ func TestProducer_Publish(t *testing.T) {
 
 	// 普通消息
 	msg := &xmq.Message{Body: []byte("hello"), Headers: map[string]interface{}{"k": "v"}}
-	assert.NoError(t, producer.Publish(ctx, "snow_test.exchange", "user.create1", msg))
+	assert.NoError(t, producer.Publish(ctx, constant.NormalExchange, constant.ExampleNormalRoutingKey, msg))
 
 	// 延迟消息
 	dmsg := &xmq.Message{Body: []byte("hello-delayed"), Headers: map[string]interface{}{"k": "d"}}
-	assert.NoError(t, producer.PublishDelayed(ctx, "snow_test.delayed.exchange", "order.pay", dmsg, 1000))
+	assert.NoError(t, producer.PublishDelayed(ctx, constant.DelayedExchange, constant.ExampleDelayedRoutingKey, dmsg, 1000))
 }
 
 // ----------------- 压测基准 -----------------
 func BenchmarkProducerPublish(b *testing.B) {
-	exchange := "snow_test.exchange"
+	exchange := constant.NormalExchange
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	conn := mustDialOrSkip(&testing.T{})
@@ -89,7 +89,7 @@ func BenchmarkProducerPublish(b *testing.B) {
 			Name: exchange,
 			Type: xmq.DirectExchange,
 			Queues: []rabbitmq.QueueDeclare{
-				{Name: "user.delete.queue", RoutingKeys: []string{"user.delete"}},
+				{Name: constant.ExampleNormalQueue, RoutingKeys: []string{constant.ExampleNormalRoutingKey}},
 			},
 		})
 
@@ -111,7 +111,7 @@ func BenchmarkProducerPublish(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			benchMsg := &xmq.Message{Body: []byte(fmt.Sprintf("bench-message-%d", success)), Headers: map[string]interface{}{"k": "b"}}
-			if err := p.Publish(ctx, exchange, "user.delete", benchMsg); err != nil {
+			if err := p.Publish(ctx, exchange, constant.ExampleNormalRoutingKey, benchMsg); err != nil {
 				atomic.AddUint64(&fail, 1)
 			} else {
 				atomic.AddUint64(&success, 1)

@@ -2,10 +2,15 @@ package api
 
 import (
 	"context"
+	"encoding/json"
+	"snowgo/internal/constant"
 	"snowgo/internal/di"
+	"snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
+	"snowgo/pkg/xmq"
 	"snowgo/pkg/xresponse"
 	str "snowgo/pkg/xstr_tool"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,6 +22,43 @@ func Index(c *gin.Context) {
 		"client_ip":  c.ClientIP(),
 		"random_str": str.RandStr(10, str.LowerFlag|str.UpperFlag|str.DigitFlag),
 	})
+}
+
+// PublishMessage 发送消息
+func PublishMessage(c *gin.Context) {
+	container := di.GetContainer(c)
+	delayMs, _ := strconv.ParseInt(c.Query("delay"), 10, 64)
+
+	body := struct {
+		ClientIP  string `json:"client_ip"`
+		Timestamp int64  `json:"timestamp"`
+	}{
+		ClientIP:  c.ClientIP(),
+		Timestamp: time.Now().UTC().UnixMilli(),
+	}
+	bodyBytes, _ := json.Marshal(body)
+	msg := &xmq.Message{
+		Body:    bodyBytes,
+		Headers: map[string]interface{}{"source": "http-api"},
+	}
+
+	// 如果是延时消息
+	if delayMs > 0 {
+		err := container.Producer.PublishDelayed(c.Request.Context(), constant.DelayedExchange, constant.ExampleDelayedRoutingKey, msg, delayMs)
+		if err != nil {
+			xlogger.ErrorfCtx(c.Request.Context(), "publish delay message error: %s", err.Error())
+			xresponse.FailByError(c, xerror.HttpInternalServerError)
+			return
+		}
+	} else {
+		err := container.Producer.Publish(c.Request.Context(), constant.NormalExchange, constant.ExampleNormalRoutingKey, msg)
+		if err != nil {
+			xlogger.ErrorfCtx(c.Request.Context(), "publish message error: %s", err.Error())
+			xresponse.FailByError(c, xerror.HttpInternalServerError)
+			return
+		}
+	}
+	xresponse.Success(c, nil)
 }
 
 // Liveness 存活检查

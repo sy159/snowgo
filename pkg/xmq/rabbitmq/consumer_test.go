@@ -3,6 +3,7 @@ package rabbitmq_test
 import (
 	"context"
 	"fmt"
+	"snowgo/internal/constant"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -15,8 +16,8 @@ import (
 
 // TestConsumer_ProcessMessage_WhenQueueExists  测试消费固定数量消息
 func TestConsumer_ProcessMessage_WhenQueueExists(t *testing.T) {
-	exchange := "snow_test.exchange"
-	queue := "user.delete.queue"
+	exchange := constant.NormalExchange
+	queue := constant.ExampleNormalQueue
 	expectedCount := 5 // 消费数量
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -31,7 +32,7 @@ func TestConsumer_ProcessMessage_WhenQueueExists(t *testing.T) {
 			Name: exchange,
 			Type: xmq.DirectExchange,
 			Queues: []rabbitmq.QueueDeclare{
-				{Name: queue, RoutingKeys: []string{"user.delete"}},
+				{Name: queue, RoutingKeys: []string{constant.ExampleNormalRoutingKey}},
 			},
 		})
 	require.NoError(t, reg.RegisterAll(ctx))
