@@ -24,8 +24,11 @@
 snowgo
 ├── .github  github cicd
 ├── assets  静态文件
+├── cmd  项目启动入口
+│   ├── http  http项目启动入口
+│   ├── mq-declarer  mq声明执行入口
+│   └── worker  消费启动入口
 ├── config  配置文件
-├── cmd  项目启动入口(http、worker等)
 ├── depoly
 │   ├── elk  elk部署
 │   └── monitor 监控部署
