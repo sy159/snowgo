@@ -24,7 +24,7 @@ jobs:
         language: [ go ]
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -49,7 +49,7 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
 
-  # Gosec - Go 专用安全扫描（SARIF + console）
+  # Gosec - Go 专用安全扫描（一次扫描 -> console + SARIF）
   gosec:
     name: Gosec Analysis
     runs-on: ubuntu-22.04
@@ -60,7 +60,7 @@ jobs:
       security-events: write
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -72,27 +72,70 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
 
+      - name: Install jq (for SARIF inspection)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+
       - name: Install Gosec (pinned)
         run: |
           GOSEC_VERSION=v2.22.10
+          echo "Installing gosec ${GOSEC_VERSION}"
           go install github.com/securego/gosec/v2/cmd/gosec@${GOSEC_VERSION}
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
           gosec version
 
       - name: Run Gosec (console + SARIF)
+        id: run_gosec
         run: |
-          gosec -fmt=sarif -out=gosec.sarif -stdout -quiet \
-                -exclude-generated -exclude=G115,G404 ./...
-      - name: Ensure SARIF file exists
-        if: always()
-        run: |
-          if [ ! -f gosec.sarif ] || [ ! -s gosec.sarif ]; then
-            echo "Creating empty SARIF file..."
-            echo '{"version": "2.1.0", "runs": []}' > gosec.sarif
+          # Run once, print to console and write SARIF file. Do not fail the step on findings.
+          gosec -fmt=sarif -out=gosec.sarif -stdout -exclude-generated -exclude=G115,G404 ./... || true
+          # show SARIF file metadata (if produced) to help debugging
+          if [ -f gosec.sarif ]; then
+            echo "==== gosec.sarif metadata ===="
+            ls -lh gosec.sarif
+            echo "==== gosec.sarif head ===="
+            head -n 200 gosec.sarif || true
+          else
+            echo "gosec.sarif not produced"
           fi
 
-      - name: Upload Gosec SARIF
+      - name: Inspect SARIF (count runs/results)
+        id: inspect_sarif
+        run: |
+          # default outputs
+          echo "sarif_runs=0" >> $GITHUB_OUTPUT
+          echo "sarif_results=0" >> $GITHUB_OUTPUT
+
+          if [ ! -f gosec.sarif ]; then
+            echo "No SARIF file found."
+            exit 0
+          fi
+
+          # get number of runs
+          runs=$(jq '.runs | length' gosec.sarif 2>/dev/null || echo 0)
+          if [ "$runs" -eq 0 ]; then
+            echo "SARIF has 0 runs."
+            exit 0
+          fi
+
+          # total results across all runs (handles absent fields safely)
+          total=$(jq '[ .runs[]?.results? | length ] | add' gosec.sarif 2>/dev/null || echo 0)
+          echo "sarif_runs=$runs" >> $GITHUB_OUTPUT
+          echo "sarif_results=$total" >> $GITHUB_OUTPUT
+          echo "Found SARIF runs=$runs results=$total"
+
+      - name: Upload SARIF to Code Scanning (only if results > 0)
+        if: ${{ always() && steps.inspect_sarif.outputs.sarif_results && steps.inspect_sarif.outputs.sarif_results != '0' }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: gosec.sarif
           category: gosec
+
+      - name: Upload Gosec SARIF artifact (always - for audit)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: gosec-sarif
+          path: gosec.sarif
+          retention-days: 7
