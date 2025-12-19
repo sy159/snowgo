@@ -40,11 +40,6 @@ jobs:
             echo "module_dir=." >> $GITHUB_OUTPUT
           fi
 
-      - name: Debug go.mod detection
-        run: |
-          echo "no_go_mod=${{ steps.find-mod.outputs.no_go_mod }}"
-          echo "module_dir=${{ steps.find-mod.outputs.module_dir }}"
-
       - name: Skip CodeQL if no Go module
         if: ${{ steps.find-mod.outputs.no_go_mod == 'true' }}
         run: echo "No go.mod detected, skipping CodeQL analysis."
@@ -57,16 +52,7 @@ jobs:
           cache: true
           cache-dependency-path: ${{ steps.find-mod.outputs.module_dir }}/go.sum
 
-      - name: Cache Go build
-        if: ${{ steps.find-mod.outputs.no_go_mod != 'true' }}
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-
-      - name: Initialize CodeQL
+      - name: CodeQL Init
         if: ${{ steps.find-mod.outputs.no_go_mod != 'true' }}
         uses: github/codeql-action/init@v3.28.0
         with:
@@ -88,7 +74,7 @@ jobs:
           go mod download
           go build ./...
 
-      - name: Analyze with CodeQL
+      - name: CodeQL Analyze
         if: ${{ steps.find-mod.outputs.no_go_mod != 'true' }}
         uses: github/codeql-action/analyze@v3.28.0
         with:
@@ -140,19 +126,14 @@ jobs:
         run: |
           set -euo pipefail
           MODULE_DIR="${{ steps.find-mod-gosec.outputs.module_dir }}"
-          if [[ "$MODULE_DIR" == "." ]]; then
-            SARIF="${GITHUB_WORKSPACE}/gosec.sarif"
-          else
-            SARIF="${GITHUB_WORKSPACE}/${MODULE_DIR}/gosec.sarif"
-          fi
-
-          cd "$MODULE_DIR" || { echo "cd failed"; exit 2; }
+          SARIF="${GITHUB_WORKSPACE}/gosec.sarif"
+          cd "$MODULE_DIR" || exit 1
           EXIT=0
           gosec -fmt=sarif -out="$SARIF" ./... || EXIT=$?
           echo "exit_code=$EXIT" >> $GITHUB_OUTPUT
           echo "sarif=$SARIF" >> $GITHUB_OUTPUT
 
-      - name: Upload SARIF to Code Scanning
+      - name: Upload SARIF to GitHub Code Scanning
         if: ${{ steps.gosec.outputs.exit_code != '0' }}
         uses: github/codeql-action/upload-sarif@v3.28.0
         with:
