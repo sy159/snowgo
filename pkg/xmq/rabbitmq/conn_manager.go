@@ -96,7 +96,7 @@ func (l *pendingList) ackLE(tag uint64, ack bool) int {
 		}
 		l.list = l.list[i:]
 		// #nosec G115 -- 值已在安全范围内，int -> int32 转换可控
-		l.decCount(int32(i)) //nolint:gosec
+		l.decCount(int32(i))
 	}
 	l.mu.Unlock()
 	return i

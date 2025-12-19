@@ -7,7 +7,7 @@ on:
     branches: [ main ]
   workflow_dispatch:
   schedule:
-    - cron: '0 2 * * 1' # weekly scan
+    - cron: '0 10 * * 5' # 每周五18:00, 配置的是utc时间
 
 permissions:
   contents: read
