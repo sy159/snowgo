@@ -89,63 +89,47 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
 
-      - name: Detect go.mod
-        id: find-mod-gosec
-        run: |
-          MODPATH=$(git ls-files go.mod | head -n 1 || true)
-          if [ -z "$MODPATH" ]; then
-            echo "no_go_mod=true" >> $GITHUB_OUTPUT
-            echo "module_dir=." >> $GITHUB_OUTPUT
-          else
-            echo "no_go_mod=false" >> $GITHUB_OUTPUT
-            echo "module_dir=." >> $GITHUB_OUTPUT
-          fi
-
-      - name: Skip gosec if no Go module
-        if: ${{ steps.find-mod-gosec.outputs.no_go_mod == 'true' }}
-        run: echo "No go.mod detected, skipping gosec."
-
       - name: Setup Go
-        if: ${{ steps.find-mod-gosec.outputs.no_go_mod != 'true' }}
         uses: actions/setup-go@v5.2.0
         with:
-          go-version-file: ${{ steps.find-mod-gosec.outputs.module_dir }}/go.mod
+          go-version-file: go.mod
           cache: true
 
       - name: Install gosec
-        if: ${{ steps.find-mod-gosec.outputs.no_go_mod != 'true' }}
         run: |
-          set -euo pipefail
           go install github.com/securego/gosec/v2/cmd/gosec@v2.22.10
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
           gosec version
 
-      - name: Run gosec & generate SARIF
-        if: ${{ steps.find-mod-gosec.outputs.no_go_mod != 'true' }}
+      - name: Run gosec and generate SARIF
         id: gosec
         run: |
           set -euo pipefail
-          MODULE_DIR="${{ steps.find-mod-gosec.outputs.module_dir }}"
-          SARIF="${GITHUB_WORKSPACE}/gosec.sarif"
-          cd "$MODULE_DIR" || exit 1
-
+          SARIF="$GITHUB_WORKSPACE/gosec.sarif"
           echo "Running gosec scan..."
-          # 生成 SARIF 并同时输出到 Actions log
-          EXIT=0
-          gosec -fmt=sarif -out="$SARIF" ./... || EXIT=$?
-          cat "$SARIF"  # 打印 SARIF 内容到 log
+          # 生成 SARIF 文件
+          gosec -fmt=sarif -out="$SARIF" ./...
+          EXIT=$?
           echo "exit_code=$EXIT" >> $GITHUB_OUTPUT
           echo "sarif=$SARIF" >> $GITHUB_OUTPUT
 
+          # 输出高/中问题到 Actions log
+          if [ -s "$SARIF" ]; then
+            echo "Gosec scan results:"
+            jq -r '.runs[].results[] | "\(.severity): \(.message.text) (\(.locations[].file):\(.locations[].line))"' "$SARIF"
+          else
+            echo "No gosec issues found."
+          fi
+
       - name: Upload SARIF to GitHub Code Scanning
-        if: ${{ steps.find-mod-gosec.outputs.no_go_mod != 'true' && steps.gosec.outputs.exit_code != '' }}
+        if: ${{ steps.gosec.outputs.sarif != '' }}
         uses: github/codeql-action/upload-sarif@v3.28.0
         with:
           sarif_file: ${{ steps.gosec.outputs.sarif }}
 
       - name: Upload SARIF artifact
-        if: ${{ steps.find-mod-gosec.outputs.no_go_mod != 'true' && steps.gosec.outputs.exit_code != '' }}
-        uses: actions/upload-artifact@v4.5.0
+        if: ${{ steps.gosec.outputs.sarif != '' }}
+        uses: actions/upload-artifact@v4
         with:
           name: gosec-sarif
           path: ${{ steps.gosec.outputs.sarif }}
