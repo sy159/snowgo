@@ -1,15 +1,16 @@
 name: Security Scan
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
+  push:
+    branches: [ main ]
   workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 1' # weekly full scan
 
 permissions:
   contents: read
-  actions: read
 
 env:
   GOSEC_VERSION: v2.22.10
@@ -20,14 +21,12 @@ jobs:
     name: CodeQL Analysis (Go)
     runs-on: ubuntu-22.04
     timeout-minutes: 60
+
     permissions:
       contents: read
       actions: read
       security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ go ]
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,152 +38,113 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-          cache-dependency-path: go.sum
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
-          languages: ${{ matrix.language }}
+          languages: go
           queries: security-and-quality
-          build-mode: auto
+          build-mode: autobuild
 
-      - name: Try CodeQL autobuild
-        id: autobuild
-        uses: github/codeql-action/autobuild@v3
-        continue-on-error: true
-
-      - name: Manual Go build fallback
-        if: steps.autobuild.outcome != 'success'
-        run: |
-          set -euo pipefail
-          go mod download
-          go build ./...
+      - name: Autobuild (Go)
+        uses: github/codeql-action/autobuild@v4
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          fail-fast: false
+        uses: github/codeql-action/analyze@v4
 
   gosec:
     name: Gosec Security Scan
     runs-on: ubuntu-22.04
     timeout-minutes: 30
-    needs: codeql
+
     permissions:
       contents: read
       actions: read
       security-events: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
-          cache-dependency-path: go.sum
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Install jq
+      - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Install gosec
         run: |
           set -euo pipefail
-          echo "Installing gosec ${GOSEC_VERSION}..."
-          GO111MODULE=on go install github.com/securego/gosec/v2/cmd/gosec@${GOSEC_VERSION}
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-          echo "gosec: $(gosec version || true)"
+          go install github.com/securego/gosec/v2/cmd/gosec@${GOSEC_VERSION}
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          gosec version
 
-      - name: Run gosec -> produce SARIF once; extract counts and print top findings
-        id: gosec-scan
+      - name: Run gosec (single pass, SARIF)
+        id: gosec
         run: |
           set -euo pipefail
-          WORKDIR="${GITHUB_WORKSPACE}"
-          SARIF="${WORKDIR}/gosec.sarif"
-          JSON="${WORKDIR}/gosec.json"
-          LOGFILE="${WORKDIR}/gosec.log"
 
-          echo "Running gosec: SARIF -> ${SARIF}, log -> ${LOGFILE}"
+          SARIF="${GITHUB_WORKSPACE}/gosec.sarif"
+          LOG="${GITHUB_WORKSPACE}/gosec.log"
 
           EXIT_CODE=0
-          # 临时关闭 set -e 避免工具异常退出导致步骤中断
           set +e
-          gosec -fmt=sarif -out="${SARIF}" ./... || EXIT_CODE=$?
+          gosec -fmt=sarif -out="${SARIF}" ./...
+          EXIT_CODE=$?
           set -e
 
+          echo "Top findings:"
           if [ -f "${SARIF}" ]; then
-            echo "Top findings:" > "${LOGFILE}"
-            jq -r '.runs[0].results[] |
-              (.level // (.properties.severity // "UNKNOWN")) as $sev |
-              ($sev + " : " + (.message.text // "") + " (" +
-              (.locations[0].physicalLocation.artifactLocation.uri // "unknown") + ":" +
-              ((.locations[0].physicalLocation.region.startLine|tostring) // "0") + ")")' "${SARIF}" \
-              | head -n 25 \
-              | tee -a "${LOGFILE}"
-
-            HIGH_COUNT=$(jq '[.runs[0].results[] | select((.level // .properties.severity // "") | test("HIGH|CRITICAL"))] | length' "${SARIF}" 2>/dev/null || echo "0")
-            MED_COUNT=$(jq '[.runs[0].results[] | select((.level // .properties.severity // "") | test("MEDIUM"))] | length' "${SARIF}" 2>/dev/null || echo "0")
-          else
-            echo "SARIF not generated, fallback to JSON..."
-            gosec -fmt=json -out="${JSON}" ./... || EXIT_CODE=$?
-            HIGH_COUNT=$(jq '[.issues[] | select(.severity == "HIGH" or .severity == "CRITICAL")] | length' "${JSON}" 2>/dev/null || echo "0")
-            MED_COUNT=$(jq '[.issues[] | select(.severity == "MEDIUM")] | length' "${JSON}" 2>/dev/null || echo "0")
+            jq -r '
+              .runs[0].results[] |
+              "\(.level // "UNKNOWN") : \(.message.text)
+               (\(.locations[0].physicalLocation.artifactLocation.uri):
+                \(.locations[0].physicalLocation.region.startLine))"
+            ' "${SARIF}" | head -n 20 | tee "${LOG}"
           fi
 
-          echo "high_count=${HIGH_COUNT}" >> "${GITHUB_OUTPUT}"
-          echo "med_count=${MED_COUNT}" >> "${GITHUB_OUTPUT}"
-          echo "exit_code=${EXIT_CODE}" >> "${GITHUB_OUTPUT}"
-          echo "sarif_file=${SARIF}" >> "${GITHUB_OUTPUT}"
+          HIGH=$(jq '[.runs[0].results[] | select(.level=="error")] | length' "${SARIF}" 2>/dev/null || echo 0)
+          MED=$(jq '[.runs[0].results[] | select(.level=="warning")] | length' "${SARIF}" 2>/dev/null || echo 0)
 
-      - name: Upload SARIF to GitHub Code Scanning (if exists)
-        if: ${{ steps.gosec-scan.outputs.sarif_file != '' }}
-        uses: github/codeql-action/upload-sarif@v3
+          echo "high=${HIGH}" >> "$GITHUB_OUTPUT"
+          echo "medium=${MED}" >> "$GITHUB_OUTPUT"
+          echo "exit_code=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
+          echo "sarif=${SARIF}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: ${{ steps.gosec-scan.outputs.sarif_file }}
+          sarif_file: ${{ steps.gosec.outputs.sarif }}
           category: gosec
 
       - name: Upload gosec artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: gosec-reports-${{ github.run_id }}
+          name: gosec-${{ github.run_id }}
           path: |
             ${{ github.workspace }}/gosec.sarif
-            ${{ github.workspace }}/gosec.json
             ${{ github.workspace }}/gosec.log
           retention-days: 7
 
-      - name: Fail policy if necessary
+      - name: Enforce security policy
         run: |
-          set -euo pipefail
-          HIGH="${{ steps.gosec-scan.outputs.high_count || '0' }}"
-          MED="${{ steps.gosec-scan.outputs.med_count || '0' }}"
-          FAIL_ON_MED="${{ env.FAIL_ON_MEDIUM }}"
-          echo "Detected HIGH=${HIGH}, MED=${MED}, FAIL_ON_MEDIUM=${FAIL_ON_MED}"
+          HIGH="${{ steps.gosec.outputs.high }}"
+          MED="${{ steps.gosec.outputs.medium }}"
+          FAIL_MED="${{ env.FAIL_ON_MEDIUM }}"
+
+          echo "HIGH=${HIGH}, MEDIUM=${MED}, FAIL_ON_MEDIUM=${FAIL_MED}"
+
           if [ "${HIGH}" -gt 0 ]; then
-            echo "❌ Failing because HIGH severity issues detected by gosec"
+            echo "❌ HIGH severity vulnerabilities detected"
             exit 1
           fi
-          if [ "${FAIL_ON_MED}" = "true" ] && [ "${MED}" -gt 0 ]; then
-            echo "❌ Failing because MEDIUM severity issues detected and FAIL_ON_MEDIUM=true"
+
+          if [ "${FAIL_MED}" = "true" ] && [ "${MED}" -gt 0 ]; then
+            echo "❌ MEDIUM severity vulnerabilities detected"
             exit 1
           fi
-          echo "✅ gosec policy check passed"
+
+          echo "✅ gosec policy passed"
