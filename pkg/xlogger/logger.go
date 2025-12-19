@@ -354,7 +354,11 @@ func mergeFieldsWithTrace(ctx context.Context, fields []zap.Field) []zap.Field {
 	if tf == zap.Skip() {
 		return fields
 	}
-	out := make([]zap.Field, 0, 1+len(fields))
+	n := len(fields)
+	if n > 1024 {
+		n = 1024
+	}
+	out := make([]zap.Field, 0, n+1)
 	out = append(out, tf)
 	out = append(out, fields...)
 	return out
