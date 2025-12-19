@@ -53,7 +53,8 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
         with:
-          fail-fast: false
+          upload: true
+          wait-for-processing: true
 
   gosec:
     name: Gosec Security Scan
@@ -87,7 +88,7 @@ jobs:
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           gosec version
 
-      - name: Run gosec -> produce SARIF once; extract counts and print top findings
+      - name: Run gosec scan
         id: gosec-scan
         run: |
           set -euo pipefail
@@ -95,8 +96,9 @@ jobs:
           SARIF="${WORKDIR}/gosec.sarif"
 
           echo "Running gosec security scan..."
-          echo "Output: ${SARIF}"
+          echo "SARIF output: ${SARIF}"
 
+          # 运行 gosec 并捕获 exit code
           EXIT_CODE=0
           set +e
           gosec -fmt=sarif -out="${SARIF}" ./...
@@ -108,9 +110,8 @@ jobs:
             exit 1
           fi
 
-          echo ""
+          # 打印 top 20 问题
           echo "================ Security Findings (Top 20) ================"
-
           jq -r '
             .runs[0].results[]
             | "❌ [\(.level // "UNKNOWN")] \(.ruleId)
@@ -118,14 +119,9 @@ jobs:
                What: \(.message.text)"
           ' "${SARIF}" | head -n 20
 
+          # 统计 HIGH/CRITICAL 和 MEDIUM
           HIGH=$(jq '[.runs[0].results[] | select((.level // "")=="error")] | length' "${SARIF}")
           MED=$(jq '[.runs[0].results[] | select((.level // "")=="warning")] | length' "${SARIF}")
-
-          echo ""
-          echo "================ Summary ================="
-          echo "HIGH   : ${HIGH}"
-          echo "MEDIUM : ${MED}"
-          echo "================================================"
 
           echo "high=${HIGH}" >> "$GITHUB_OUTPUT"
           echo "medium=${MED}" >> "$GITHUB_OUTPUT"
