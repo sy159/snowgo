@@ -7,7 +7,7 @@ on:
     branches: [ main ]
   workflow_dispatch:
   schedule:
-    - cron: '0 10 * * 5' # 每周五18:00北京时间（UTC 10:00）
+    - cron: '0 10 * * 5' # 每周五 UTC 10:00 -> 北京时间周五 18:00
 
 permissions:
   contents: read
@@ -26,7 +26,6 @@ jobs:
       contents: read
       actions: read
       security-events: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,7 +44,7 @@ jobs:
         with:
           languages: go
           queries: security-and-quality
-          build-mode: autobuild
+          build-mode: none  # 避免重复 autobuild
 
       - name: Autobuild (Go)
         uses: github/codeql-action/autobuild@v4
@@ -64,7 +63,6 @@ jobs:
       contents: read
       actions: read
       security-events: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -81,14 +79,17 @@ jobs:
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
-          path: ~/go/pkg/mod
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
           key: go-mod-${{ runner.os }}-${{ hashFiles('go.sum') }}
           restore-keys: |
             go-mod-${{ runner.os }}-
-          continue-on-error: true
 
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Install utilities
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
 
       - name: Install gosec
         run: |
@@ -103,66 +104,101 @@ jobs:
           set -euo pipefail
           WORKDIR="${GITHUB_WORKSPACE}"
           SARIF="${WORKDIR}/gosec.sarif"
+          LOG="${WORKDIR}/gosec.log"
 
-          echo "Running gosec security scan..."
-          echo "SARIF output: ${SARIF}"
+          rm -f "${SARIF}" "${LOG}" || true
 
-          EXIT_CODE=0
+          echo "Running gosec scan..."
           set +e
-          gosec -fmt=sarif -out="${SARIF}" ./...
-          EXIT_CODE=$?
+          gosec -fmt=sarif -out="${SARIF}" ./... 2>&1 | tee "${LOG}"
+          GC_EXIT=$?
           set -e
 
-          if [ ! -f "${SARIF}" ]; then
-            touch "${SARIF}"
+          echo "exit_code=${GC_EXIT}" >> "$GITHUB_OUTPUT"
+          echo "sarif=${SARIF}" >> "$GITHUB_OUTPUT"
+
+          SARIF_HAS_RUNS="false"
+          if [ -f "${SARIF}" ] && [ -s "${SARIF}" ]; then
+            if jq -e 'has("runs") and (.runs | length) > 0' "${SARIF}" >/dev/null 2>&1; then
+              SARIF_HAS_RUNS="true"
+            fi
+          fi
+          echo "sarif_has_runs=${SARIF_HAS_RUNS}" >> "$GITHUB_OUTPUT"
+
+          echo "================ Security Findings (Top 60) ================"
+          if [ "${SARIF_HAS_RUNS}" = "true" ]; then
+            jq -r '
+              .runs[]?.results[]?
+              | (
+                  (.level // (.properties.severity // "UNKNOWN")) as $sev |
+                  (.ruleId // "-") as $rule |
+                  (.message.text // .message.markdown // "-") as $msg |
+                  (.locations[0].physicalLocation.artifactLocation.uri // "-") as $file |
+                  ((.locations[0].physicalLocation.region.startLine // 0) | tostring) as $line
+                )
+              | "[" + ($sev) + "] " + $rule + "\nFile: " + $file + ":" + $line + "\nWhat: " + $msg + "\n---"
+            ' "${SARIF}" | head -n 60 || true
+          else
+            echo "No SARIF results; tail gosec.log"
+            tail -n 200 "${LOG}" || true
           fi
 
-          # 打印 top 20 问题
-          echo "================ Security Findings (Top 20) ================"
-          jq -r '
-            .runs[0].results[]
-            | "❌ [\(.level // "UNKNOWN")] \(.ruleId)
-               File: \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine)
-               What: \(.message.text)"
-          ' "${SARIF}" | head -n 20
-
-          HIGH=$(jq '[.runs[0].results[] | select((.level // "")=="error")] | length' "${SARIF}")
-          MED=$(jq '[.runs[0].results[] | select((.level // "")=="warning")] | length' "${SARIF}")
+          HIGH=$(jq -r 'if (has("runs") and (.runs|length)>0) then ([.runs[]?.results[]? | select(((.level // (.properties.severity // "")) | test("(?i)high|critical")))] | length) else 0 end' "${SARIF}" 2>/dev/null || echo "0")
+          MED=$(jq -r 'if (has("runs") and (.runs|length)>0) then ([.runs[]?.results[]? | select(((.level // (.properties.severity // "")) | test("(?i)medium")))] | length) else 0 end' "${SARIF}" 2>/dev/null || echo "0")
 
           echo "high=${HIGH}" >> "$GITHUB_OUTPUT"
           echo "medium=${MED}" >> "$GITHUB_OUTPUT"
-          echo "exit_code=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
-          echo "sarif=${SARIF}" >> "$GITHUB_OUTPUT"
 
       - name: Upload SARIF to GitHub Security
+        if: always() && steps.gosec-scan.outputs.sarif_has_runs == 'true'
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ${{ steps.gosec-scan.outputs.sarif }}
           category: gosec
 
       - name: Upload gosec artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gosec-${{ github.run_id }}
-          path: ${{ github.workspace }}/gosec.sarif
+          path: |
+            ${{ github.workspace }}/gosec.log
+            ${{ github.workspace }}/gosec.sarif
           retention-days: 7
+          if-no-files-found: warn
 
       - name: Enforce security policy
+        if: always()
         run: |
+          set -euo pipefail
           HIGH="${{ steps.gosec-scan.outputs.high }}"
           MED="${{ steps.gosec-scan.outputs.medium }}"
+          GC_EXIT="${{ steps.gosec-scan.outputs.exit_code }}"
+          GC_EXIT=${GC_EXIT:-0}
+          SARIF_HAS_RUNS="${{ steps.gosec-scan.outputs.sarif_has_runs }}"
           FAIL_MED="${{ env.FAIL_ON_MEDIUM }}"
 
-          echo "HIGH=${HIGH}, MEDIUM=${MED}, FAIL_ON_MEDIUM=${FAIL_MED}"
+          is_true() { case "$1" in "true"|"True"|"TRUE"|"1") return 0 ;; *) return 1 ;; esac; }
 
-          if [ "${HIGH}" -gt 0 ]; then
-            echo "❌ High/Critical severity vulnerabilities detected"
+          echo "gosec exit_code=${GC_EXIT}, sarif_has_runs=${SARIF_HAS_RUNS}, HIGH=${HIGH}, MED=${MED}, FAIL_ON_MEDIUM=${FAIL_MED}"
+
+          if [ "${GC_EXIT}" -ge 2 ]; then
+            echo "::error::gosec execution failed with exit code ${GC_EXIT}. See gosec.log"
             exit 1
           fi
 
-          if [ "${FAIL_MED}" = "true" ] && [ "${MED}" -gt 0 ]; then
-            echo "❌ Medium severity vulnerabilities detected"
+          if [ "${HIGH}" -gt 0 ]; then
+            echo "::error::High/Critical severity vulnerabilities detected (count=${HIGH})"
             exit 1
+          fi
+
+          if is_true "${FAIL_MED}" && [ "${MED}" -gt 0 ]; then
+            echo "::error::Medium severity vulnerabilities detected and FAIL_ON_MEDIUM=true (count=${MED})"
+            exit 1
+          fi
+
+          if [ "${SARIF_HAS_RUNS}" != "true" ] && [ "${GC_EXIT}" -eq 1 ]; then
+            echo "::warning::gosec reported issues (exit_code=1) but SARIF contained no runs. See gosec.log"
           fi
 
           echo "✅ gosec policy passed"
