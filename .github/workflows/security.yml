@@ -30,8 +30,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
-          cache-dependency-path: go.sum
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -58,18 +56,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
-          cache-dependency-path: go.sum
-
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: go-mod-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            go-mod-${{ runner.os }}-
-        continue-on-error: true
 
       - name: Install utilities
         run: |
@@ -78,7 +64,6 @@ jobs:
 
       - name: Install gosec
         run: |
-          set -euo pipefail
           go install github.com/securego/gosec/v2/cmd/gosec@${GOSEC_VERSION}
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           gosec version
@@ -157,7 +142,7 @@ jobs:
           fi
 
           if [ "${SARIF_HAS_RUNS}" != "true" ] && [ "${GC_EXIT}" -eq 1 ]; then
-            echo "::warning::gosec reported issues (exit_code=1) but SARIF contained no runs. See gosec.log"
+            echo "::warning::gosec reported issues but SARIF contained no runs. See gosec.log"
           fi
 
           echo "✅ gosec policy passed"
