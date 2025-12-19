@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 env:
   GOSEC_VERSION: v2.22.10
@@ -21,97 +22,121 @@ jobs:
     name: CodeQL Analysis (Go)
     runs-on: ubuntu-22.04
     timeout-minutes: 60
-
     permissions:
       contents: read
+      actions: read
       security-events: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: go.sum
 
-      - uses: github/codeql-action/init@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
         with:
           languages: go
           queries: security-and-quality
           build-mode: autobuild
 
-      - uses: github/codeql-action/autobuild@v4
+      - name: Autobuild (Go)
+        uses: github/codeql-action/autobuild@v4
 
-      - uses: github/codeql-action/analyze@v4
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          fail-fast: false
 
   gosec:
     name: Gosec Security Scan
     runs-on: ubuntu-22.04
     timeout-minutes: 30
-
     permissions:
       contents: read
+      actions: read
+      security-events: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: go.sum
 
-      - name: Install tools
+      - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Install gosec
         run: |
+          set -euo pipefail
           go install github.com/securego/gosec/v2/cmd/gosec@${GOSEC_VERSION}
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           gosec version
 
-      - name: Run gosec and print findings
-        id: gosec
+      - name: Run gosec -> produce SARIF once; extract counts and print top findings
+        id: gosec-scan
         run: |
           set -euo pipefail
+          WORKDIR="${GITHUB_WORKSPACE}"
+          SARIF="${WORKDIR}/gosec.sarif"
 
-          SARIF="${GITHUB_WORKSPACE}/gosec.sarif"
-          LOG="${GITHUB_WORKSPACE}/gosec.log"
+          echo "Running gosec security scan..."
+          echo "Output: ${SARIF}"
 
-          echo "▶ Running gosec..."
+          EXIT_CODE=0
           set +e
           gosec -fmt=sarif -out="${SARIF}" ./...
+          EXIT_CODE=$?
           set -e
 
           if [ ! -f "${SARIF}" ]; then
-            echo "❌ gosec failed to generate SARIF"
+            echo "❌ gosec did not generate SARIF output"
             exit 1
           fi
 
-          echo "" | tee "${LOG}"
-          echo "================ gosec findings ================" | tee -a "${LOG}"
+          echo ""
+          echo "================ Security Findings (Top 20) ================"
 
           jq -r '
             .runs[0].results[]
-            | {
-                severity: (.level // .properties.severity // "UNKNOWN"),
-                rule: (.ruleId // "UNKNOWN"),
-                file: (.locations[0].physicalLocation.artifactLocation.uri // "unknown"),
-                line: (.locations[0].physicalLocation.region.startLine // 0),
-                message: (.message.text // "")
-              }
-            | "• [\(.severity)] \(.rule)\n  File: \(.file):\(.line)\n  What: \(.message)\n"
-          ' "${SARIF}" | tee -a "${LOG}"
+            | "❌ [\(.level // "UNKNOWN")] \(.ruleId)
+               File: \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine)
+               What: \(.message.text)"
+          ' "${SARIF}" | head -n 20
 
-          HIGH=$(jq '[.runs[0].results[] | select((.level // .properties.severity // "") | test("(?i)error|high|critical"))] | length' "${SARIF}")
-          MED=$(jq '[.runs[0].results[] | select((.level // .properties.severity // "") | test("(?i)warning|medium"))] | length' "${SARIF}")
+          HIGH=$(jq '[.runs[0].results[] | select((.level // "")=="error")] | length' "${SARIF}")
+          MED=$(jq '[.runs[0].results[] | select((.level // "")=="warning")] | length' "${SARIF}")
 
-          echo "================ Summary ================" | tee -a "${LOG}"
-          echo "HIGH   : ${HIGH}" | tee -a "${LOG}"
-          echo "MEDIUM : ${MED}" | tee -a "${LOG}"
-          echo "========================================" | tee -a "${LOG}"
+          echo ""
+          echo "================ Summary ================="
+          echo "HIGH   : ${HIGH}"
+          echo "MEDIUM : ${MED}"
+          echo "================================================"
 
           echo "high=${HIGH}" >> "$GITHUB_OUTPUT"
           echo "medium=${MED}" >> "$GITHUB_OUTPUT"
+          echo "exit_code=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
+          echo "sarif=${SARIF}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ steps.gosec-scan.outputs.sarif }}
+          category: gosec
 
       - name: Upload gosec artifacts
         uses: actions/upload-artifact@v4
@@ -119,25 +144,24 @@ jobs:
           name: gosec-${{ github.run_id }}
           path: |
             ${{ github.workspace }}/gosec.sarif
-            ${{ github.workspace }}/gosec.log
           retention-days: 7
 
-      - name: Enforce policy (only after details are printed)
+      - name: Enforce security policy
         run: |
-          HIGH="${{ steps.gosec.outputs.high }}"
-          MEDIUM="${{ steps.gosec.outputs.medium }}"
+          HIGH="${{ steps.gosec-scan.outputs.high }}"
+          MED="${{ steps.gosec-scan.outputs.medium }}"
           FAIL_MED="${{ env.FAIL_ON_MEDIUM }}"
 
-          echo "Policy check: HIGH=${HIGH}, MEDIUM=${MEDIUM}, FAIL_ON_MEDIUM=${FAIL_MED}"
+          echo "HIGH=${HIGH}, MEDIUM=${MED}, FAIL_ON_MEDIUM=${FAIL_MED}"
 
           if [ "${HIGH}" -gt 0 ]; then
-            echo "❌ HIGH severity issues detected"
+            echo "❌ High/Critical severity vulnerabilities detected"
             exit 1
           fi
 
-          if [ "${FAIL_MED}" = "true" ] && [ "${MEDIUM}" -gt 0 ]; then
-            echo "❌ MEDIUM severity issues detected"
+          if [ "${FAIL_MED}" = "true" ] && [ "${MED}" -gt 0 ]; then
+            echo "❌ Medium severity vulnerabilities detected"
             exit 1
           fi
 
-          echo "✅ gosec passed"
+          echo "✅ gosec policy passed"
