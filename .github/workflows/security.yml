@@ -7,7 +7,7 @@ on:
     branches: [ main ]
   workflow_dispatch:
   schedule:
-    - cron: '0 10 * * 5' # 每周五 UTC 10:00 -> 北京时间周五 18:00
+    - cron: '0 10 * * 5' # UTC 10:00 -> 北京时间周五 18:00
 
 permissions:
   contents: read
@@ -22,10 +22,6 @@ jobs:
     name: CodeQL Analysis (Go)
     runs-on: ubuntu-22.04
     timeout-minutes: 60
-    permissions:
-      contents: read
-      actions: read
-      security-events: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,10 +50,6 @@ jobs:
     name: Gosec Security Scan
     runs-on: ubuntu-22.04
     timeout-minutes: 30
-    permissions:
-      contents: read
-      actions: read
-      security-events: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,6 +69,7 @@ jobs:
           key: go-mod-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             go-mod-${{ runner.os }}-
+        continue-on-error: true
 
       - name: Install utilities
         run: |
@@ -98,7 +91,6 @@ jobs:
           LOG="${GITHUB_WORKSPACE}/gosec.log"
           rm -f "${SARIF}" "${LOG}" || true
 
-          echo "Running gosec scan..."
           set +e
           gosec -fmt=sarif -out="${SARIF}" ./... 2>&1 | tee "${LOG}"
           GC_EXIT=$?
