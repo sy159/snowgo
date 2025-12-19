@@ -17,12 +17,6 @@ jobs:
     name: CodeQL Analysis (Go)
     runs-on: ubuntu-22.04
     timeout-minutes: 60
-
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-
     strategy:
       fail-fast: false
       matrix:
@@ -41,11 +35,9 @@ jobs:
           if [ -z "$MODPATH" ]; then
             echo "no_go_mod=true" >> $GITHUB_OUTPUT
             echo "module_dir=." >> $GITHUB_OUTPUT
-            echo "No go.mod found at root"
           else
             echo "no_go_mod=false" >> $GITHUB_OUTPUT
             echo "module_dir=." >> $GITHUB_OUTPUT
-            echo "Found go.mod at root"
           fi
 
       - name: Debug go.mod detection
@@ -55,8 +47,7 @@ jobs:
 
       - name: Skip CodeQL if no Go module
         if: ${{ steps.find-mod.outputs.no_go_mod == 'true' }}
-        run: |
-          echo "No go.mod detected, skipping CodeQL analysis."
+        run: echo "No go.mod detected, skipping CodeQL analysis."
 
       - name: Setup Go
         if: ${{ steps.find-mod.outputs.no_go_mod != 'true' }}
@@ -81,7 +72,7 @@ jobs:
         with:
           languages: go
           queries: security-and-quality
-          build-mode: auto
+          build-mode: autobuild
 
       - name: CodeQL autobuild
         if: ${{ steps.find-mod.outputs.no_go_mod != 'true' }}
@@ -90,7 +81,7 @@ jobs:
         continue-on-error: true
 
       - name: Manual Go build fallback
-        if: ${{ steps.find-mod.outputs.no_go_mod != 'true' && steps.autobuild.outcome != 'success' }}
+        if: steps.autobuild.outcome != 'success'
         run: |
           set -euo pipefail
           cd "${{ steps.find-mod.outputs.module_dir }}"
@@ -119,11 +110,9 @@ jobs:
           if [ -z "$MODPATH" ]; then
             echo "no_go_mod=true" >> $GITHUB_OUTPUT
             echo "module_dir=." >> $GITHUB_OUTPUT
-            echo "No go.mod found at root"
           else
             echo "no_go_mod=false" >> $GITHUB_OUTPUT
             echo "module_dir=." >> $GITHUB_OUTPUT
-            echo "Found go.mod at root"
           fi
 
       - name: Skip gosec if no Go module
@@ -177,6 +166,8 @@ jobs:
           path: ${{ steps.gosec.outputs.sarif }}
           retention-days: 7
 
-      - name: Fail on gosec findings
+      - name: Fail on high/medium gosec findings
         if: ${{ steps.gosec.outputs.exit_code != '0' }}
-        run: exit 1
+        run: |
+          echo "Gosec found issues! High/Medium issues will fail the job."
+          exit 1

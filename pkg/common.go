@@ -8,7 +8,6 @@ import (
 	"math/big"
 	mrand "math/rand"
 	"reflect"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -31,7 +30,7 @@ func init() {
 
 // 初始化高性能 RNG（非安全）
 func initWeakRng() {
-	// nosec G404 非安全随机，仅用于生成测试数据/混淆用，不适用于安全用途
+	//nosec G404 非安全随机，仅用于生成测试数据/混淆用，不适用于安全用途
 	weakRng = mrand.New(mrand.NewSource(time.Now().UnixNano())) //nolint:gosec
 }
 
@@ -61,14 +60,10 @@ func GenerateID() string {
 	if sfNode != nil {
 		return sfNode.Generate().String()
 	}
-
-	// 毫秒时间戳（41 bit）
-	ts := uint64(time.Now().UnixMilli()) << 22
-
-	// 22 bit 随机（0 ~ 4,194,304）
-	r, _ := SecureRandInt63n(1 << 22)
-
-	return strconv.FormatUint(ts|uint64(r), 10)
+	// 直接时间戳+随机数
+	ts := time.Now().UnixMilli()
+	r := weakRng.Int63n(1 << 20)
+	return fmt.Sprintf("%d%05d", ts, r)
 }
 
 // ErrorToString 错误转字符串（可安全处理 panic）

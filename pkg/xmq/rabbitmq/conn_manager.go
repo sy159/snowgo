@@ -96,7 +96,7 @@ func (l *pendingList) ackLE(tag uint64, ack bool) int {
 		}
 		l.list = l.list[i:]
 		// 防御性递减 count
-		l.decCount(int32(i))
+		l.decCount(int32(i)) //nolint:gosec
 	}
 	l.mu.Unlock()
 	return i
