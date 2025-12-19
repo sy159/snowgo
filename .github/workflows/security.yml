@@ -10,10 +10,7 @@ on:
 permissions:
   contents: read
   actions: read
-
-defaults:
-  run:
-    shell: bash
+  security-events: write
 
 jobs:
   codeql:
@@ -40,18 +37,26 @@ jobs:
       - name: Detect go.mod
         id: find-mod
         run: |
-          MODPATH=$(git ls-files --full-name -- **/go.mod | head -n 1 || true)
+          MODPATH=$(git ls-files go.mod | head -n 1 || true)
           if [ -z "$MODPATH" ]; then
             echo "no_go_mod=true" >> $GITHUB_OUTPUT
             echo "module_dir=." >> $GITHUB_OUTPUT
+            echo "No go.mod found at root"
           else
             echo "no_go_mod=false" >> $GITHUB_OUTPUT
-            echo "module_dir=$(dirname "$MODPATH")" >> $GITHUB_OUTPUT
+            echo "module_dir=." >> $GITHUB_OUTPUT
+            echo "Found go.mod at root"
           fi
+
+      - name: Debug go.mod detection
+        run: |
+          echo "no_go_mod=${{ steps.find-mod.outputs.no_go_mod }}"
+          echo "module_dir=${{ steps.find-mod.outputs.module_dir }}"
 
       - name: Skip CodeQL if no Go module
         if: ${{ steps.find-mod.outputs.no_go_mod == 'true' }}
-        run: echo "No go.mod detected, skipping CodeQL."
+        run: |
+          echo "No go.mod detected, skipping CodeQL analysis."
 
       - name: Setup Go
         if: ${{ steps.find-mod.outputs.no_go_mod != 'true' }}
@@ -78,7 +83,7 @@ jobs:
           queries: security-and-quality
           build-mode: auto
 
-      - name: CodeQL autobuild (best effort)
+      - name: CodeQL autobuild
         if: ${{ steps.find-mod.outputs.no_go_mod != 'true' }}
         id: autobuild
         uses: github/codeql-action/autobuild@v3.28.0
@@ -103,40 +108,37 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
 
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
 
       - name: Detect go.mod
-        id: find-mod
+        id: find-mod-gosec
         run: |
-          MODPATH=$(git ls-files --full-name -- **/go.mod | head -n 1 || true)
+          MODPATH=$(git ls-files go.mod | head -n 1 || true)
           if [ -z "$MODPATH" ]; then
             echo "no_go_mod=true" >> $GITHUB_OUTPUT
             echo "module_dir=." >> $GITHUB_OUTPUT
+            echo "No go.mod found at root"
           else
             echo "no_go_mod=false" >> $GITHUB_OUTPUT
-            echo "module_dir=$(dirname "$MODPATH")" >> $GITHUB_OUTPUT
+            echo "module_dir=." >> $GITHUB_OUTPUT
+            echo "Found go.mod at root"
           fi
 
       - name: Skip gosec if no Go module
-        if: ${{ steps.find-mod.outputs.no_go_mod == 'true' }}
+        if: ${{ steps.find-mod-gosec.outputs.no_go_mod == 'true' }}
         run: echo "No go.mod detected, skipping gosec."
 
       - name: Setup Go
-        if: ${{ steps.find-mod.outputs.no_go_mod != 'true' }}
+        if: ${{ steps.find-mod-gosec.outputs.no_go_mod != 'true' }}
         uses: actions/setup-go@v5.2.0
         with:
-          go-version-file: ${{ steps.find-mod.outputs.module_dir }}/go.mod
+          go-version-file: ${{ steps.find-mod-gosec.outputs.module_dir }}/go.mod
           cache: true
 
       - name: Install gosec
-        if: ${{ steps.find-mod.outputs.no_go_mod != 'true' }}
+        if: ${{ steps.find-mod-gosec.outputs.no_go_mod != 'true' }}
         run: |
           set -euo pipefail
           go install github.com/securego/gosec/v2/cmd/gosec@v2.22.10
@@ -144,18 +146,18 @@ jobs:
           gosec version
 
       - name: Run gosec
-        if: ${{ steps.find-mod.outputs.no_go_mod != 'true' }}
+        if: ${{ steps.find-mod-gosec.outputs.no_go_mod != 'true' }}
         id: gosec
         run: |
           set -euo pipefail
-          MODULE_DIR="${{ steps.find-mod.outputs.module_dir }}"
+          MODULE_DIR="${{ steps.find-mod-gosec.outputs.module_dir }}"
           if [[ "$MODULE_DIR" == "." ]]; then
             SARIF="${GITHUB_WORKSPACE}/gosec.sarif"
           else
             SARIF="${GITHUB_WORKSPACE}/${MODULE_DIR}/gosec.sarif"
           fi
 
-          cd "$MODULE_DIR"
+          cd "$MODULE_DIR" || { echo "cd failed"; exit 2; }
           EXIT=0
           gosec -fmt=sarif -out="$SARIF" ./... || EXIT=$?
           echo "exit_code=$EXIT" >> $GITHUB_OUTPUT
@@ -168,7 +170,7 @@ jobs:
           sarif_file: ${{ steps.gosec.outputs.sarif }}
 
       - name: Upload SARIF artifact
-        if: ${{ steps.find-mod.outputs.no_go_mod != 'true' }}
+        if: ${{ steps.find-mod-gosec.outputs.no_go_mod != 'true' }}
         uses: actions/upload-artifact@v4.5.0
         with:
           name: gosec-sarif
