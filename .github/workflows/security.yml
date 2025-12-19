@@ -128,13 +128,19 @@ jobs:
           MODULE_DIR="${{ steps.find-mod-gosec.outputs.module_dir }}"
           SARIF="${GITHUB_WORKSPACE}/gosec.sarif"
           cd "$MODULE_DIR" || exit 1
-          EXIT=0
-          gosec -fmt=sarif -out="$SARIF" ./... || EXIT=$?
+
+          echo "Running gosec..."
+          # 输出到 Actions log
+          gosec -fmt=text ./...
+
+          # 生成 SARIF
+          gosec -fmt=sarif -out="$SARIF" ./...
+          EXIT=$?
           echo "exit_code=$EXIT" >> $GITHUB_OUTPUT
           echo "sarif=$SARIF" >> $GITHUB_OUTPUT
 
       - name: Upload SARIF to GitHub Code Scanning
-        if: ${{ steps.gosec.outputs.exit_code != '0' }}
+        if: ${{ steps.find-mod-gosec.outputs.no_go_mod != 'true' }}
         uses: github/codeql-action/upload-sarif@v3.28.0
         with:
           sarif_file: ${{ steps.gosec.outputs.sarif }}
@@ -150,5 +156,5 @@ jobs:
       - name: Fail on high/medium gosec findings
         if: ${{ steps.gosec.outputs.exit_code != '0' }}
         run: |
-          echo "Gosec found issues! High/Medium issues will fail the job."
+          echo "Gosec found High/Medium issues! Failing the job."
           exit 1
