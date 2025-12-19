@@ -27,13 +27,11 @@ jobs:
       actions: read
       security-events: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
@@ -44,10 +42,7 @@ jobs:
         with:
           languages: go
           queries: security-and-quality
-          build-mode: none  # 避免重复 autobuild
-
-      - name: Autobuild (Go)
-        uses: github/codeql-action/autobuild@v4
+          build-mode: autobuild
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
@@ -64,25 +59,22 @@ jobs:
       actions: read
       security-events: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
           cache-dependency-path: go.sum
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-mod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          key: go-mod-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             go-mod-${{ runner.os }}-
 
@@ -102,10 +94,8 @@ jobs:
         id: gosec-scan
         run: |
           set -euo pipefail
-          WORKDIR="${GITHUB_WORKSPACE}"
-          SARIF="${WORKDIR}/gosec.sarif"
-          LOG="${WORKDIR}/gosec.log"
-
+          SARIF="${GITHUB_WORKSPACE}/gosec.sarif"
+          LOG="${GITHUB_WORKSPACE}/gosec.log"
           rm -f "${SARIF}" "${LOG}" || true
 
           echo "Running gosec scan..."
@@ -125,39 +115,19 @@ jobs:
           fi
           echo "sarif_has_runs=${SARIF_HAS_RUNS}" >> "$GITHUB_OUTPUT"
 
-          echo "================ Security Findings (Top 60) ================"
-          if [ "${SARIF_HAS_RUNS}" = "true" ]; then
-            jq -r '
-              .runs[]?.results[]?
-              | (
-                  (.level // (.properties.severity // "UNKNOWN")) as $sev |
-                  (.ruleId // "-") as $rule |
-                  (.message.text // .message.markdown // "-") as $msg |
-                  (.locations[0].physicalLocation.artifactLocation.uri // "-") as $file |
-                  ((.locations[0].physicalLocation.region.startLine // 0) | tostring) as $line
-                )
-              | "[" + ($sev) + "] " + $rule + "\nFile: " + $file + ":" + $line + "\nWhat: " + $msg + "\n---"
-            ' "${SARIF}" | head -n 60 || true
-          else
-            echo "No SARIF results; tail gosec.log"
-            tail -n 200 "${LOG}" || true
-          fi
-
           HIGH=$(jq -r 'if (has("runs") and (.runs|length)>0) then ([.runs[]?.results[]? | select(((.level // (.properties.severity // "")) | test("(?i)high|critical")))] | length) else 0 end' "${SARIF}" 2>/dev/null || echo "0")
           MED=$(jq -r 'if (has("runs") and (.runs|length)>0) then ([.runs[]?.results[]? | select(((.level // (.properties.severity // "")) | test("(?i)medium")))] | length) else 0 end' "${SARIF}" 2>/dev/null || echo "0")
-
           echo "high=${HIGH}" >> "$GITHUB_OUTPUT"
           echo "medium=${MED}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload SARIF to GitHub Security
-        if: always() && steps.gosec-scan.outputs.sarif_has_runs == 'true'
+      - name: Upload SARIF
+        if: steps.gosec-scan.outputs.sarif_has_runs == 'true'
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ${{ steps.gosec-scan.outputs.sarif }}
           category: gosec
 
-      - name: Upload gosec artifacts
-        if: always()
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: gosec-${{ github.run_id }}
@@ -168,7 +138,6 @@ jobs:
           if-no-files-found: warn
 
       - name: Enforce security policy
-        if: always()
         run: |
           set -euo pipefail
           HIGH="${{ steps.gosec-scan.outputs.high }}"
@@ -179,8 +148,6 @@ jobs:
           FAIL_MED="${{ env.FAIL_ON_MEDIUM }}"
 
           is_true() { case "$1" in "true"|"True"|"TRUE"|"1") return 0 ;; *) return 1 ;; esac; }
-
-          echo "gosec exit_code=${GC_EXIT}, sarif_has_runs=${SARIF_HAS_RUNS}, HIGH=${HIGH}, MED=${MED}, FAIL_ON_MEDIUM=${FAIL_MED}"
 
           if [ "${GC_EXIT}" -ge 2 ]; then
             echo "::error::gosec execution failed with exit code ${GC_EXIT}. See gosec.log"
@@ -193,7 +160,7 @@ jobs:
           fi
 
           if is_true "${FAIL_MED}" && [ "${MED}" -gt 0 ]; then
-            echo "::error::Medium severity vulnerabilities detected and FAIL_ON_MEDIUM=true (count=${MED})"
+            echo "::error::Medium severity vulnerabilities detected (count=${MED})"
             exit 1
           fi
 
