@@ -30,7 +30,7 @@ func init() {
 
 // 初始化高性能 RNG（非安全）
 func initWeakRng() {
-	//nosec G404 非安全随机，仅用于生成测试数据/混淆用，不适用于安全用途
+	// #nosec G404 -- 非安全随机，仅用于生成测试数据/混淆用途，不用于安全用途
 	weakRng = mrand.New(mrand.NewSource(time.Now().UnixNano())) //nolint:gosec
 }
 
