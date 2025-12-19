@@ -82,51 +82,64 @@ jobs:
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           gosec version
 
-      - name: Run gosec
+      - name: Run gosec (SARIF + readable output)
         id: gosec
         run: |
           set -euo pipefail
 
-          WORKDIR="${GITHUB_WORKSPACE}"
-          SARIF="${WORKDIR}/gosec.sarif"
-          JSON="${WORKDIR}/gosec.json"
+          SARIF="${GITHUB_WORKSPACE}/gosec.sarif"
 
           echo "Running gosec security scan..."
+          echo "SARIF output: ${SARIF}"
 
-          EXIT_CODE=0
           set +e
-          gosec -fmt=sarif -out="${SARIF}" -json -out="${JSON}" ./...
-          EXIT_CODE=$?
+          gosec -fmt=sarif -out="${SARIF}" ./...
           set -e
+
+          if [ ! -f "${SARIF}" ]; then
+            echo "❌ gosec did not generate SARIF output"
+            exit 1
+          fi
 
           echo ""
           echo "================ Security Findings (Top 20) ================"
 
-          if [ -f "${JSON}" ]; then
-            jq -r '
-              .Issues[]
-              | select(.Severity == "HIGH" or .Severity == "CRITICAL")
-              | "❌ [\(.Severity)] \(.RuleID)
-                 File: \(.File):\(.Line)
-                 What: \(.Details)
-                 Why:  \(.Confidence)"
-            ' "${JSON}" | head -n 20
-          else
-            echo "No gosec.json generated"
-          fi
+          jq -r '
+            .runs[0].results[]
+            | select(
+                (.level // "") == "error"
+                or
+                ((.properties.severity // "") | test("HIGH|CRITICAL"))
+              )
+            | "❌ [HIGH] \(.ruleId)
+               File: \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine)
+               What: \(.message.text)"
+          ' "${SARIF}" | head -n 20
 
-          HIGH=$(jq '[.Issues[] | select(.Severity=="HIGH" or .Severity=="CRITICAL")] | length' "${JSON}" 2>/dev/null || echo 0)
-          MED=$(jq '[.Issues[] | select(.Severity=="MEDIUM")] | length' "${JSON}" 2>/dev/null || echo 0)
+          HIGH=$(jq '[.runs[0].results[]
+            | select(
+                (.level // "") == "error"
+                or
+                ((.properties.severity // "") | test("HIGH|CRITICAL"))
+              )
+          ] | length' "${SARIF}")
+
+          MEDIUM=$(jq '[.runs[0].results[]
+            | select(
+                (.level // "") == "warning"
+                or
+                ((.properties.severity // "") == "MEDIUM")
+              )
+          ] | length' "${SARIF}")
 
           echo ""
           echo "================ Summary ================="
-          echo "HIGH/CRITICAL: ${HIGH}"
-          echo "MEDIUM:        ${MED}"
+          echo "HIGH:   ${HIGH}"
+          echo "MEDIUM: ${MEDIUM}"
           echo "================================================"
 
           echo "high=${HIGH}" >> "$GITHUB_OUTPUT"
-          echo "medium=${MED}" >> "$GITHUB_OUTPUT"
-          echo "exit_code=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
+          echo "medium=${MEDIUM}" >> "$GITHUB_OUTPUT"
           echo "sarif=${SARIF}" >> "$GITHUB_OUTPUT"
 
       - name: Upload SARIF to GitHub Security
@@ -135,31 +148,28 @@ jobs:
           sarif_file: ${{ steps.gosec.outputs.sarif }}
           category: gosec
 
-      - name: Upload gosec artifacts
+      - name: Upload gosec artifact
         uses: actions/upload-artifact@v4
         with:
           name: gosec-${{ github.run_id }}
-          path: |
-            ${{ github.workspace }}/gosec.sarif
-            ${{ github.workspace }}/gosec.log
+          path: ${{ github.workspace }}/gosec.sarif
           retention-days: 7
 
       - name: Enforce security policy
         run: |
+          set -euo pipefail
+
           HIGH="${{ steps.gosec.outputs.high }}"
-          MED="${{ steps.gosec.outputs.medium }}"
+          MEDIUM="${{ steps.gosec.outputs.medium }}"
           FAIL_MED="${{ env.FAIL_ON_MEDIUM }}"
 
-          echo "HIGH=${HIGH}, MEDIUM=${MED}, FAIL_ON_MEDIUM=${FAIL_MED}"
+          echo "HIGH=${HIGH}, MEDIUM=${MEDIUM}, FAIL_ON_MEDIUM=${FAIL_MED}"
 
           if [ "${HIGH}" -gt 0 ]; then
             echo "❌ HIGH severity vulnerabilities detected"
             exit 1
           fi
 
-          if [ "${FAIL_MED}" = "true" ] && [ "${MED}" -gt 0 ]; then
+          if [ "${FAIL_MED}" = "true" ] && [ "${MEDIUM}" -gt 0 ]; then
             echo "❌ MEDIUM severity vulnerabilities detected"
-            exit 1
-          fi
-
-          echo "✅ gosec policy passed"
+            exit
