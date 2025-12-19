@@ -82,32 +82,47 @@ jobs:
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           gosec version
 
-      - name: Run gosec (single pass, SARIF)
+      - name: Run gosec
         id: gosec
         run: |
           set -euo pipefail
 
-          SARIF="${GITHUB_WORKSPACE}/gosec.sarif"
-          LOG="${GITHUB_WORKSPACE}/gosec.log"
+          WORKDIR="${GITHUB_WORKSPACE}"
+          SARIF="${WORKDIR}/gosec.sarif"
+          JSON="${WORKDIR}/gosec.json"
+
+          echo "Running gosec security scan..."
 
           EXIT_CODE=0
           set +e
-          gosec -fmt=sarif -out="${SARIF}" ./...
+          gosec -fmt=sarif -out="${SARIF}" -json -out="${JSON}" ./...
           EXIT_CODE=$?
           set -e
 
-          echo "Top findings:"
-          if [ -f "${SARIF}" ]; then
+          echo ""
+          echo "================ Security Findings (Top 20) ================"
+
+          if [ -f "${JSON}" ]; then
             jq -r '
-              .runs[0].results[] |
-              "\(.level // "UNKNOWN") : \(.message.text)
-               (\(.locations[0].physicalLocation.artifactLocation.uri):
-                \(.locations[0].physicalLocation.region.startLine))"
-            ' "${SARIF}" | head -n 20 | tee "${LOG}"
+              .Issues[]
+              | select(.Severity == "HIGH" or .Severity == "CRITICAL")
+              | "❌ [\(.Severity)] \(.RuleID)
+                 File: \(.File):\(.Line)
+                 What: \(.Details)
+                 Why:  \(.Confidence)"
+            ' "${JSON}" | head -n 20
+          else
+            echo "No gosec.json generated"
           fi
 
-          HIGH=$(jq '[.runs[0].results[] | select(.level=="error")] | length' "${SARIF}" 2>/dev/null || echo 0)
-          MED=$(jq '[.runs[0].results[] | select(.level=="warning")] | length' "${SARIF}" 2>/dev/null || echo 0)
+          HIGH=$(jq '[.Issues[] | select(.Severity=="HIGH" or .Severity=="CRITICAL")] | length' "${JSON}" 2>/dev/null || echo 0)
+          MED=$(jq '[.Issues[] | select(.Severity=="MEDIUM")] | length' "${JSON}" 2>/dev/null || echo 0)
+
+          echo ""
+          echo "================ Summary ================="
+          echo "HIGH/CRITICAL: ${HIGH}"
+          echo "MEDIUM:        ${MED}"
+          echo "================================================"
 
           echo "high=${HIGH}" >> "$GITHUB_OUTPUT"
           echo "medium=${MED}" >> "$GITHUB_OUTPUT"
