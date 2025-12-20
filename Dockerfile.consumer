@@ -1,8 +1,5 @@
 FROM golang:1.24.11-alpine AS builder
 
-# private repository
-# RUN go env -w GOPRIVATE=github.com/sy159
-
 ARG GOPRIVATE
 
 ENV GO111MODULE=on \
@@ -20,11 +17,10 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 COPY . .
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    go build -trimpath -ldflags="-s -w" -o /out/snowgo ./cmd/http
+    go build -trimpath -ldflags="-s -w" -o /out/consumer ./cmd/consumer
 
 
 FROM alpine:latest AS runtime
-#FROM debian:stable-slim AS runtime
 
 # 最小化运行时依赖
 RUN apk add --no-cache \
@@ -36,6 +32,7 @@ RUN apk add --no-cache \
 RUN addgroup -S appgroup && \
     adduser -S -D -H -G appgroup -h /app -s /sbin/nologin appuser
 
+
 ENV APP_HOME=/app
 ENV PORT=8000
 # 环境变量示例，消费使用
@@ -45,14 +42,14 @@ ENV CONFIG_PATH=${APP_HOME}/config \
 
 WORKDIR ${APP_HOME}
 
-COPY --from=builder --chown=appuser:appgroup /out/snowgo ${APP_HOME}/
+COPY --from=builder --chown=appuser:appgroup /out/consumer ${APP_HOME}/
 COPY --from=builder --chown=appuser:appgroup /src/config ${APP_HOME}/config/
 
 # 用户授权
-RUN chmod +x ${APP_HOME}/snowgo && \
+RUN chmod +x ${APP_HOME}/consumer && \
     chown -R appuser:appgroup ${APP_HOME}
 
 EXPOSE ${PORT}
 USER appuser
 
-ENTRYPOINT ["/app/snowgo"]
+ENTRYPOINT ["/app/consumer"]

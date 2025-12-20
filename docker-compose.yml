@@ -79,8 +79,8 @@ services:
     privileged: true
     volumes:
       - /etc/localtime:/etc/localtime
-      - ./config:/snowgo-service/config
-      - ./logs/app1:/snowgo-service/logs
+      - ./config:/app/config
+      - ./logs/app1:/app/logs
     networks:
       - snowgo_network
     depends_on:
@@ -104,8 +104,8 @@ services:
     privileged: true
     volumes:
       - /etc/localtime:/etc/localtime
-      - ./config:/snowgo-service/config
-      - ./logs/app2:/snowgo-service/logs
+      - ./config:/app/config
+      - ./logs/app2:/app/logs
     networks:
       - snowgo_network
     depends_on:
