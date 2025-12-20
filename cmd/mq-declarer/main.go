@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"snowgo/internal/constant"
 	"snowgo/pkg/xmq"
 	"snowgo/pkg/xmq/rabbitmq"
+	"strings"
 	"time"
 )
 
@@ -29,6 +31,17 @@ func DeclareTopology(ctx context.Context, conn *amqp.Connection) error {
 				{Name: constant.ExampleDelayedQueue, RoutingKeys: []string{constant.ExampleDelayedRoutingKey}},
 			},
 		})
+	// 构建 log 信息
+	var logBuilder strings.Builder
+	logBuilder.WriteString("==== MQ Topology Registration ====\n")
+	for idx, mq := range reg.Declares {
+		logBuilder.WriteString(fmt.Sprintf("[Exchange %d] Name: %s | Type: %s\n", idx+1, mq.Name, mq.Type))
+		for qIdx, q := range mq.Queues {
+			logBuilder.WriteString(fmt.Sprintf("    [Queue %d] Name: %s | RoutingKeys: %v\n", qIdx+1, q.Name, q.RoutingKeys))
+		}
+		logBuilder.WriteString("\n")
+	}
+	log.Println(logBuilder.String())
 
 	// 简单重试：3 次，间隔逐步增长
 	var lastErr error
