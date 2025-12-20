@@ -17,6 +17,9 @@ var (
 	weakOnce sync.Once
 	weakRng  *mrand.Rand
 	sfNode   *snowflake.Node
+	fbMu     sync.Mutex
+	fbLast   int64
+	fbSeq    uint64
 )
 
 func init() {
@@ -61,13 +64,20 @@ func GenerateID() string {
 	if sfNode != nil {
 		return sfNode.Generate().String()
 	}
+	now := time.Now().UnixMilli()
+	fbMu.Lock()
+	if now == fbLast {
+		fbSeq++
+	} else {
+		fbLast = now
+		fbSeq = 0
+	}
+	seq := fbSeq & ((1 << 22) - 1)
+	fbMu.Unlock()
 
-	// #nosec G115 -- time.Now().UnixMilli() is always non-negative
-	ts := uint64(time.Now().UnixMilli()) << 22
-
-	// #nosec G115 -- now is Unix millisecond timestamp, guaranteed >= 0
-	r, _ := SecureRandInt63n(1 << 22)
-	return strconv.FormatUint(ts|uint64(r), 10)
+	// #nosec G115 -- Unix millisecond timestamp is always non-negative
+	id := (uint64(now) << 22) | seq
+	return strconv.FormatUint(id, 10)
 }
 
 // ErrorToString 错误转字符串（可安全处理 panic）
