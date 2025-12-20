@@ -50,7 +50,7 @@ func main() {
 	}
 
 	// 注册所有队列
-	if err := worker.RegisterAll(context.Background(), consumer, &worker.Deps{
+	if err := worker.RegisterConsumer(context.Background(), consumer, &worker.ConsumerDeps{
 		Logger: logger,
 	}); err != nil {
 		panic(err)

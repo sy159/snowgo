@@ -9,11 +9,12 @@ import (
 	"time"
 )
 
-type Deps struct {
+type ConsumerDeps struct {
 	Logger xmq.Logger
 }
 
-func RegisterAll(ctx context.Context, consumer *rabbitmq.Consumer, deps *Deps) error {
+// RegisterConsumer 注册所有队列消费
+func RegisterConsumer(ctx context.Context, consumer *rabbitmq.Consumer, deps *ConsumerDeps) error {
 
 	// 示例消费
 	if err := consumer.Register(

@@ -11,10 +11,10 @@
 | 🗃️ 数据访问     | GORM + Gen            | ORM 工具，支持读写分离、多数据库配置                  |
 | 🚀 缓存系统     | go-redis              | 高性能 Redis 客户端封装                       |
 | 🔐 鉴权系统     | JWT                   | 支持 access_token / refresh_token 的鉴权方案 |
-| 🛂 权限系统     | 自定义 RBAC（菜单树） | 支持按钮/接口权限，基于菜单树结构                     |
-| 🛡️ 限流中间件   | 自研 Rate Limiter     | 支持 IP / 路由维度的限流控制                     |
-| 🔗 中间件       | 跨域、日志、异常处理  | 全面覆盖 Web 常用中间件                        |
-| 🧵 分布式能力   | Redis Lock、Pulsar MQ | 实现分布式锁、事件驱动架构                         |
+| 🛂 权限系统     | 自定义 RBAC（菜单树）         | 支持按钮/接口权限，基于菜单树结构                     |
+| 🛡️ 限流中间件   | 自研 Rate Limiter       | 支持 IP / 路由维度的限流控制                     |
+| 🔗 中间件       | 跨域、日志、异常处理            | 全面覆盖 Web 常用中间件                        |
+| 🧵 分布式能力   | Redis Lock、RabbitmqMQ | 实现分布式锁、事件驱动架构                         |
 | 📈 可观测性     | Prometheus + Grafana  | 实现服务监控指标管理等                           |
 
 
@@ -27,7 +27,7 @@ snowgo
 ├── cmd  项目启动入口
 │   ├── http  http项目启动入口
 │   ├── mq-declarer  mq声明执行入口
-│   └── worker  消费启动入口
+│   └── consumer  消费启动入口
 ├── config  配置文件
 ├── depoly
 │   ├── elk  elk部署
@@ -59,7 +59,7 @@ snowgo
 │   │   └── query_model.go  需要生成的model列表
 │   ├── server  服务相关
 │   │   └── http_server.go  http服务启动，关闭
-│   ├── worker  消费任务
+│   ├── worker  后台工作任务
 │   └── service 业务处理层
 ├── logs  日志
 ├── test  测试用例
