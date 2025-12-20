@@ -33,7 +33,7 @@ jobs:
           source .env
           set +a
           echo "SERVICE_IMAGE_NAME=${SERVICE_IMAGE_NAME:-snowgo}" >> $GITHUB_ENV
-          echo "SERVICE_IMAGE_VERSION=${SERVICE_IMAGE_VERSION:-v1.0.0}" >> $GITHUB_ENV
+          echo "SERVICE_IMAGE_VERSION=${SERVICE_IMAGE_VERSION:-1.0.0}" >> $GITHUB_ENV
 
       - name: Extract version tag
         id: extract_tag

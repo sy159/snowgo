@@ -1,4 +1,4 @@
-PROJECT_NAME := snowgo-service
+SERVICE_NAME := snowgo-service
 PORT := 8000
 
 .PHONY: init
@@ -7,20 +7,20 @@ init:
 	@go run ./internal/dal/cmd/init/main.go
 
 docker-build: name ?= snowgo
-docker-build: version ?= v1.0.0
+docker-build: version ?= 1.0.0
 docker-build:
 	echo "docker build  start..."
 	docker build -t $(name):$(version) .
 
 docker-start: name ?= snowgo
-docker-start: version ?= v1.0.0
+docker-start: version ?= 1.0.0
 docker-start:
 	echo  "docker run ..."
-	docker run --name $(PROJECT_NAME) -d -p $(PORT):$(PORT) $(name):$(version)
+	docker run --name $(SERVICE_NAME) -d -p $(PORT):$(PORT) $(name):$(version)
 
 docker-stop:
 	echo "docker stop"
-	docker stop $(PROJECT_NAME) && docker rm $(PROJECT_NAME)
+	docker stop $(SERVICE_NAME) && docker rm $(SERVICE_NAME)
 
 
 # 生成model

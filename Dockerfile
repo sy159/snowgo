@@ -1,32 +1,54 @@
-FROM golang:1.24.10 AS builder
+FROM golang:1.24.11-alpine AS builder
 
 # private repository
 # RUN go env -w GOPRIVATE=github.com/sy159
 
+ARG GOPRIVATE
+
 ENV GO111MODULE=on \
-    GOPROXY=https://goproxy.cn,direct
+    GOPROXY=https://goproxy.cn,direct \
+    CGO_ENABLED=0 \
+    GOOS=linux
 
-WORKDIR /go/src/app
+WORKDIR /src
+
 COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    if [ -n "$GOPRIVATE" ]; then go env -w GOPRIVATE="$GOPRIVATE"; fi && \
+    go mod download
+
 COPY . .
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    go build -trimpath -ldflags="-s -w" -o /out/snowgo ./cmd/http
 
-RUN go mod download && \
-    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /go/bin/app ./cmd/http
 
+ FROM alpine:latest AS runtime
+#FROM debian:stable-slim AS runtime
 
-FROM alpine:latest
-#FROM debian:stable-slim
+# 最小化运行时依赖
+RUN apk add --no-cache \
+    ca-certificates \
+    tzdata \
+    && ln -snf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo "Asia/Shanghai" > /etc/timezone
 
-# 安装根证书，防止部分请求失败
-RUN apk --no-cache add ca-certificates tzdata
+RUN addgroup -S appgroup && \
+    adduser -S -D -H -G appgroup -h /app -s /sbin/nologin appuser
 
-ENV PROJECT_NAME=snowgo-service
+ENV APP_HOME=/app
 ENV PORT=8000
 
-WORKDIR /${PROJECT_NAME}
-COPY --from=builder /go/bin/app /${PROJECT_NAME}/
-COPY --from=builder /go/src/app/config /${PROJECT_NAME}/config/
+WORKDIR ${APP_HOME}
 
-EXPOSE $PORT
+COPY --from=builder --chown=appuser:appgroup /out/snowgo ${APP_HOME}/
+COPY --from=builder --chown=appuser:appgroup /src/config ${APP_HOME}/config/
 
-CMD ["./app"]
+# 用户授权
+RUN chmod +x ${APP_HOME}/snowgo && \
+    chown -R appuser:appgroup ${APP_HOME}
+
+EXPOSE ${PORT}
+USER appuser
+
+ENTRYPOINT ["/app/snowgo"]
