@@ -62,10 +62,10 @@ func GenerateID() string {
 		return sfNode.Generate().String()
 	}
 
-	// 毫秒时间戳（41 bit）
+	// #nosec G115 -- time.Now().UnixMilli() is always non-negative
 	ts := uint64(time.Now().UnixMilli()) << 22
 
-	// 22 bit 随机（0 ~ 4,194,304）
+	// #nosec G115 -- now is Unix millisecond timestamp, guaranteed >= 0
 	r, _ := SecureRandInt63n(1 << 22)
 	return strconv.FormatUint(ts|uint64(r), 10)
 }
