@@ -151,13 +151,13 @@ func Init(basePath string) {
 // 普通编码器配置
 func getNormalEncoder() zapcore.Encoder {
 	return zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
-		TimeKey:       "time",
-		LevelKey:      "level",
-		NameKey:       "logger",
-		CallerKey:     "caller",
-		MessageKey:    "msg",
-		StacktraceKey: "stacktrace",
-		LineEnding:    zapcore.DefaultLineEnding,
+		TimeKey:    "time",
+		LevelKey:   "level",
+		NameKey:    "logger",
+		CallerKey:  "caller",
+		MessageKey: "msg",
+		//StacktraceKey: "stacktrace",
+		LineEnding: zapcore.DefaultLineEnding,
 		//EncodeLevel: 带颜色输出 CapitalColorLevelEncoder
 		EncodeLevel: func(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
 			enc.AppendString("[" + level.CapitalString() + "]")
@@ -179,13 +179,13 @@ func getNormalEncoder() zapcore.Encoder {
 // json编码器配置
 func getJsonEncoder() zapcore.Encoder {
 	return zapcore.NewJSONEncoder(zapcore.EncoderConfig{
-		TimeKey:       "time",
-		LevelKey:      "level",
-		NameKey:       "logger",
-		CallerKey:     "caller",
-		MessageKey:    "msg",
-		StacktraceKey: "stacktrace",
-		LineEnding:    zapcore.DefaultLineEnding,
+		TimeKey:    "time",
+		LevelKey:   "level",
+		NameKey:    "logger",
+		CallerKey:  "caller",
+		MessageKey: "msg",
+		//StacktraceKey: "stacktrace",
+		LineEnding: zapcore.DefaultLineEnding,
 		//EncodeLevel: 带颜色输出 CapitalColorLevelEncoder
 		EncodeLevel: func(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
 			enc.AppendString(level.CapitalString())
@@ -207,11 +207,11 @@ func getJsonEncoder() zapcore.Encoder {
 // 用于记录访问日志(不记录调用地方跟level)
 func getAccessNormalEncoder() zapcore.Encoder {
 	return zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
-		TimeKey:       "time",
-		NameKey:       "logger",
-		MessageKey:    "msg",
-		StacktraceKey: "stacktrace",
-		LineEnding:    zapcore.DefaultLineEnding,
+		TimeKey:    "time",
+		NameKey:    "logger",
+		MessageKey: "msg",
+		//StacktraceKey: "stacktrace",
+		LineEnding: zapcore.DefaultLineEnding,
 		// 时间格式 zapcore.ISO8601TimeEncoder
 		EncodeTime: func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 			enc.AppendString(t.Format(logTmFmtWithMS))
@@ -229,11 +229,11 @@ func getAccessNormalEncoder() zapcore.Encoder {
 // 用于记录访问日志 json(不记录调用地方跟level)
 func getAccessJsonEncoder() zapcore.Encoder {
 	return zapcore.NewJSONEncoder(zapcore.EncoderConfig{
-		TimeKey:       "time",
-		NameKey:       "logger",
-		MessageKey:    "msg",
-		StacktraceKey: "stacktrace",
-		LineEnding:    zapcore.DefaultLineEnding,
+		TimeKey:    "time",
+		NameKey:    "logger",
+		MessageKey: "msg",
+		//StacktraceKey: "stacktrace",
+		LineEnding: zapcore.DefaultLineEnding,
 		// 时间格式 zapcore.ISO8601TimeEncoder
 		EncodeTime: func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 			enc.AppendString(t.Format(logTmFmtWithMS))
