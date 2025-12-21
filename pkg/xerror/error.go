@@ -81,12 +81,15 @@ var (
 	MenuCreateError = NewCode(CategoryMenu, 10222, "菜单创建失败")
 	MenuUpdateError = NewCode(CategoryMenu, 10223, "菜单更新失败")
 	MenuDeleteError = NewCode(CategoryMenu, 10224, "菜单删除失败")
+	MenuListError   = NewCode(CategoryMenu, 10225, "菜单列表获取失败")
 
 	// RoleNotFound 角色相关 102 41 - 102 59
 	RoleNotFound    = NewCode(CategoryRole, 10241, "角色不存在")
 	RoleCreateError = NewCode(CategoryRole, 10242, "角色创建失败")
 	RoleUpdateError = NewCode(CategoryRole, 10243, "角色更新失败")
 	RoleDeleteError = NewCode(CategoryRole, 10244, "角色删除失败")
+	RoleListError   = NewCode(CategoryRole, 10245, "角色列表获取失败")
+	RoleInfoError   = NewCode(CategoryUser, 10246, "角色获取失败")
 )
 
 type Code interface {

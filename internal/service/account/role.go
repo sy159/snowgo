@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"gorm.io/gorm"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/query"
 	"snowgo/internal/service/log"
 	"snowgo/pkg/xauth"
+	e "snowgo/pkg/xerror"
 	"time"
 
 	"github.com/pkg/errors"
@@ -82,6 +84,10 @@ type RoleListCondition struct {
 	Offset int32   `json:"offset" form:"offset"`
 	Limit  int32   `json:"limit" form:"limit"`
 }
+
+var (
+	ErrRoleNotFound = errors.New(e.RoleListError.GetErrMsg())
+)
 
 // CreateRole 创建角色
 func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, error) {
@@ -365,6 +371,9 @@ func (s *RoleService) GetRoleById(ctx context.Context, id int32) (*RoleInfo, err
 	// 获取role信息
 	r, err := s.roleDao.GetRoleById(ctx, id)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrRoleNotFound
+		}
 		xlogger.ErrorfCtx(ctx, "获取角色失败: %v", err)
 		return nil, errors.WithMessage(err, "获取角色失败")
 	}

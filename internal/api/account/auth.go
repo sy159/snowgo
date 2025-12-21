@@ -138,7 +138,7 @@ func Logout(c *gin.Context) {
 	ctx := c.Request.Context()
 	userContext, err := xauth.GetUserContext(ctx)
 	if err != nil {
-		xresponse.FailByError(c, e.HttpForbidden)
+		xresponse.FailByError(c, e.HttpUnauthorized)
 		return
 	}
 

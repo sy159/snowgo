@@ -1,6 +1,7 @@
 package account
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
 	"snowgo/internal/constant"
 	"snowgo/internal/di"
@@ -23,7 +24,7 @@ func CreateRole(c *gin.Context) {
 	roleID, err := container.RoleService.CreateRole(ctx, &param)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "create role is err: %v", err)
-		xresponse.Fail(c, e.RoleCreateError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.RoleCreateError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": roleID})
@@ -42,7 +43,7 @@ func UpdateRole(c *gin.Context) {
 	err := container.RoleService.UpdateRole(ctx, &param)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "update role is err: %v", err)
-		xresponse.Fail(c, e.RoleUpdateError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.RoleUpdateError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": param.ID})
@@ -63,7 +64,7 @@ func DeleteRole(c *gin.Context) {
 	err := container.RoleService.DeleteRole(ctx, param.ID)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "delete role is err: %v", err)
-		xresponse.Fail(c, e.RoleDeleteError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.RoleDeleteError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": param.ID})
@@ -92,7 +93,7 @@ func GetRoleList(c *gin.Context) {
 	list, err := container.RoleService.ListRoles(ctx, &cond)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "get role list is err: %v", err)
-		xresponse.FailByError(c, e.HttpInternalServerError)
+		xresponse.FailByError(c, e.RoleListError)
 		return
 	}
 	xresponse.Success(c, list)
@@ -112,8 +113,12 @@ func GetRoleById(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	role, err := container.RoleService.GetRoleById(ctx, param.ID)
 	if err != nil {
+		if errors.Is(err, account.ErrRoleNotFound) {
+			xresponse.FailByError(c, e.RoleNotFound)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "get role by id is err: %v", err)
-		xresponse.Fail(c, e.RoleNotFound.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.RoleInfoError)
 		return
 	}
 	xresponse.Success(c, role)

@@ -37,7 +37,7 @@ func CreateMenu(c *gin.Context) {
 	menuId, err := container.MenuService.CreateMenu(ctx, &menuParam)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "create menu is err: %v", err)
-		xresponse.Fail(c, e.MenuCreateError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.MenuCreateError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": menuId})
@@ -56,7 +56,7 @@ func UpdateMenu(c *gin.Context) {
 	err := container.MenuService.UpdateMenu(ctx, &menuParam)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "update menu is err: %v", err)
-		xresponse.Fail(c, e.MenuUpdateError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.MenuUpdateError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": menuParam.ID})
@@ -69,7 +69,7 @@ func GetMenuList(c *gin.Context) {
 	res, err := container.MenuService.GetMenuTree(ctx)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "get user list is err: %v", err)
-		xresponse.FailByError(c, e.HttpInternalServerError)
+		xresponse.FailByError(c, e.MenuListError)
 		return
 	}
 	xresponse.Success(c, res)
@@ -91,7 +91,7 @@ func DeleteMenuById(c *gin.Context) {
 	err := container.MenuService.DeleteMenuById(ctx, menuParam.ID)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "delete menu is err: %v", err)
-		xresponse.Fail(c, e.MenuDeleteError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.MenuDeleteError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": menuParam.ID})
