@@ -56,7 +56,7 @@ func GetOperationLogList(c *gin.Context) {
 	res, err := container.OperationLogService.GetOperationLogList(ctx, &logListReq)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "get operation log list is err: %v", err)
-		xresponse.Fail(c, e.HttpInternalServerError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.LogListError)
 		return
 	}
 	logList := make([]*OperationLogInfo, 0, len(res.List))

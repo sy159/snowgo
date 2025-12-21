@@ -92,6 +92,12 @@ var (
 	RoleInfoError   = NewCode(CategoryUser, 10246, "角色获取失败")
 )
 
+// 业务system相关 103开头
+var (
+	// LogListError 日志相关 103 01 - 103 10
+	LogListError = NewCode(CategoryUser, 10301, "操作日志列表获取失败")
+)
+
 type Code interface {
 	i() // 避免被其他包实现
 	GetErrCode() int
