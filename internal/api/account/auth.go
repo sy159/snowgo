@@ -1,11 +1,13 @@
 package account
 
 import (
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"snowgo/internal/constant"
 	"snowgo/internal/di"
 	"snowgo/pkg/xauth"
+	"snowgo/pkg/xauth/jwt"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlimiter"
 	"snowgo/pkg/xlogger"
@@ -93,7 +95,12 @@ func RefreshToken(c *gin.Context) {
 	// 检查 jti 是否使用过（防止重放攻击、每个refresh token只能使用一次）
 	claims, err := jwtMgr.ParseToken(req.RefreshToken)
 	if err != nil {
-		xresponse.Fail(c, e.TokenInvalid.GetErrCode(), err.Error())
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenExpired.GetErrMsg())
+			return
+		}
+		xlogger.ErrorfCtx(c.Request.Context(), "parse token(%s) is err: %v", req.RefreshToken, err)
+		xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenInvalid.GetErrMsg())
 		return
 	}
 
@@ -101,7 +108,7 @@ func RefreshToken(c *gin.Context) {
 	token, err := jwtMgr.RefreshTokens(req.RefreshToken)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "refresh access token err: %s", err.Error())
-		xresponse.FailByError(c, e.TokenError)
+		xresponse.FailByError(c, e.HttpInternalServerError)
 		return
 	}
 
