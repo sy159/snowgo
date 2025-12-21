@@ -2,18 +2,16 @@ package xerror
 
 import (
 	"encoding/json"
-	"fmt"
 	"sync"
 )
 
 const (
-	CategoryHttp       = "http"
-	CategorySystem     = "system"
-	CategoryAuth       = "auth"
-	CategoryPermission = "permission"
-	CategoryUser       = "user"
-	CategoryRole       = "role"
-	CategoryMenu       = "menu"
+	CategoryHttp   = "http"
+	CategorySystem = "system"
+	CategoryAuth   = "auth"
+	CategoryUser   = "user"
+	CategoryRole   = "role"
+	CategoryMenu   = "menu"
 )
 
 var (
@@ -114,9 +112,6 @@ func NewCode(category string, errCode int, errMsg string) Code {
 	registryMu.Lock()
 	defer registryMu.Unlock()
 
-	if _, exists := registry[errCode]; exists {
-		panic(fmt.Sprintf("xerror: duplicate error code: %d", errCode))
-	}
 	codeInfo := &code{
 		ErrCode:  errCode,
 		ErrMsg:   errMsg,

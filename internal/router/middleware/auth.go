@@ -7,6 +7,7 @@ import (
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xauth/jwt"
 	e "snowgo/pkg/xerror"
+	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
 	"strings"
 
@@ -20,14 +21,14 @@ func JWTAuth() func(c *gin.Context) {
 		// 假设Token放在Header的Authorization中，并使用Bearer开头
 		authHeader := c.Request.Header.Get("Authorization")
 		if authHeader == "" {
-			xresponse.FailByError(c, e.TokenNotFound)
+			xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenNotFound.GetErrMsg())
 			c.Abort()
 			return
 		}
 		// 按空格分割
 		parts := strings.SplitN(authHeader, " ", 2)
 		if !(len(parts) == 2 && strings.EqualFold(parts[0], "Bearer")) {
-			xresponse.FailByError(c, e.TokenIncorrectFormat)
+			xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenIncorrectFormat.GetErrMsg())
 			c.Abort()
 			return
 		}
@@ -36,19 +37,20 @@ func JWTAuth() func(c *gin.Context) {
 		jwtManager := container.JwtManager
 		mc, err := jwtManager.ParseToken(parts[1])
 		if err != nil {
-			xresponse.Fail(c, e.TokenInvalid.GetErrCode(), err.Error())
+			if errors.Is(err, jwt.ErrTokenExpired) {
+				xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenExpired.GetErrMsg())
+				c.Abort()
+				return
+			}
+			xlogger.ErrorfCtx(c.Request.Context(), "parse token(%s) is err: %v", parts[1], err)
+			xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenInvalid.GetErrMsg())
 			c.Abort()
 			return
 		}
 
-		// 检查token的过期时间，以及type
+		// 检查token的type
 		if err := mc.ValidAccessToken(); err != nil {
-			if errors.Is(err, jwt.ErrInvalidTokenType) {
-				xresponse.FailByError(c, e.TokenTypeError)
-				c.Abort()
-				return
-			}
-			xresponse.FailByError(c, e.TokenExpired)
+			xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenTypeError.GetErrMsg())
 			c.Abort()
 			return
 		}
@@ -90,6 +92,7 @@ func PermissionAuth(requiredPerm string) gin.HandlerFunc {
 		// 拿该用户的perms列表
 		perms, err := container.UserService.GetPermsListById(c, userId)
 		if err != nil {
+			xlogger.ErrorfCtx(c.Request.Context(), "get user(%d) perms list is err: %v", userId, err)
 			xresponse.FailByError(c, e.HttpInternalServerError)
 			c.Abort()
 			return
