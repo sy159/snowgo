@@ -79,8 +79,12 @@ consumer-stop:    ## Stop consumer container
 	docker rm $(CONSUMER_NAME) 2>/dev/null || true
 
 .PHONY: up
-up: ## Start all services via docker-compose
+up:  ## Start all services via docker-compose
 	docker compose -f $(COMPOSE_FILE) up -d
+
+.PHONY: restart
+restart:  ## Restart all services via docker-compose
+	docker compose -f $(COMPOSE_FILE) restart
 
 .PHONY: down
 down: ## Stop all services via docker-compose
@@ -89,6 +93,10 @@ down: ## Stop all services via docker-compose
 .PHONY: start stop
 start: up
 stop: down
+
+.PHONY: test
+test:
+	go test ./... -cover
 
 
 # 生成model

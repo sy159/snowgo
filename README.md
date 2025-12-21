@@ -1,5 +1,5 @@
-# snowgo <img src="https://img.shields.io/badge/golang-1.23-blue"/> <img src="https://img.shields.io/badge/gin-1.10.0-green"/> <img src="https://img.shields.io/badge/gorm-1.25.12-red"/>
-基于 Gin 开发的高可用、模块化 Go 脚手架，集成丰富的中间件与企业级基础设施，适用于中小型服务系统快速搭建，支持 Docker & Docker Compose 一键部署。
+# snowgo <img src="https://img.shields.io/badge/golang-1.24-blue"/> <img src="https://img.shields.io/badge/gin-1.11.0-green"/> <img src="https://img.shields.io/badge/gorm-1.31.1-red"/>
+基于Gin + GORM的高可用、模块化 Go Web脚手架，集成常用中间件与企业级基础设施（日志、配置、鉴权、消息队列、分布式锁、codegen、Docker/Compose 支持等），旨在快速搭建中小型项目。
 
 ------------
 ### 🔌 集成组件:
@@ -22,80 +22,53 @@
 ### 🧬 项目结构
 ```
 snowgo
-├── .github  github cicd
-├── assets  静态文件
-├── cmd  项目启动入口
-│   ├── http  http项目启动入口
-│   ├── mq-declarer  mq声明执行入口
-│   └── consumer  消费启动入口
-├── config  配置文件
-├── depoly
-│   ├── elk  elk部署
-│   └── monitor 监控部署
-├── docs  放置swagger，db.sql等文档
-├── internal
+├── .github                 # github cicd
+├── assets                  # 静态文件
+├── cmd                     # 项目启动入口
+│   ├── http                # http项目启动入口
+│   ├── mq-declarer         # mq声明执行入口
+│   └── consumer            # 消费启动入口
+├── config                  # 配置文件
+├── depoly                  # 部署示例：elk / monitor / rabbitmq 等
+├── docs                    # 放置swagger，db.sql等文档
+├── internal                # 应用实现（api, dal, di, router, service, worker, server）
 │   ├── api
-│   │   ├── account  账户相关接口
-│   │   ├── api.go
-│   │   └── system  系统相关接口
-│   │       └── log.go
-│   ├── constant  应用常量
-│   │   └── constant.go
-│   ├── dao    数据处理层
-│   │   └── dao.go
-│   ├── di    依赖管理
-│   │   └── container.go
-│   ├── router  web路由
-│   │   ├── middleware   中间件
-│   │   ├── router.go  路由初始化
-│   │   └── root_router.go 未分组的根路由
-│   ├── dal  数据库model query定义
-│   │   ├── cmd  使用gen生成model跟query、使用init初始化数据
-│   │   ├── model  生成的model
-│   │   ├── query  model对应的query
-│   │   │   └── gen.go
-│   │   ├── repo  db的repo
-│   │   │   └── repo.go
-│   │   └── query_model.go  需要生成的model列表
-│   ├── server  服务相关
-│   │   └── http_server.go  http服务启动，关闭
-│   ├── worker  后台工作任务
-│   └── service 业务处理层
-├── logs  日志
-├── test  测试用例
-├── pkg   公用工具包
-│   ├── xauth  认证相关
-│   │   ├── auth.go
-│   │   └── jwt
-│   │       └── jwt.go
-│   ├── xcache
-│   │   ├── cache.go  缓存接口
-│   │   └── redis_cache.go  基于redis实现的缓存方法
-│   ├── xcolor   带颜色字符串
-│   ├── xcryption   加解密，编码等操作
-│   ├── xdatabase  db相关
-│   │   ├── db.go
-│   │   ├── mysql
-│   │   │   └── mysql.go
-│   │   └── redis
-│   │       └── redis.go   
-│   ├── xerror response自定义错误码  
-│   ├── xlimiter 限流相关  
-│   ├── xlogger 日志相关  
-│   ├── xmq 消息队列(pulsar等)  
-│   ├── xrequests http请求相关
-│   ├── xresponse 请求统一格式处理
-│   ├── xstr_tool 字符串相关操作
-│   ├── xlock 分布式锁实现
-│   └── common.go  常用工具
-├── Makefile
-├── Dockerfile
-├── go.mod
-└── go.sum
+│   ├── constant            # 应用常量
+│   ├── dao                 # 数据处理层
+│   ├── di                  # 依赖管理
+│   ├── router              # web路由&&中间件
+│   ├── dal                 # 数据库model query定义
+│   │   ├── cmd             # 使用gen生成model跟query、使用init初始化数据
+│   │   ├── model           # 生成的model
+│   │   ├── query           # model对应的query
+│   │   ├── repo            # db的repo
+│   │   └── query_model.go  # 需要生成的model列表
+│   ├── server              # 服务相关
+│   ├── worker              # 后台工作任务
+│   └── service             # 业务处理层
+├── logs                    # 日志
+├── test                    # 测试用例
+├── pkg                     # 公共工具库（xlogger, xmq, xdatabase, xauth, xlock, ...）
+├── Makefile                # 常用构建/运行脚本
+├── Dockerfile              # API 镜像构建
+├── Dockerfile.consumser    # Consumer 镜像构建
+├── go.mod / go.sum
+└── README.md
 ```
 
 ------------
 ### 🚀 快速开始
+#### 环境准备
+- Go >= 1.24
+- Docker & Docker Compose（若使用容器）
+- GNU Make
+#### 项目拉取
+```shell
+git clone https://github.com/sy159/snowgo.git
+cd snowgo
+```
+------------
+
 #### 1. 修改配置
 修改配置文件
 ```shell
@@ -111,30 +84,64 @@ vim config$.{env}.yaml
 go mod download
 go mod tidy
 ```
-初始化项目(初始化数据等)
+初始化（可选：数据库、mq 声明等）
 ```shell
-make init
+make mysql-init     # 初始化 MySQL（如果你有 init 脚本）
+make mq-init        # 初始化 RabbitMQ 声明
 ```
-启动项目
+直接运行（适合开发调试）
 ```shell
-go run main.go
+go run ./cmd/http  # http服务
+go run ./cmd/consumer  # mq消费服务(根据需求可选)
 ```
 
 ------------
 ##### 2.2 🐳 Docker 运行
-生成项目服务docker镜像
+构建镜像
 ```shell
+# API 镜像
+make api-build
+# 或手动
 docker build -t snowgo:1.0.0 .
+
+# Consumer 镜像
+make consumer-build
+docker build -f Dockerfile.consumer -t snowgo-consumer:1.0.0 .
+
 ```
-启动项目
+运行单个容器
 ```shell
-docker run --name snowgo-service --restart always -d -p 8000:8000 -e ENV=dev -v ./config:/snowgo-service/config -v ./logs:/snowgo-service/logs snow:1.0.0
+# API
+make api-run
+# 或手动
+docker run -d \
+  --restart unless-stopped \
+  --name snowgo-service \
+  -p 8000:8000
+  -e ENV=dev \
+  -v ./config:/app/config \
+  -v ./logs:/app/logs \
+  snowgo:1.0.0
+
+# Consumer
+make consumer-run
+# 或手动
+docker run -d \
+  --restart unless-stopped \
+  --name snowgo-consumer-service \
+  -e ENV=dev \
+  -v ./config:/app/config \
+  -v ./logs:/app/logs \
+  snowgo-consumer:1.0.0
 ```
 
 ------------
 ##### 2.3 🛠 Docker Compose 部署
 生成项目服务docker镜像
 ```shell
+# API 镜像
+make api-build
+# 或手动
 docker build -t snowgo:1.0.0 .
 ```
 配置.env相关信息(服务端口、使用镜像等)
@@ -147,7 +154,10 @@ vim config$.{env}.yaml
 ```
 启动项目
 ```shell
-docker-compose up -d
+# 启动 mysql/redis/nginx 等（由 docker-compose.yml 定义）
+make up
+# 停止并清理
+make down
 ```
 
 
