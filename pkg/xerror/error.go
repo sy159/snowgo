@@ -71,6 +71,10 @@ var (
 	UserNameTelEmptyError = NewCode(CategoryUser, 10205, "用户名或电话不能为空")
 	UserNameTelExistError = NewCode(CategoryUser, 10206, "用户名或电话不能重复")
 	PwdError              = NewCode(CategoryUser, 10207, "密码须为 6–32 位，并至少包含数字、字母、特殊符号（.!@#$%^&*?_~-）中的两种类型")
+	UserListError         = NewCode(CategoryUser, 10208, "用户列表获取失败")
+	UserInfoError         = NewCode(CategoryUser, 10209, "用户信息获取失败")
+	ResetPwdError         = NewCode(CategoryUser, 10210, "重置密码失败")
+	UserPermissionError   = NewCode(CategoryUser, 10211, "用户权限获取失败")
 
 	// MenuNotFound 菜单权限相关  102 21 - 102 39
 	MenuNotFound    = NewCode(CategoryMenu, 10221, "菜单不存在")

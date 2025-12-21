@@ -107,12 +107,12 @@ func CreateUser(c *gin.Context) {
 	container := di.GetContainer(c)
 	userId, err := container.UserService.CreateUser(ctx, &user)
 	if err != nil {
-		if err.Error() == e.UserNameTelExistError.GetErrMsg() {
+		if errors.Is(err, account.ErrUserNameTelExist) {
 			xresponse.FailByError(c, e.UserNameTelExistError)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "create user info is err: %v", err)
-		xresponse.Fail(c, e.UserCreateError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.UserCreateError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": userId})
@@ -130,12 +130,12 @@ func UpdateUser(c *gin.Context) {
 	container := di.GetContainer(c)
 	userId, err := container.UserService.UpdateUser(ctx, &user)
 	if err != nil {
-		if err.Error() == e.UserNameTelExistError.GetErrMsg() {
+		if errors.Is(err, account.ErrUserNameTelExist) {
 			xresponse.FailByError(c, e.UserNameTelExistError)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "update user info is err: %v", err)
-		xresponse.Fail(c, e.UserUpdateError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.UserUpdateError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": userId})
@@ -155,8 +155,12 @@ func GetUserInfo(c *gin.Context) {
 	container := di.GetContainer(c)
 	user, err := container.UserService.GetUserById(ctx, param.ID)
 	if err != nil {
+		if errors.Is(err, account.ErrUserNotFound) {
+			xresponse.FailByError(c, e.UserNotFound)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "get user info is err: %v", err)
-		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.UserInfoError)
 		return
 	}
 	roleList := make([]*UserRole, 0, len(user.RoleList))
@@ -203,7 +207,7 @@ func GetUserList(c *gin.Context) {
 	res, err := container.UserService.GetUserList(ctx, &userListReq)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "get user list is err: %v", err)
-		xresponse.Fail(c, e.HttpInternalServerError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.UserListError)
 		return
 	}
 	userList := make([]*UserListInfo, 0, len(res.List))
@@ -228,7 +232,7 @@ func GetUserList(c *gin.Context) {
 func DeleteUserById(c *gin.Context) {
 	var user UserInfo
 	if err := c.ShouldBindJSON(&user); err != nil {
-		xresponse.FailByError(c, e.HttpBadRequest)
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
 	if user.ID < 1 {
@@ -240,7 +244,7 @@ func DeleteUserById(c *gin.Context) {
 	err := container.UserService.DeleteById(ctx, user.ID)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "delete user is err: %v", err)
-		xresponse.Fail(c, e.UserDeleteError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.UserDeleteError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": user.ID})
@@ -261,8 +265,6 @@ func ResetPwdById(c *gin.Context) {
 		return
 	}
 	ctx := c.Request.Context()
-
-	xlogger.InfofCtx(ctx, "reset user pwd by id: %v", param.ID)
 	if param.ID < 1 {
 		xresponse.FailByError(c, e.UserNotFound)
 		return
@@ -270,8 +272,8 @@ func ResetPwdById(c *gin.Context) {
 	container := di.GetContainer(c)
 	err := container.UserService.ResetPwdById(ctx, param.ID, param.Password)
 	if err != nil {
-		xlogger.ErrorfCtx(ctx, "delete user is err: %v", err)
-		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
+		xlogger.ErrorfCtx(ctx, "reset user pwd is err: %v", err)
+		xresponse.FailByError(c, e.ResetPwdError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": param.ID})
@@ -290,7 +292,7 @@ func GetUserPermission(c *gin.Context) {
 	user, err := container.UserService.GetUserPermissionById(ctx, userContext.UserId)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "get user permission is err: %v", err)
-		xresponse.Fail(c, e.UserNotFound.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.UserPermissionError)
 		return
 	}
 	xresponse.Success(c, user)

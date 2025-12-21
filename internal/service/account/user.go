@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
+	"gorm.io/gorm"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
@@ -120,6 +121,12 @@ type UserListCondition struct {
 	Limit    int32   `json:"limit" form:"limit"`
 }
 
+var (
+	ErrUserNameTelExist = errors.New(e.UserNameTelExistError.GetErrMsg())
+	ErrUserNotFound     = errors.New(e.UserNotFound.GetErrMsg())
+	ErrAuth             = errors.New(e.AuthError.GetErrMsg())
+)
+
 // CreateUser 创建用户
 func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int32, error) {
 	// 获取登录ctx
@@ -135,7 +142,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		return 0, errors.WithMessage(err, "查询用户名或电话是否存在异常")
 	}
 	if isDuplicate {
-		return 0, errors.New(e.UserNameTelExistError.GetErrMsg())
+		return 0, ErrUserNameTelExist
 	}
 
 	// 检查设置的角色id是否存在
@@ -229,7 +236,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 	}
 
 	if userParam.ID <= 0 {
-		return 0, errors.New(e.UserNotFound.GetErrMsg())
+		return 0, ErrUserNotFound
 	}
 	// 获取用户信息
 	oldUser, err := u.userDao.GetUserById(ctx, userParam.ID)
@@ -245,7 +252,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		return 0, errors.WithMessage(err, "查询用户名或电话是否存在异常")
 	}
 	if isDuplicate {
-		return 0, errors.New(e.UserNameTelExistError.GetErrMsg())
+		return 0, ErrUserNameTelExist
 	}
 
 	// 检查设置的角色id是否存在
@@ -331,10 +338,13 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 // GetUserById 根据id获取用户信息
 func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo, error) {
 	if userId <= 0 {
-		return nil, errors.New(e.UserNotFound.GetErrMsg())
+		return nil, ErrUserNotFound
 	}
 	user, err := u.userDao.GetUserById(ctx, userId)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound
+		}
 		xlogger.ErrorfCtx(ctx, "获取用户(%d)信息异常: %v", userId, err)
 		return nil, errors.WithMessage(err, "用户信息查询失败")
 	}
@@ -403,7 +413,7 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 	}
 
 	if userId <= 0 {
-		return errors.New(e.UserNotFound.GetErrMsg())
+		return ErrUserNotFound
 	}
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 删除用户
@@ -455,11 +465,18 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 // ResetPwdById 重置用户密码
 func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password string) error {
 	if userId <= 0 {
-		return errors.New(e.UserNotFound.GetErrMsg())
+		return ErrUserNotFound
 	}
-
-	_, err := u.userDao.GetUserById(ctx, userId)
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
 	if err != nil {
+		return err
+	}
+	_, err = u.userDao.GetUserById(ctx, userId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrUserNotFound
+		}
 		xlogger.ErrorfCtx(ctx, "获取用户(%d)信息异常: %v", userId, err)
 		return errors.WithMessage(err, "用户信息查询失败")
 	}
@@ -475,13 +492,14 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 		xlogger.ErrorfCtx(ctx, "修改用户(%d)密码异常: %v", userId, err)
 		return errors.WithMessage(err, "用户信息查询失败")
 	}
+	xlogger.InfofCtx(ctx, "登录用户(%d-%s)重置用户(%d)密码成功", userContext.UserId, userContext.Username, userId)
 	return nil
 }
 
 // Authenticate 用户登录校验
 func (u *UserService) Authenticate(ctx context.Context, username, password string) (*UserInfo, error) {
 	if len(username) <= 0 {
-		return nil, errors.New(e.UserNotFound.GetErrMsg())
+		return nil, ErrUserNotFound
 	}
 
 	user, err := u.userDao.GetUserByUsername(ctx, username)
@@ -493,7 +511,7 @@ func (u *UserService) Authenticate(ctx context.Context, username, password strin
 	// 密码加密
 	isOk := xcryption.CheckPassword(user.Password, password)
 	if !isOk {
-		return nil, errors.New(e.AuthError.GetErrMsg())
+		return nil, ErrAuth
 	}
 	return &UserInfo{
 		ID:        user.ID,
@@ -510,7 +528,7 @@ func (u *UserService) Authenticate(ctx context.Context, username, password strin
 func (u *UserService) GetRoleIdsByUserId(ctx context.Context, userId int32) ([]int32, error) {
 	var roleIds []int32
 	if userId <= 0 {
-		return roleIds, errors.New(e.UserNotFound.GetErrMsg())
+		return roleIds, ErrUserNotFound
 	}
 
 	// 读缓存 user->roleId
@@ -542,7 +560,7 @@ func (u *UserService) GetRoleIdsByUserId(ctx context.Context, userId int32) ([]i
 // GetPermsListById 根据userId拿该用户所有接口权限标识
 func (u *UserService) GetPermsListById(ctx context.Context, userId int32) ([]string, error) {
 	if userId <= 0 {
-		return nil, errors.New(e.UserNotFound.GetErrMsg())
+		return nil, ErrUserNotFound
 	}
 
 	// 根据userId拿到roleId
@@ -573,7 +591,7 @@ func (u *UserService) GetPermsListById(ctx context.Context, userId int32) ([]str
 // GetUserPermissionById 根据id获取用户信息
 func (u *UserService) GetUserPermissionById(ctx context.Context, userId int32) (*UserPermissionInfo, error) {
 	if userId <= 0 {
-		return nil, errors.New(e.UserNotFound.GetErrMsg())
+		return nil, ErrUserNotFound
 	}
 	// 获取用户信息
 	user, err := u.GetUserById(ctx, userId)
