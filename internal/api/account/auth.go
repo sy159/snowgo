@@ -108,7 +108,7 @@ func RefreshToken(c *gin.Context) {
 	jtiKey := constant.CacheRefreshJtiPrefix + claims.ID
 	if del, _ := container.Cache.Delete(ctx, jtiKey); del == 0 {
 		xlogger.ErrorfCtx(ctx, "refresh token reuse attempt: userID=%d, jti=%s", claims.UserId, claims.ID)
-		xresponse.FailByError(c, e.TokenUseDError)
+		xresponse.FailByError(c, e.TokenUsedError)
 		return
 	}
 

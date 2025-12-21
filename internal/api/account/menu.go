@@ -91,7 +91,7 @@ func DeleteMenuById(c *gin.Context) {
 	err := container.MenuService.DeleteMenuById(ctx, menuParam.ID)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "delete menu is err: %v", err)
-		xresponse.Fail(c, e.MenuNotFound.GetErrCode(), err.Error())
+		xresponse.Fail(c, e.MenuDeleteError.GetErrCode(), err.Error())
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": menuParam.ID})
