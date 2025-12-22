@@ -187,8 +187,8 @@ func AccessLogger() gin.HandlerFunc {
 				zap.String("trace_id", traceId),
 				zap.String("user_agent", c.Request.UserAgent()),
 				zap.String("errors", c.Errors.ByType(gin.ErrorTypePrivate).String()),
-				zap.String("start_time", startTime.Format("2006-01-02 15:04:05.000")),
-				zap.String("end_time", endTime.Format("2006-01-02 15:04:05.000")),
+				zap.String("start_time", startTime.Format(constant.TimeFmtWithMS)),
+				zap.String("end_time", endTime.Format(constant.TimeFmtWithMS)),
 			)
 		}
 		// 正式环境不进行标准输出
@@ -197,7 +197,7 @@ func AccessLogger() gin.HandlerFunc {
 			fmt.Printf("%s %s %20s | status %3s | biz code %6s | %8v | %5s  %#v | %12s | %s\n",
 				xcolor.GreenFont(fmt.Sprintf("[%s:%s]", cfg.Application.Server.Name, cfg.Application.Server.Version)),
 				xcolor.YellowFont("[access] |"),
-				startTime.Format("2006-01-02 15:04:05.000"),
+				startTime.Format(constant.TimeFmtWithMS),
 				xcolor.StatusCodeColor(c.Writer.Status()),
 				xcolor.BizCodeColor(bizCode),
 				cost,
