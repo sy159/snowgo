@@ -74,7 +74,7 @@ func GetOperationLogList(c *gin.Context) {
 			AfterData:    *operationLog.AfterData,
 			Description:  *operationLog.Description,
 			IP:           *operationLog.IP,
-			CreatedAt:    operationLog.CreatedAt.Format("2006-01-02 15:04:05.000"),
+			CreatedAt:    operationLog.CreatedAt.Format(constant.TimeFmtWithMS),
 		})
 	}
 	xresponse.Success(c, &OperationLogList{

@@ -178,8 +178,8 @@ func GetUserInfo(c *gin.Context) {
 		Tel:       user.Tel,
 		Nickname:  user.Nickname,
 		Status:    user.Status,
-		CreatedAt: user.CreatedAt.Format("2006-01-02 15:04:05.000"),
-		UpdatedAt: user.UpdatedAt.Format("2006-01-02 15:04:05.000"),
+		CreatedAt: user.CreatedAt.Format(constant.TimeFmtWithMS),
+		UpdatedAt: user.UpdatedAt.Format(constant.TimeFmtWithMS),
 		RoleList:  roleList,
 	})
 }
@@ -218,8 +218,8 @@ func GetUserList(c *gin.Context) {
 			Tel:       user.Tel,
 			Nickname:  user.Nickname,
 			Status:    user.Status,
-			CreatedAt: user.CreatedAt.Format("2006-01-02 15:04:05.000"),
-			UpdatedAt: user.UpdatedAt.Format("2006-01-02 15:04:05.000"),
+			CreatedAt: user.CreatedAt.Format(constant.TimeFmtWithMS),
+			UpdatedAt: user.UpdatedAt.Format(constant.TimeFmtWithMS),
 		})
 	}
 	xresponse.Success(c, &UserList{

@@ -4,6 +4,11 @@ package constant
 const (
 	DefaultLimit = 10 // 分页默认10条数据
 
+	TimeFmtWithMS = "2006-01-02 15:04:05.000"
+	TimeFmtWithS  = "2006-01-02 15:04:05"
+	TimeFmtWithM  = "2006-01-02 15:04"
+	TimeFmtWithH  = "2006-01-02 15"
+
 	CONTAINER = "snowgo.internal.di.container" // 注册的container名
 
 	// ActiveStatus 状态
