@@ -48,14 +48,14 @@ func NewMenuService(db *repo.Repository, cache xcache.Cache, menuDao MenuRepo, l
 }
 
 type MenuParam struct {
-	ID       int32  `json:"id"`
-	ParentID int32  `json:"parent_id"`
-	MenuType string `json:"menu_type" binding:"required,oneof=Dir Menu Btn"`
-	Name     string `json:"name"`
-	Path     string `json:"path"`
-	Icon     string `json:"icon"`
-	Perms    string `json:"perms"`
-	OrderNum int32  `json:"order_num" binding:"required,gte=0"`
+	ID        int32  `json:"id"`
+	ParentID  int32  `json:"parent_id"`
+	MenuType  string `json:"menu_type" binding:"required,oneof=Dir Menu Btn"`
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	Icon      string `json:"icon"`
+	Perms     string `json:"perms"`
+	SortOrder int32  `json:"sort_order" binding:"required,gte=0"`
 }
 
 // MenuInfo 返回给前端的树节点结构
@@ -67,10 +67,10 @@ type MenuInfo struct {
 	Path      string      `json:"path"`
 	Icon      string      `json:"icon"`
 	Perms     string      `json:"perms"`
-	OrderNum  int32       `json:"order_num"`
+	SortOrder int32       `json:"sort_order"`
 	CreatedAt time.Time   `json:"created_at"`
 	UpdatedAt time.Time   `json:"updated_at"`
-	Children  []*MenuInfo `json:"children,omitempty"`
+	Children  []*MenuInfo `json:"children"`
 }
 
 // MenuData menu数据
@@ -82,7 +82,7 @@ type MenuData struct {
 	Path      string    `json:"path"`
 	Icon      string    `json:"icon"`
 	Perms     string    `json:"perms"`
-	OrderNum  int32     `json:"order_num"`
+	SortOrder int32     `json:"sort_order"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -103,13 +103,13 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 	}
 
 	menu := &model.Menu{
-		ParentID: p.ParentID,
-		MenuType: p.MenuType,
-		Name:     p.Name,
-		Path:     &p.Path,
-		Icon:     &p.Icon,
-		Perms:    &p.Perms,
-		OrderNum: p.OrderNum,
+		ParentID:  p.ParentID,
+		MenuType:  p.MenuType,
+		Name:      p.Name,
+		Path:      &p.Path,
+		Icon:      &p.Icon,
+		Perms:     &p.Perms,
+		SortOrder: p.SortOrder,
 	}
 	var menuObj *model.Menu
 
@@ -185,14 +185,14 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 	}
 	// 更新
 	mn := &model.Menu{
-		ID:       p.ID,
-		ParentID: p.ParentID,
-		MenuType: p.MenuType,
-		Name:     p.Name,
-		Path:     &p.Path,
-		Icon:     &p.Icon,
-		Perms:    &p.Perms,
-		OrderNum: p.OrderNum,
+		ID:        p.ID,
+		ParentID:  p.ParentID,
+		MenuType:  p.MenuType,
+		Name:      p.Name,
+		Path:      &p.Path,
+		Icon:      &p.Icon,
+		Perms:     &p.Perms,
+		SortOrder: p.SortOrder,
 	}
 
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
@@ -347,7 +347,7 @@ func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 			Path:      *m.Path,
 			Icon:      *m.Icon,
 			Perms:     *m.Perms,
-			OrderNum:  m.OrderNum,
+			SortOrder: m.SortOrder,
 			CreatedAt: *m.CreatedAt,
 			UpdatedAt: *m.UpdatedAt,
 			Children:  []*MenuInfo{},
@@ -374,7 +374,7 @@ func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 			return
 		}
 		sort.SliceStable(nodes, func(i, j int) bool {
-			return nodes[i].OrderNum < nodes[j].OrderNum
+			return nodes[i].SortOrder < nodes[j].SortOrder
 		})
 		for _, n := range nodes {
 			sortNodes(n.Children)

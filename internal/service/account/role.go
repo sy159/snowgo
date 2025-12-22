@@ -491,7 +491,7 @@ func (s *RoleService) GetRoleMenuListByRuleID(ctx context.Context, roleId int32)
 			Path:      *m.Path,
 			Icon:      *m.Icon,
 			Perms:     *m.Perms,
-			OrderNum:  m.OrderNum,
+			SortOrder: m.SortOrder,
 			CreatedAt: *m.CreatedAt,
 			UpdatedAt: *m.UpdatedAt,
 		})

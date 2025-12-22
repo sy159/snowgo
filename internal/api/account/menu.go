@@ -17,11 +17,11 @@ type MenuInfo struct {
 	Path      string      `json:"path"`
 	Icon      string      `json:"icon"`
 	Perms     string      `json:"perms"`
-	OrderNum  int32       `json:"order_num"`
+	SortOrder int32       `json:"sort_order"`
 	Status    string      `json:"status"`
 	CreatedAt string      `json:"created_at"`
 	UpdatedAt string      `json:"updated_at"`
-	Children  []*MenuInfo `json:"children,omitempty"`
+	Children  []*MenuInfo `json:"children"`
 }
 
 // CreateMenu 创建菜单权限

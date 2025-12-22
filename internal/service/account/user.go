@@ -645,7 +645,7 @@ func (u *UserService) GetUserPermissionById(ctx context.Context, userId int32) (
 				Path:      m.Path,
 				Icon:      m.Icon,
 				Perms:     m.Perms,
-				OrderNum:  m.OrderNum,
+				SortOrder: m.SortOrder,
 				CreatedAt: m.CreatedAt,
 				UpdatedAt: m.UpdatedAt,
 				Children:  []*MenuInfo{},
@@ -670,7 +670,7 @@ func (u *UserService) GetUserPermissionById(ctx context.Context, userId int32) (
 				return
 			}
 			sort.SliceStable(nodes, func(i, j int) bool {
-				return nodes[i].OrderNum < nodes[j].OrderNum
+				return nodes[i].SortOrder < nodes[j].SortOrder
 			})
 			for _, n := range nodes {
 				sortNodes(n.Children)

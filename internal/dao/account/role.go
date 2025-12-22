@@ -43,7 +43,7 @@ type RoleMenuInfo struct {
 	Path      string    `json:"path"`
 	Icon      string    `json:"icon"`
 	Perms     string    `json:"perms"`
-	OrderNum  int32     `json:"order_num"`
+	SortOrder int32     `json:"sort_order"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

@@ -33,7 +33,7 @@ func newMenu(db *gorm.DB, opts ...gen.DOOption) menu {
 	_menu.Path = field.NewString(tableName, "path")
 	_menu.Icon = field.NewString(tableName, "icon")
 	_menu.Perms = field.NewString(tableName, "perms")
-	_menu.OrderNum = field.NewInt32(tableName, "order_num")
+	_menu.SortOrder = field.NewInt32(tableName, "sort_order")
 	_menu.CreatedAt = field.NewTime(tableName, "created_at")
 	_menu.UpdatedAt = field.NewTime(tableName, "updated_at")
 
@@ -53,7 +53,7 @@ type menu struct {
 	Path      field.String // 前端路由路径，仅 Dir/Menu 生效
 	Icon      field.String // 节点图标，仅 Dir/Menu 生效
 	Perms     field.String // 权限标识，如 system:user:add，仅 Btn生效
-	OrderNum  field.Int32  // 排序号
+	SortOrder field.Int32  // 排序号
 	CreatedAt field.Time
 	UpdatedAt field.Time
 
@@ -79,7 +79,7 @@ func (m *menu) updateTableName(table string) *menu {
 	m.Path = field.NewString(table, "path")
 	m.Icon = field.NewString(table, "icon")
 	m.Perms = field.NewString(table, "perms")
-	m.OrderNum = field.NewInt32(table, "order_num")
+	m.SortOrder = field.NewInt32(table, "sort_order")
 	m.CreatedAt = field.NewTime(table, "created_at")
 	m.UpdatedAt = field.NewTime(table, "updated_at")
 
@@ -114,7 +114,7 @@ func (m *menu) fillFieldMap() {
 	m.fieldMap["path"] = m.Path
 	m.fieldMap["icon"] = m.Icon
 	m.fieldMap["perms"] = m.Perms
-	m.fieldMap["order_num"] = m.OrderNum
+	m.fieldMap["sort_order"] = m.SortOrder
 	m.fieldMap["created_at"] = m.CreatedAt
 	m.fieldMap["updated_at"] = m.UpdatedAt
 }
