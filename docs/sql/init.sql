@@ -201,6 +201,7 @@ INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `per
 VALUES (21, 20, 'Menu', '操作日志管理', '/system/operation-log', 'fa fa-pencil-square-o', '', 1);
 INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
 VALUES (22, 21, 'Btn', '操作日志列表', '', '', 'system:operation-log:list', 1);
+INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
 VALUES (23, 20, 'Menu', '字典管理', '/system/dict', 'fa fa-bookmark-o', '', 2);
 INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
 VALUES (24, 23, 'Btn', '字典列表', '', '', 'system:dict:list', 1);
