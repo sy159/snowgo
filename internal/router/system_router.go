@@ -16,4 +16,10 @@ func systemRouters(r *gin.RouterGroup) {
 		// 操作日志
 		logGroup.GET("/operation", middleware.PermissionAuth(constant.PermSystemOperationLogList), GetOperationLogList)
 	}
+
+	dictGroup := systemGroup.Group("/dict")
+	{
+		// 字典管理
+		dictGroup.GET("/", middleware.PermissionAuth(constant.PermSystemDictList), GetDictList)
+	}
 }

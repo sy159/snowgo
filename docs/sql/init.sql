@@ -114,6 +114,42 @@ CREATE TABLE `operation_log`
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='操作日志表';
 
+# 创建系统字典表
+DROP TABLE IF EXISTS `system_dict`;
+CREATE TABLE `system_dict`
+(
+    `id`          INT(11)      NOT NULL AUTO_INCREMENT,
+    `code`        VARCHAR(64)  NOT NULL COMMENT '字典编码',
+    `name`        VARCHAR(128) NOT NULL COMMENT '字典名称',
+    `status`      VARCHAR(20)  NOT NULL DEFAULT 'Active' COMMENT '状态：Active 启用，Disabled 禁用',
+    `description` TEXT         NULL COMMENT '描述',
+    `created_at`  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `updated_at`  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_code` (`code`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='系统字典表';
+
+# 创建系统字典枚举值表
+DROP TABLE IF EXISTS `system_dict_item`;
+CREATE TABLE `system_dict_item`
+(
+    `id`          INT(11)      NOT NULL AUTO_INCREMENT,
+    `dict_code`   VARCHAR(64)  NOT NULL COMMENT '字典编码',
+    `item_name`   VARCHAR(128) NOT NULL COMMENT '枚举显示名称',
+    `item_code`   VARCHAR(64) NOT NULL COMMENT '枚举值编码',
+    `status`      VARCHAR(20)  NOT NULL DEFAULT 'Active' COMMENT '状态：Active 启用，Disabled 禁用',
+    `sort_order`  INT          NOT NULL DEFAULT 0 COMMENT '排序号',
+    `description` TEXT         NULL COMMENT '描述',
+    `created_at`  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `updated_at`  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_dict_item` (`dict_code`, `item_code`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='系统字典枚举值表';
+
 # 插入测试数据
 # 用户数据
 INSERT INTO `user` (`username`, `tel`, `nickname`, `password`, `status`, `is_deleted`)
@@ -165,6 +201,9 @@ INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `per
 VALUES (21, 20, 'Menu', '操作日志管理', '/system/operation-log', 'fa fa-pencil-square-o', '', 1);
 INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
 VALUES (22, 21, 'Btn', '操作日志列表', '', '', 'system:operation-log:list', 1);
+VALUES (23, 20, 'Menu', '字典管理', '/system/dict', 'fa fa-bookmark-o', '', 2);
+INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
+VALUES (24, 23, 'Btn', '字典列表', '', '', 'system:dict:list', 1);
 
 # 角色数据
 INSERT INTO `role` (`id`, `code`, `name`, `description`)
@@ -215,6 +254,10 @@ INSERT INTO `role_menu` (`role_id`, `menu_id`)
 VALUES (1, 21);
 INSERT INTO `role_menu` (`role_id`, `menu_id`)
 VALUES (1, 22);
+INSERT INTO `role_menu` (`role_id`, `menu_id`)
+VALUES (1, 23);
+INSERT INTO `role_menu` (`role_id`, `menu_id`)
+VALUES (1, 24);
 
 # 用户角色关联数据
 INSERT INTO `user_role` (`user_id`, `role_id`)

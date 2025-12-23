@@ -8,6 +8,8 @@ func GetQueryModels() []interface{} {
 		&model.OperationLog{},
 		&model.RoleMenu{},
 		&model.Role{},
+		&model.SystemDictItem{},
+		&model.SystemDict{},
 		&model.UserRole{},
 		&model.User{},
 	}
