@@ -92,3 +92,31 @@ func CreateDict(c *gin.Context) {
 	}
 	xresponse.Success(c, &gin.H{"id": dictId})
 }
+
+// UpdateDict 更新字典
+func UpdateDict(c *gin.Context) {
+	var dict system.DictParam
+	if err := c.ShouldBindJSON(&dict); err != nil {
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	container := di.GetSystemContainer(c)
+	dictId, err := container.DictService.UpdateDict(ctx, &dict)
+	if err != nil {
+		if errors.Is(err, system.ErrDictCodeNotFound) {
+			xresponse.FailByError(c, e.DictNotFound)
+			return
+		}
+		if errors.Is(err, system.ErrDictCodeExist) {
+			xresponse.FailByError(c, e.DictCodeExistError)
+			return
+		}
+		xlogger.ErrorfCtx(ctx, "update system dict is err: %v", err)
+		xresponse.FailByError(c, e.DictUpdateError)
+		return
+	}
+	xresponse.Success(c, &gin.H{"id": dictId})
+}

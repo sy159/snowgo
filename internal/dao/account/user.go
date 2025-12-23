@@ -180,7 +180,7 @@ func (u *UserDao) GetUserById(ctx context.Context, userId int32) (*model.User, e
 		return nil, errors.New("用户id不存在")
 	}
 	m := u.repo.Query().User
-	user, err := u.repo.Query().User.WithContext(ctx).Where(m.ID.Eq(userId), m.IsDeleted.Is(false)).First()
+	user, err := m.WithContext(ctx).Where(m.ID.Eq(userId), m.IsDeleted.Is(false)).First()
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -193,7 +193,7 @@ func (u *UserDao) GetUserByUsername(ctx context.Context, username string) (*mode
 		return nil, errors.New("用户username不存在")
 	}
 	m := u.repo.Query().User
-	user, err := u.repo.Query().User.WithContext(ctx).Where(m.Username.Eq(username), m.IsDeleted.Is(false)).First()
+	user, err := m.WithContext(ctx).Where(m.Username.Eq(username), m.IsDeleted.Is(false)).First()
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -285,7 +285,7 @@ func (u *UserDao) DeleteById(ctx context.Context, userId int32) error {
 		return errors.New("用户id不存在")
 	}
 	m := u.repo.Query().User
-	_, err := u.repo.Query().User.WithContext(ctx).Where(m.ID.Eq(userId)).UpdateSimple(m.IsDeleted.Value(true))
+	_, err := m.WithContext(ctx).Where(m.ID.Eq(userId)).UpdateSimple(m.IsDeleted.Value(true))
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -303,7 +303,7 @@ func (u *UserDao) UpdateUser(ctx context.Context, user *model.User) (*model.User
 		return nil, errors.New("用户id不存在")
 	}
 	m := u.repo.Query().User
-	err := u.repo.Query().User.WithContext(ctx).Where(m.ID.Eq(user.ID)).Save(user)
+	err := m.WithContext(ctx).Where(m.ID.Eq(user.ID)).Save(user)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -316,7 +316,7 @@ func (u *UserDao) ResetPwdById(ctx context.Context, userId int32, password strin
 		return errors.New("用户id不存在")
 	}
 	m := u.repo.Query().User
-	_, err := u.repo.Query().User.WithContext(ctx).Where(m.ID.Eq(userId)).UpdateSimple(m.Password.Value(password))
+	_, err := m.WithContext(ctx).Where(m.ID.Eq(userId)).UpdateSimple(m.Password.Value(password))
 	if err != nil {
 		return errors.WithStack(err)
 	}

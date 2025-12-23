@@ -40,7 +40,7 @@ func GetOperationLogList(c *gin.Context) {
 	}
 	ctx := c.Request.Context()
 
-	xlogger.InfofCtx(ctx, "get operation log list: %+v", logListReq)
+	//xlogger.InfofCtx(ctx, "get operation log list: %+v", logListReq)
 	if logListReq.Offset < 0 {
 		xresponse.FailByError(c, e.OffsetErrorRequests)
 		return

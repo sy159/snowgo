@@ -3,6 +3,7 @@ package system
 import (
 	"context"
 	"github.com/pkg/errors"
+	"gorm.io/gorm"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/repo"
 	daoSystem "snowgo/internal/dao/system"
@@ -14,9 +15,11 @@ import (
 
 // DictRepo 定义opt dict相关db操作接口
 type DictRepo interface {
+	GetDictById(ctx context.Context, dictId int32) (*model.SystemDict, error)
 	GetDictList(ctx context.Context, condition *daoSystem.DictListCondition) ([]*model.SystemDict, int64, error)
 	IsCodeDuplicate(ctx context.Context, code string, dictId int32) (bool, error)
 	CreateDict(ctx context.Context, dict *model.SystemDict) (*model.SystemDict, error)
+	UpdateDict(ctx context.Context, dict *model.SystemDict) (*model.SystemDict, error)
 }
 
 type DictService struct {
@@ -65,7 +68,8 @@ type DictList struct {
 }
 
 var (
-	ErrDictCodeExist = errors.New(e.DictCodeExistError.GetErrMsg())
+	ErrDictCodeExist    = errors.New(e.DictCodeExistError.GetErrMsg())
+	ErrDictCodeNotFound = errors.New(e.DictNotFound.GetErrMsg())
 )
 
 // GetDictList 获取字典列表数据
@@ -114,7 +118,7 @@ func (d *DictService) GetDictList(ctx context.Context, condition *DictListCondit
 	return &DictList{List: dictInfoList, Total: total}, nil
 }
 
-// CreateDict 记录字典数据
+// CreateDict 添加字典数据
 func (d *DictService) CreateDict(ctx context.Context, param *DictParam) (int32, error) {
 	// 获取登录ctx
 	userContext, err := xauth.GetUserContext(ctx)
@@ -140,8 +144,55 @@ func (d *DictService) CreateDict(ctx context.Context, param *DictParam) (int32, 
 	})
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "字典创建失败: %+v err: %v", param, err)
-		return 0, errors.WithMessage(err, "用户创建失败")
+		return 0, errors.WithMessage(err, "字典创建失败")
 	}
 	xlogger.InfofCtx(ctx, "用户(%d)创建字典成功: %+v", userContext.UserId, dict)
+	return dict.ID, nil
+}
+
+// UpdateDict 更新字典数据
+func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, error) {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	if param.ID <= 0 {
+		return 0, ErrDictCodeNotFound
+	}
+	// 获取用户信息
+	oldDict, err := d.dictRepo.GetDictById(ctx, param.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, ErrDictCodeNotFound
+		}
+		xlogger.ErrorfCtx(ctx, "获取字典(%d)信息异常: %v", param.ID, err)
+		return 0, errors.WithMessage(err, "字典信息查询失败")
+	}
+
+	// 检查code是否存在
+	isDuplicate, err := d.dictRepo.IsCodeDuplicate(ctx, param.Code, oldDict.ID)
+	if err != nil {
+		xlogger.ErrorfCtx(ctx, "查询code是否存在异常: %v", err)
+		return 0, errors.WithMessage(err, "查询字典编码是否存在异常")
+	}
+	if isDuplicate {
+		return 0, ErrDictCodeExist
+	}
+
+	// 更新字典
+	dict, err := d.dictRepo.UpdateDict(ctx, &model.SystemDict{
+		ID:          param.ID,
+		Code:        param.Code,
+		Name:        param.Name,
+		Status:      &param.Status,
+		Description: &param.Description,
+	})
+	if err != nil {
+		xlogger.ErrorfCtx(ctx, "字典更新失败: %+v err: %v", param, err)
+		return 0, errors.WithMessage(err, "字典更新失败")
+	}
+	xlogger.InfofCtx(ctx, "用户(%d)更新字典成功: old=%+v new=%+v", userContext.UserId, oldDict, dict)
 	return dict.ID, nil
 }

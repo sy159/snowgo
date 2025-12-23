@@ -207,6 +207,8 @@ INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `per
 VALUES (24, 23, 'Btn', '字典列表', '', '', 'system:dict:list', 1);
 INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
 VALUES (25, 23, 'Btn', '添加字典', '', '', 'system:dict:create', 2);
+INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
+VALUES (26, 23, 'Btn', '更新字典', '', '', 'system:dict:update', 3);
 
 # 角色数据
 INSERT INTO `role` (`id`, `code`, `name`, `description`)
@@ -263,6 +265,8 @@ INSERT INTO `role_menu` (`role_id`, `menu_id`)
 VALUES (1, 24);
 INSERT INTO `role_menu` (`role_id`, `menu_id`)
 VALUES (1, 25);
+INSERT INTO `role_menu` (`role_id`, `menu_id`)
+VALUES (1, 26);
 
 # 用户角色关联数据
 INSERT INTO `user_role` (`user_id`, `role_id`)

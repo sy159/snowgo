@@ -22,5 +22,6 @@ func systemRouters(r *gin.RouterGroup) {
 		// 字典管理
 		dictGroup.GET("/", middleware.PermissionAuth(constant.PermSystemDictList), GetDictList)
 		dictGroup.POST("/", middleware.PermissionAuth(constant.PermSystemDictCreate), CreateDict)
+		dictGroup.PUT("/", middleware.PermissionAuth(constant.PermSystemDictUpdate), UpdateDict)
 	}
 }

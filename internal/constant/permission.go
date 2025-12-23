@@ -28,4 +28,5 @@ const (
 	// PermSystemDictList 系统管理 - 字典管理
 	PermSystemDictList   = "system:dict:list"
 	PermSystemDictCreate = "system:dict:create"
+	PermSystemDictUpdate = "system:dict:update"
 )

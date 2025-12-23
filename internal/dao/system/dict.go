@@ -31,6 +31,19 @@ type DictListCondition struct {
 	Limit     int32      `json:"limit" form:"limit"`
 }
 
+// GetDictById 查询字典by id
+func (d *DictDao) GetDictById(ctx context.Context, dictId int32) (*model.SystemDict, error) {
+	if dictId <= 0 {
+		return nil, errors.New("字典id不存在")
+	}
+	m := d.repo.Query().SystemDict
+	dict, err := m.WithContext(ctx).Where(m.ID.Eq(dictId)).First()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return dict, nil
+}
+
 // GetDictList 字典列表
 func (d *DictDao) GetDictList(ctx context.Context, condition *DictListCondition) ([]*model.SystemDict, int64, error) {
 	m := d.repo.Query().SystemDict
@@ -123,6 +136,18 @@ func (d *DictDao) IsCodeDuplicate(ctx context.Context, code string, dictId int32
 func (d *DictDao) CreateDict(ctx context.Context, dict *model.SystemDict) (*model.SystemDict, error) {
 	m := d.repo.Query().SystemDict
 	err := m.WithContext(ctx).Create(dict)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return dict, nil
+}
+
+func (d *DictDao) UpdateDict(ctx context.Context, dict *model.SystemDict) (*model.SystemDict, error) {
+	if dict.ID <= 0 {
+		return nil, errors.New("字典id不存在")
+	}
+	m := d.repo.Query().SystemDict
+	err := m.WithContext(ctx).Where(m.ID.Eq(dict.ID)).Save(dict)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
