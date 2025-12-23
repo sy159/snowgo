@@ -11,7 +11,7 @@ import (
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/repo"
 	accountDao "snowgo/internal/dao/account"
-	"snowgo/internal/dao/log"
+	systemDao "snowgo/internal/dao/system"
 	accountService "snowgo/internal/service/account"
 	systemService "snowgo/internal/service/system"
 	"snowgo/pkg/xauth/jwt"
@@ -194,7 +194,7 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 	userDao := accountDao.NewUserDao(repository)
 	menuDao := accountDao.NewMenuDao(repository)
 	roleDao := accountDao.NewRoleDao(repository)
-	operationLogDao := log.NewOperationLogDao(repository)
+	operationLogDao := systemDao.NewOperationLogDao(repository)
 
 	// 构造Service依赖
 	operationLogService := systemService.NewOperationLogService(repository, operationLogDao)

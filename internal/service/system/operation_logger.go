@@ -7,7 +7,7 @@ import (
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
-	"snowgo/internal/dao/log"
+	daoSystem "snowgo/internal/dao/system"
 	"snowgo/pkg/xlogger"
 	"time"
 )
@@ -15,7 +15,7 @@ import (
 // OperationLogRepo 定义opt log相关db操作接口
 type OperationLogRepo interface {
 	TransactionCreate(ctx context.Context, tx *query.Query, operationLog *model.OperationLog) (*model.OperationLog, error)
-	GetOperationLogList(ctx context.Context, condition *log.OperationLogCondition) ([]*model.OperationLog, int64, error)
+	GetOperationLogList(ctx context.Context, condition *daoSystem.OperationLogCondition) ([]*model.OperationLog, int64, error)
 }
 
 type OperationLogInput struct {
@@ -129,7 +129,7 @@ func (o *OperationLogService) GetOperationLogList(ctx context.Context, condition
 		}
 		endTimePtr = &t
 	}
-	operationLogList, total, err := o.operationLogDao.GetOperationLogList(ctx, &log.OperationLogCondition{
+	operationLogList, total, err := o.operationLogDao.GetOperationLogList(ctx, &daoSystem.OperationLogCondition{
 		OperatorId:   condition.OperatorId,
 		OperatorName: condition.OperatorName,
 		Resource:     condition.Resource,
