@@ -1,6 +1,7 @@
 package system
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
 	"snowgo/internal/constant"
 	"snowgo/internal/di"
@@ -47,22 +48,47 @@ func GetDictList(c *gin.Context) {
 	res, err := container.DictService.GetDictList(ctx, &dictListReq)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "get system dict list is err: %v", err)
-		xresponse.FailByError(c, e.LogListError)
+		xresponse.FailByError(c, e.DictListError)
 		return
 	}
 	dictList := make([]*DictInfo, 0, len(res.List))
 	for _, dict := range res.List {
 		dictList = append(dictList, &DictInfo{
-			ID:        dict.ID,
-			Code:      dict.Code,
-			Name:      dict.Name,
-			Status:    *dict.Status,
-			CreatedAt: dict.CreatedAt.Format(constant.TimeFmtWithMS),
-			UpdatedAt: dict.UpdatedAt.Format(constant.TimeFmtWithMS),
+			ID:          dict.ID,
+			Code:        dict.Code,
+			Name:        dict.Name,
+			Status:      *dict.Status,
+			Description: *dict.Description,
+			CreatedAt:   dict.CreatedAt.Format(constant.TimeFmtWithMS),
+			UpdatedAt:   dict.UpdatedAt.Format(constant.TimeFmtWithMS),
 		})
 	}
 	xresponse.Success(c, &DictList{
 		Total: res.Total,
 		List:  dictList,
 	})
+}
+
+// CreateDict 创建字典
+func CreateDict(c *gin.Context) {
+	var dict system.DictParam
+	if err := c.ShouldBindJSON(&dict); err != nil {
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	container := di.GetSystemContainer(c)
+	dictId, err := container.DictService.CreateDict(ctx, &dict)
+	if err != nil {
+		if errors.Is(err, system.ErrDictCodeExist) {
+			xresponse.FailByError(c, e.DictCodeExistError)
+			return
+		}
+		xlogger.ErrorfCtx(ctx, "create system dict is err: %v", err)
+		xresponse.FailByError(c, e.DictCreateError)
+		return
+	}
+	xresponse.Success(c, &gin.H{"id": dictId})
 }

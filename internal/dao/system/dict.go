@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/pkg/errors"
 	"gorm.io/gen"
+	"gorm.io/gorm"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/repo"
 	"time"
@@ -99,4 +100,31 @@ func (d *DictDao) EndTimeScope(endTime *time.Time) func(tx gen.Dao) gen.Dao {
 		tx = tx.Where(m.CreatedAt.Lte(*endTime))
 		return tx
 	}
+}
+
+func (d *DictDao) IsCodeDuplicate(ctx context.Context, code string, dictId int32) (bool, error) {
+	m := d.repo.Query().SystemDict
+	dictQuery := m.WithContext(ctx).
+		Select(m.ID).
+		Where(m.Code.Eq(code))
+	if dictId > 0 {
+		dictQuery = dictQuery.Where(m.ID.Neq(dictId))
+	}
+	_, err := dictQuery.First()
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return true, errors.WithStack(err)
+	}
+	return true, nil
+}
+
+func (d *DictDao) CreateDict(ctx context.Context, dict *model.SystemDict) (*model.SystemDict, error) {
+	m := d.repo.Query().SystemDict
+	err := m.WithContext(ctx).Create(dict)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return dict, nil
 }

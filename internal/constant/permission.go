@@ -26,5 +26,6 @@ const (
 	PermSystemOperationLogList = "system:operation-log:list" // 查看操作日志列表
 
 	// PermSystemDictList 系统管理 - 字典管理
-	PermSystemDictList = "system:dict:list"
+	PermSystemDictList   = "system:dict:list"
+	PermSystemDictCreate = "system:dict:create"
 )
