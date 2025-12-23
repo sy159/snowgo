@@ -13,7 +13,7 @@ import (
 	accountDao "snowgo/internal/dao/account"
 	"snowgo/internal/dao/log"
 	accountService "snowgo/internal/service/account"
-	logService "snowgo/internal/service/log"
+	systemService "snowgo/internal/service/system"
 	"snowgo/pkg/xauth/jwt"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xdatabase/mysql"
@@ -55,7 +55,7 @@ type AccountContainer struct {
 }
 
 type SystemContainer struct {
-	OperationLogService *logService.OperationLogService
+	OperationLogService *systemService.OperationLogService
 }
 
 // BuildJwtManager 构建jwt操作
@@ -197,7 +197,7 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 	operationLogDao := log.NewOperationLogDao(repository)
 
 	// 构造Service依赖
-	operationLogService := logService.NewOperationLogService(repository, operationLogDao)
+	operationLogService := systemService.NewOperationLogService(repository, operationLogDao)
 	menuService := accountService.NewMenuService(repository, redisCache, menuDao, operationLogService)
 	roleService := accountService.NewRoleService(repository, roleDao, redisCache, operationLogService)
 	userService := accountService.NewUserService(repository, userDao, redisCache, roleService, operationLogService)

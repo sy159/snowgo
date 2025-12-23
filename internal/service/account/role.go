@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/query"
-	"snowgo/internal/service/log"
+	"snowgo/internal/service/system"
 	"snowgo/pkg/xauth"
 	e "snowgo/pkg/xerror"
 	"time"
@@ -43,11 +43,11 @@ type RoleService struct {
 	db         *repo.Repository
 	roleDao    RoleRepo
 	cache      xcache.Cache
-	logService *log.OperationLogService
+	logService *system.OperationLogService
 }
 
 // NewRoleService 构造函数
-func NewRoleService(db *repo.Repository, roleDao RoleRepo, cache xcache.Cache, logService *log.OperationLogService) *RoleService {
+func NewRoleService(db *repo.Repository, roleDao RoleRepo, cache xcache.Cache, logService *system.OperationLogService) *RoleService {
 	return &RoleService{db: db, roleDao: roleDao, cache: cache, logService: logService}
 }
 
@@ -152,7 +152,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 		}
 
 		// 创建操作日志
-		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+		err = s.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -255,7 +255,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 		}
 
 		// 创建操作日志
-		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+		err = s.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -328,7 +328,7 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 		}
 
 		// 创建操作日志
-		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+		err = s.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,

@@ -11,7 +11,7 @@ import (
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
 	"snowgo/internal/dao/account"
-	"snowgo/internal/service/log"
+	"snowgo/internal/service/system"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xcryption"
@@ -47,11 +47,11 @@ type UserService struct {
 	userDao     UserRepo
 	cache       xcache.Cache
 	roleService *RoleService
-	logService  *log.OperationLogService
+	logService  *system.OperationLogService
 }
 
 func NewUserService(db *repo.Repository, userDao UserRepo, cache xcache.Cache, roleService *RoleService,
-	logService *log.OperationLogService) *UserService {
+	logService *system.OperationLogService) *UserService {
 	return &UserService{
 		db:          db,
 		cache:       cache,
@@ -198,7 +198,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		}
 
 		// 创建操作日志
-		err = u.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+		err = u.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -300,7 +300,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		}
 
 		// 创建操作日志
-		err = u.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+		err = u.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -431,7 +431,7 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 		}
 
 		// 创建操作日志
-		err = u.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+		err = u.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,

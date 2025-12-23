@@ -9,7 +9,7 @@ import (
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
-	"snowgo/internal/service/log"
+	"snowgo/internal/service/system"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xlogger"
@@ -35,10 +35,10 @@ type MenuService struct {
 	db         *repo.Repository
 	menuDao    MenuRepo
 	cache      xcache.Cache
-	logService *log.OperationLogService
+	logService *system.OperationLogService
 }
 
-func NewMenuService(db *repo.Repository, cache xcache.Cache, menuDao MenuRepo, logService *log.OperationLogService) *MenuService {
+func NewMenuService(db *repo.Repository, cache xcache.Cache, menuDao MenuRepo, logService *system.OperationLogService) *MenuService {
 	return &MenuService{
 		db:         db,
 		cache:      cache,
@@ -122,7 +122,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		}
 
 		// 创建操作日志
-		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+		err = s.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -203,7 +203,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		}
 
 		// 创建操作日志
-		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+		err = s.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -288,7 +288,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 		}
 
 		// 创建操作日志
-		err = s.logService.CreateOperationLog(ctx, tx, log.OperationLogInput{
+		err = s.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,

@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"snowgo/internal/constant"
 	"snowgo/internal/di"
-	"snowgo/internal/service/log"
+	"snowgo/internal/service/system"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
@@ -33,7 +33,7 @@ type OperationLogList struct {
 
 // GetOperationLogList 操作日志列表
 func GetOperationLogList(c *gin.Context) {
-	var logListReq log.OperationLogCondition
+	var logListReq system.OperationLogCondition
 	if err := c.ShouldBindQuery(&logListReq); err != nil {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
