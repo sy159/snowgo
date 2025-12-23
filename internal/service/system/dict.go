@@ -84,7 +84,7 @@ func (d *DictService) GetDictList(ctx context.Context, condition *DictListCondit
 		return nil, errors.WithMessage(err, "系统字典列表查询失败")
 	}
 	dictInfoList := make([]*DictInfo, 0, len(dictList))
-	for _, dictInfo := range dictInfoList {
+	for _, dictInfo := range dictList {
 		dictInfoList = append(dictInfoList, &DictInfo{
 			ID:          dictInfo.ID,
 			Name:        dictInfo.Name,
