@@ -11,6 +11,7 @@ import (
 	"snowgo/internal/dal/repo"
 	daoSystem "snowgo/internal/dao/system"
 	"snowgo/pkg/xauth"
+	"snowgo/pkg/xcache"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"time"
@@ -31,13 +32,15 @@ type DictRepo interface {
 
 type DictService struct {
 	db         *repo.Repository
+	cache      xcache.Cache
 	dictRepo   DictRepo
 	logService *OperationLogService
 }
 
-func NewDictService(db *repo.Repository, dictRepo DictRepo, logService *OperationLogService) *DictService {
+func NewDictService(db *repo.Repository, cache xcache.Cache, dictRepo DictRepo, logService *OperationLogService) *DictService {
 	return &DictService{
 		db:         db,
+		cache:      cache,
 		dictRepo:   dictRepo,
 		logService: logService,
 	}
