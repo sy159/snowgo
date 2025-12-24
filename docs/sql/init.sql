@@ -135,9 +135,10 @@ DROP TABLE IF EXISTS `system_dict_item`;
 CREATE TABLE `system_dict_item`
 (
     `id`          INT(11)      NOT NULL AUTO_INCREMENT,
+    `dict_id`     INT          NOT NULL COMMENT '字典ID',
     `dict_code`   VARCHAR(64)  NOT NULL COMMENT '字典编码',
     `item_name`   VARCHAR(128) NOT NULL COMMENT '枚举显示名称',
-    `item_code`   VARCHAR(64) NOT NULL COMMENT '枚举值编码',
+    `item_code`   VARCHAR(64)  NOT NULL COMMENT '枚举值编码',
     `status`      VARCHAR(20)  NOT NULL DEFAULT 'Active' COMMENT '状态：Active 启用，Disabled 禁用',
     `sort_order`  INT          NOT NULL DEFAULT 0 COMMENT '排序号',
     `description` TEXT         NULL COMMENT '描述',

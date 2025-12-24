@@ -24,6 +24,8 @@ type DictRepo interface {
 	TransactionCreateDict(ctx context.Context, tx *query.Query, dict *model.SystemDict) (*model.SystemDict, error)
 	TransactionUpdateDict(ctx context.Context, tx *query.Query, dict *model.SystemDict) (*model.SystemDict, error)
 	TransactionDeleteById(ctx context.Context, tx *query.Query, id int32) error
+	TransactionDeleteItemByDictID(ctx context.Context, tx *query.Query, dictId int32) error
+	TransactionUpdateItemByDictID(ctx context.Context, tx *query.Query, dictId int32, dictCode string) error
 	GetItemListByDictCode(ctx context.Context, dictCode string) ([]*model.SystemDictItem, error)
 }
 
@@ -237,6 +239,15 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 			return errors.WithMessage(err, "字典更新失败")
 		}
 
+		// 如果更新了dict code，还需要更新item表对应的dict code
+		if oldDict.Code != param.Code {
+			err = d.dictRepo.TransactionUpdateItemByDictID(ctx, tx, param.ID, param.Code)
+			if err != nil {
+				xlogger.ErrorfCtx(ctx, "字典枚举更新失败: %+v err: %v", param, err)
+				return errors.WithMessage(err, "字典枚举更新失败")
+			}
+		}
+
 		// 创建操作日志
 		err = d.logService.CreateOperationLog(ctx, tx, OperationLogInput{
 			OperatorID:   userContext.UserId,
@@ -276,6 +287,13 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 
 	// 删除字典
 	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 删除字典对应的item
+		err = d.dictRepo.TransactionDeleteItemByDictID(ctx, tx, id)
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "字典(%d)枚举删除失败:  err: %v", id, err)
+			return errors.WithMessage(err, "字典枚举删除失败")
+		}
+
 		// 删除字典
 		err = d.dictRepo.TransactionDeleteById(ctx, tx, id)
 		if err != nil {

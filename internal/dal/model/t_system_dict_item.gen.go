@@ -13,6 +13,7 @@ const TableNameSystemDictItem = "system_dict_item"
 // SystemDictItem 系统字典枚举值表
 type SystemDictItem struct {
 	ID          int32      `gorm:"column:id;type:int(11);primaryKey;autoIncrement:true" json:"id"`
+	DictID      int32      `gorm:"column:dict_id;type:int(11);not null;comment:字典ID" json:"dict_id"`                                              // 字典ID
 	DictCode    string     `gorm:"column:dict_code;type:varchar(64);not null;uniqueIndex:uk_dict_item,priority:1;comment:字典编码" json:"dict_code"`  // 字典编码
 	ItemName    string     `gorm:"column:item_name;type:varchar(128);not null;comment:枚举显示名称" json:"item_name"`                                   // 枚举显示名称
 	ItemCode    string     `gorm:"column:item_code;type:varchar(64);not null;uniqueIndex:uk_dict_item,priority:2;comment:枚举值编码" json:"item_code"` // 枚举值编码

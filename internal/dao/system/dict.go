@@ -154,6 +154,32 @@ func (d *DictDao) TransactionDeleteById(ctx context.Context, tx *query.Query, id
 	return nil
 }
 
+// TransactionDeleteItemByDictID 删除字典枚举 by id
+func (d *DictDao) TransactionDeleteItemByDictID(ctx context.Context, tx *query.Query, dictId int32) error {
+	if dictId <= 0 {
+		return errors.New("字典id不存在")
+	}
+	_, err := tx.WithContext(ctx).SystemDictItem.Where(tx.SystemDictItem.DictID.Eq(dictId)).Delete()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
+}
+
+// TransactionUpdateItemByDictID 更新字典枚举dict code by id
+func (d *DictDao) TransactionUpdateItemByDictID(ctx context.Context, tx *query.Query, dictId int32, dictCode string) error {
+	if dictId <= 0 {
+		return errors.New("字典id不存在")
+	}
+	_, err := tx.WithContext(ctx).SystemDictItem.
+		Where(tx.SystemDictItem.DictID.Eq(dictId)).
+		UpdateSimple(tx.SystemDictItem.DictCode.Value(dictCode))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
+}
+
 // GetItemListByDictCode 查询字典枚举by code
 func (d *DictDao) GetItemListByDictCode(ctx context.Context, dictCode string) ([]*model.SystemDictItem, error) {
 	if len(dictCode) == 0 {

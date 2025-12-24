@@ -27,6 +27,7 @@ func newSystemDictItem(db *gorm.DB, opts ...gen.DOOption) systemDictItem {
 	tableName := _systemDictItem.systemDictItemDo.TableName()
 	_systemDictItem.ALL = field.NewAsterisk(tableName)
 	_systemDictItem.ID = field.NewInt32(tableName, "id")
+	_systemDictItem.DictID = field.NewInt32(tableName, "dict_id")
 	_systemDictItem.DictCode = field.NewString(tableName, "dict_code")
 	_systemDictItem.ItemName = field.NewString(tableName, "item_name")
 	_systemDictItem.ItemCode = field.NewString(tableName, "item_code")
@@ -46,6 +47,7 @@ type systemDictItem struct {
 
 	ALL         field.Asterisk
 	ID          field.Int32
+	DictID      field.Int32  // 字典ID
 	DictCode    field.String // 字典编码
 	ItemName    field.String // 枚举显示名称
 	ItemCode    field.String // 枚举值编码
@@ -71,6 +73,7 @@ func (s systemDictItem) As(alias string) *systemDictItem {
 func (s *systemDictItem) updateTableName(table string) *systemDictItem {
 	s.ALL = field.NewAsterisk(table)
 	s.ID = field.NewInt32(table, "id")
+	s.DictID = field.NewInt32(table, "dict_id")
 	s.DictCode = field.NewString(table, "dict_code")
 	s.ItemName = field.NewString(table, "item_name")
 	s.ItemCode = field.NewString(table, "item_code")
@@ -107,8 +110,9 @@ func (s *systemDictItem) GetFieldByName(fieldName string) (field.OrderExpr, bool
 }
 
 func (s *systemDictItem) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 9)
+	s.fieldMap = make(map[string]field.Expr, 10)
 	s.fieldMap["id"] = s.ID
+	s.fieldMap["dict_id"] = s.DictID
 	s.fieldMap["dict_code"] = s.DictCode
 	s.fieldMap["item_name"] = s.ItemName
 	s.fieldMap["item_code"] = s.ItemCode
