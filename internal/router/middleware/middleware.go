@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -118,6 +119,11 @@ func AccessLogger() gin.HandlerFunc {
 		// 将请求 ID 存储到 Gin 上下文中
 		c.Set(xauth.XIp, c.ClientIP())
 		c.Set(xauth.XUserAgent, c.Request.UserAgent())
+		// 标准 context.Context 注入请求信息，用于后续GetUserContext获取
+		ctx := context.WithValue(c.Request.Context(), xauth.XIp, c.ClientIP())
+		ctx = context.WithValue(ctx, xauth.XUserAgent, c.Request.UserAgent())
+		// 更新请求的 Context
+		c.Request = c.Request.WithContext(ctx)
 
 		// 处理ico请求，不记录日志
 		if c.Request.URL.Path == "/favicon.ico" {

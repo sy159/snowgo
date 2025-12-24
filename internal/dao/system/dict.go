@@ -134,6 +134,7 @@ func (d *DictDao) IsCodeDuplicate(ctx context.Context, code string, dictId int32
 	return true, nil
 }
 
+// TransactionCreateDict 创建字典
 func (d *DictDao) TransactionCreateDict(ctx context.Context, tx *query.Query, dict *model.SystemDict) (*model.SystemDict, error) {
 	err := tx.WithContext(ctx).SystemDict.Create(dict)
 	if err != nil {
@@ -142,6 +143,7 @@ func (d *DictDao) TransactionCreateDict(ctx context.Context, tx *query.Query, di
 	return dict, nil
 }
 
+// TransactionUpdateDict 更新字典
 func (d *DictDao) TransactionUpdateDict(ctx context.Context, tx *query.Query, dict *model.SystemDict) (*model.SystemDict, error) {
 	if dict.ID <= 0 {
 		return nil, errors.New("字典id不存在")
@@ -151,4 +153,16 @@ func (d *DictDao) TransactionUpdateDict(ctx context.Context, tx *query.Query, di
 		return nil, errors.WithStack(err)
 	}
 	return dict, nil
+}
+
+// TransactionDeleteById 删除字典
+func (d *DictDao) TransactionDeleteById(ctx context.Context, tx *query.Query, id int32) error {
+	if id <= 0 {
+		return errors.New("字典id不存在")
+	}
+	_, err := tx.WithContext(ctx).SystemDict.Where(tx.SystemDict.ID.Eq(id)).Delete()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
 }

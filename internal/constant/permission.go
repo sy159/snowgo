@@ -29,4 +29,5 @@ const (
 	PermSystemDictList   = "system:dict:list"
 	PermSystemDictCreate = "system:dict:create"
 	PermSystemDictUpdate = "system:dict:update"
+	PermSystemDictDelete = "system:dict:delete"
 )

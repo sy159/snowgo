@@ -23,6 +23,7 @@ type DictRepo interface {
 	IsCodeDuplicate(ctx context.Context, code string, dictId int32) (bool, error)
 	TransactionCreateDict(ctx context.Context, tx *query.Query, dict *model.SystemDict) (*model.SystemDict, error)
 	TransactionUpdateDict(ctx context.Context, tx *query.Query, dict *model.SystemDict) (*model.SystemDict, error)
+	TransactionDeleteById(ctx context.Context, tx *query.Query, id int32) error
 }
 
 type DictService struct {
@@ -253,4 +254,49 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 	})
 	xlogger.InfofCtx(ctx, "用户(%d)更新字典成功: old=%+v new=%+v", userContext.UserId, oldDict, param)
 	return param.ID, nil
+}
+
+func (d *DictService) DeleteById(ctx context.Context, id int32) error {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	if id <= 0 {
+		return ErrDictCodeNotFound
+	}
+
+	// 删除字典
+	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 删除字典
+		err = d.dictRepo.TransactionDeleteById(ctx, tx, id)
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "字典(%d)删除失败:  err: %v", id, err)
+			return errors.WithMessage(err, "字典删除失败")
+		}
+
+		// 创建操作日志
+		err = d.logService.CreateOperationLog(ctx, tx, OperationLogInput{
+			OperatorID:   userContext.UserId,
+			OperatorName: userContext.Username,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceDict,
+			ResourceID:   id,
+			TraceID:      userContext.TraceId,
+			Action:       constant.ActionDelete,
+			BeforeData:   "",
+			AfterData:    "",
+			Description: fmt.Sprintf("用户(%d-%s)删除了字典(%d)信息",
+				userContext.UserId, userContext.Username, id),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", id, err)
+			return errors.WithMessage(err, "操作日志创建失败")
+		}
+		return nil
+	})
+	xlogger.InfofCtx(ctx, "用户(%d)删除字典(%d)成功", userContext.UserId, id)
+	return nil
 }
