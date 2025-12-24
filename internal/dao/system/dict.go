@@ -25,7 +25,6 @@ func NewDictDao(repo *repo.Repository) *DictDao {
 type DictListCondition struct {
 	Name      string     `json:"name" form:"name"`
 	Code      string     `json:"code" form:"code"`
-	Status    string     `json:"status" form:"status"`
 	StartTime *time.Time `json:"start_time" form:"start_time"`
 	EndTime   *time.Time `json:"end_time" form:"end_time"`
 	Offset    int32      `json:"offset" form:"offset"`
@@ -52,7 +51,6 @@ func (d *DictDao) GetDictList(ctx context.Context, condition *DictListCondition)
 		Scopes(
 			d.NameScope(condition.Name),
 			d.CodeScope(condition.Code),
-			d.StatusScope(condition.Status),
 			d.StartTimeScope(condition.StartTime),
 			d.EndTimeScope(condition.EndTime),
 		).
@@ -80,17 +78,6 @@ func (d *DictDao) CodeScope(code string) func(tx gen.Dao) gen.Dao {
 		}
 		m := d.repo.Query().SystemDict
 		return tx.Where(m.Code.Like("%" + code + "%"))
-	}
-}
-
-func (d *DictDao) StatusScope(status string) func(tx gen.Dao) gen.Dao {
-	return func(tx gen.Dao) gen.Dao {
-		if len(status) == 0 {
-			return tx
-		}
-		m := d.repo.Query().SystemDict
-		tx = tx.Where(m.Status.Eq(status))
-		return tx
 	}
 }
 
@@ -165,4 +152,21 @@ func (d *DictDao) TransactionDeleteById(ctx context.Context, tx *query.Query, id
 		return errors.WithStack(err)
 	}
 	return nil
+}
+
+// GetItemListByDictCode 查询字典枚举by code
+func (d *DictDao) GetItemListByDictCode(ctx context.Context, dictCode string) ([]*model.SystemDictItem, error) {
+	if len(dictCode) == 0 {
+		return nil, errors.New("字典code不存在")
+	}
+	m := d.repo.Query().SystemDictItem
+	itemList, err := m.WithContext(ctx).
+		Where(m.DictCode.Eq(dictCode)).
+		Order(m.SortOrder.Asc(), m.ID.Asc()).
+		Find()
+
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return itemList, nil
 }

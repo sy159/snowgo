@@ -121,7 +121,6 @@ CREATE TABLE `system_dict`
     `id`          INT(11)      NOT NULL AUTO_INCREMENT,
     `code`        VARCHAR(64)  NOT NULL COMMENT '字典编码',
     `name`        VARCHAR(128) NOT NULL COMMENT '字典名称',
-    `status`      VARCHAR(20)  NOT NULL DEFAULT 'Active' COMMENT '状态：Active 启用，Disabled 禁用',
     `description` TEXT         NULL COMMENT '描述',
     `created_at`  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at`  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),

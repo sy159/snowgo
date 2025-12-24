@@ -29,7 +29,6 @@ func newSystemDict(db *gorm.DB, opts ...gen.DOOption) systemDict {
 	_systemDict.ID = field.NewInt32(tableName, "id")
 	_systemDict.Code = field.NewString(tableName, "code")
 	_systemDict.Name = field.NewString(tableName, "name")
-	_systemDict.Status = field.NewString(tableName, "status")
 	_systemDict.Description = field.NewString(tableName, "description")
 	_systemDict.CreatedAt = field.NewTime(tableName, "created_at")
 	_systemDict.UpdatedAt = field.NewTime(tableName, "updated_at")
@@ -46,7 +45,6 @@ type systemDict struct {
 	ID          field.Int32
 	Code        field.String // 字典编码
 	Name        field.String // 字典名称
-	Status      field.String // 状态：Active 启用，Disabled 禁用
 	Description field.String // 描述
 	CreatedAt   field.Time
 	UpdatedAt   field.Time
@@ -69,7 +67,6 @@ func (s *systemDict) updateTableName(table string) *systemDict {
 	s.ID = field.NewInt32(table, "id")
 	s.Code = field.NewString(table, "code")
 	s.Name = field.NewString(table, "name")
-	s.Status = field.NewString(table, "status")
 	s.Description = field.NewString(table, "description")
 	s.CreatedAt = field.NewTime(table, "created_at")
 	s.UpdatedAt = field.NewTime(table, "updated_at")
@@ -99,11 +96,10 @@ func (s *systemDict) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (s *systemDict) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 7)
+	s.fieldMap = make(map[string]field.Expr, 6)
 	s.fieldMap["id"] = s.ID
 	s.fieldMap["code"] = s.Code
 	s.fieldMap["name"] = s.Name
-	s.fieldMap["status"] = s.Status
 	s.fieldMap["description"] = s.Description
 	s.fieldMap["created_at"] = s.CreatedAt
 	s.fieldMap["updated_at"] = s.UpdatedAt

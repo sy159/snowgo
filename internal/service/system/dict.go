@@ -24,6 +24,7 @@ type DictRepo interface {
 	TransactionCreateDict(ctx context.Context, tx *query.Query, dict *model.SystemDict) (*model.SystemDict, error)
 	TransactionUpdateDict(ctx context.Context, tx *query.Query, dict *model.SystemDict) (*model.SystemDict, error)
 	TransactionDeleteById(ctx context.Context, tx *query.Query, id int32) error
+	GetItemListByDictCode(ctx context.Context, dictCode string) ([]*model.SystemDictItem, error)
 }
 
 type DictService struct {
@@ -43,7 +44,6 @@ func NewDictService(db *repo.Repository, dictRepo DictRepo, logService *Operatio
 type DictListCondition struct {
 	Name      string `json:"name" form:"name"`
 	Code      string `json:"code" form:"code"`
-	Status    string `json:"status" form:"status"`
 	StartTime string `json:"start_time" form:"start_time"`
 	EndTime   string `json:"end_time" form:"end_time"`
 	Offset    int32  `json:"offset" form:"offset"`
@@ -54,7 +54,6 @@ type DictInfo struct {
 	ID          int32
 	Code        string
 	Name        string
-	Status      *string
 	Description *string
 	CreatedAt   *time.Time
 	UpdatedAt   *time.Time
@@ -64,13 +63,23 @@ type DictParam struct {
 	ID          int32  `json:"id"`
 	Code        string `json:"code" binding:"required,max=64"`
 	Name        string `json:"name" binding:"required,max=128"`
-	Status      string `json:"status"`
 	Description string `json:"description"`
 }
 
 type DictList struct {
 	List  []*DictInfo
 	Total int64
+}
+
+type ItemInfo struct {
+	ID          int32      `json:"id"`
+	ItemName    string     `json:"item_name"`   // 枚举显示名称
+	ItemCode    string     `json:"item_code"`   // 枚举值编码
+	Status      *string    `json:"status"`      // 状态：Active 启用，Disabled 禁用
+	SortOrder   int32      `json:"sort_order"`  // 排序号
+	Description *string    `json:"description"` // 描述
+	CreatedAt   *time.Time `json:"created_at"`
+	UpdatedAt   *time.Time `json:"updated_at"`
 }
 
 var (
@@ -99,7 +108,6 @@ func (d *DictService) GetDictList(ctx context.Context, condition *DictListCondit
 	dictList, total, err := d.dictRepo.GetDictList(ctx, &daoSystem.DictListCondition{
 		Name:      condition.Name,
 		Code:      condition.Code,
-		Status:    condition.Status,
 		StartTime: startTimePtr,
 		EndTime:   endTimePtr,
 		Offset:    condition.Offset,
@@ -115,7 +123,6 @@ func (d *DictService) GetDictList(ctx context.Context, condition *DictListCondit
 			ID:          dict.ID,
 			Name:        dict.Name,
 			Code:        dict.Code,
-			Status:      dict.Status,
 			Description: dict.Description,
 			CreatedAt:   dict.CreatedAt,
 			UpdatedAt:   dict.UpdatedAt,
@@ -223,7 +230,6 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 			ID:          param.ID,
 			Code:        param.Code,
 			Name:        param.Name,
-			Status:      &param.Status,
 			Description: &param.Description,
 		})
 		if err != nil {
@@ -256,6 +262,7 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 	return param.ID, nil
 }
 
+// DeleteById 删除字典
 func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 	// 获取登录ctx
 	userContext, err := xauth.GetUserContext(ctx)
@@ -299,4 +306,30 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 	})
 	xlogger.InfofCtx(ctx, "用户(%d)删除字典(%d)成功", userContext.UserId, id)
 	return nil
+}
+
+func (d *DictService) GetItemListByCode(ctx context.Context, code string) ([]*ItemInfo, error) {
+	if len(code) == 0 {
+		return nil, ErrDictCodeNotFound
+	}
+
+	itemList, err := d.dictRepo.GetItemListByDictCode(ctx, code)
+	if err != nil {
+		xlogger.ErrorfCtx(ctx, "获取系统字典枚举列表异常: %v", err)
+		return nil, errors.WithMessage(err, "系统字典枚举列表查询失败")
+	}
+	itemInfoList := make([]*ItemInfo, 0, len(itemList))
+	for _, item := range itemList {
+		itemInfoList = append(itemInfoList, &ItemInfo{
+			ID:          item.ID,
+			ItemName:    item.ItemName,
+			ItemCode:    item.ItemCode,
+			Status:      item.Status,
+			SortOrder:   item.SortOrder,
+			Description: item.Description,
+			CreatedAt:   item.CreatedAt,
+			UpdatedAt:   item.UpdatedAt,
+		})
+	}
+	return itemInfoList, nil
 }
