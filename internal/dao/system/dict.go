@@ -6,6 +6,7 @@ import (
 	"gorm.io/gen"
 	"gorm.io/gorm"
 	"snowgo/internal/dal/model"
+	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
 	"time"
 )
@@ -133,21 +134,19 @@ func (d *DictDao) IsCodeDuplicate(ctx context.Context, code string, dictId int32
 	return true, nil
 }
 
-func (d *DictDao) CreateDict(ctx context.Context, dict *model.SystemDict) (*model.SystemDict, error) {
-	m := d.repo.Query().SystemDict
-	err := m.WithContext(ctx).Create(dict)
+func (d *DictDao) TransactionCreateDict(ctx context.Context, tx *query.Query, dict *model.SystemDict) (*model.SystemDict, error) {
+	err := tx.WithContext(ctx).SystemDict.Create(dict)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 	return dict, nil
 }
 
-func (d *DictDao) UpdateDict(ctx context.Context, dict *model.SystemDict) (*model.SystemDict, error) {
+func (d *DictDao) TransactionUpdateDict(ctx context.Context, tx *query.Query, dict *model.SystemDict) (*model.SystemDict, error) {
 	if dict.ID <= 0 {
 		return nil, errors.New("字典id不存在")
 	}
-	m := d.repo.Query().SystemDict
-	err := m.WithContext(ctx).Where(m.ID.Eq(dict.ID)).Save(dict)
+	err := tx.WithContext(ctx).SystemDict.Where(tx.SystemDict.ID.Eq(dict.ID)).Save(dict)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

@@ -200,7 +200,7 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 
 	// 构造Service依赖
 	operationLogService := systemService.NewOperationLogService(repository, operationLogDao)
-	dictService := systemService.NewDictService(repository, dictDao)
+	dictService := systemService.NewDictService(repository, dictDao, operationLogService)
 	menuService := accountService.NewMenuService(repository, redisCache, menuDao, operationLogService)
 	roleService := accountService.NewRoleService(repository, roleDao, redisCache, operationLogService)
 	userService := accountService.NewUserService(repository, userDao, redisCache, roleService, operationLogService)

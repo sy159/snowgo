@@ -27,6 +27,7 @@ const (
 	ResourceUser = "User"
 	ResourceRole = "Role"
 	ResourceMenu = "Menu"
+	ResourceDict = "Dict"
 )
 
 // 用户相关

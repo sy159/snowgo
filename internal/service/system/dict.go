@@ -2,9 +2,12 @@ package system
 
 import (
 	"context"
+	"fmt"
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
+	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
+	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
 	daoSystem "snowgo/internal/dao/system"
 	"snowgo/pkg/xauth"
@@ -18,19 +21,21 @@ type DictRepo interface {
 	GetDictById(ctx context.Context, dictId int32) (*model.SystemDict, error)
 	GetDictList(ctx context.Context, condition *daoSystem.DictListCondition) ([]*model.SystemDict, int64, error)
 	IsCodeDuplicate(ctx context.Context, code string, dictId int32) (bool, error)
-	CreateDict(ctx context.Context, dict *model.SystemDict) (*model.SystemDict, error)
-	UpdateDict(ctx context.Context, dict *model.SystemDict) (*model.SystemDict, error)
+	TransactionCreateDict(ctx context.Context, tx *query.Query, dict *model.SystemDict) (*model.SystemDict, error)
+	TransactionUpdateDict(ctx context.Context, tx *query.Query, dict *model.SystemDict) (*model.SystemDict, error)
 }
 
 type DictService struct {
-	db       *repo.Repository
-	dictRepo DictRepo
+	db         *repo.Repository
+	dictRepo   DictRepo
+	logService *OperationLogService
 }
 
-func NewDictService(db *repo.Repository, dictRepo DictRepo) *DictService {
+func NewDictService(db *repo.Repository, dictRepo DictRepo, logService *OperationLogService) *DictService {
 	return &DictService{
-		db:       db,
-		dictRepo: dictRepo,
+		db:         db,
+		dictRepo:   dictRepo,
+		logService: logService,
 	}
 }
 
@@ -137,14 +142,43 @@ func (d *DictService) CreateDict(ctx context.Context, param *DictParam) (int32, 
 	}
 
 	// 创建字典
-	dict, err := d.dictRepo.CreateDict(ctx, &model.SystemDict{
-		Code:        param.Code,
-		Name:        param.Name,
-		Description: &param.Description,
+	var dict *model.SystemDict
+	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 创建字典
+		dict, err = d.dictRepo.TransactionCreateDict(ctx, tx, &model.SystemDict{
+			Code:        param.Code,
+			Name:        param.Name,
+			Description: &param.Description,
+		})
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "字典创建失败: %+v err: %v", param, err)
+			return errors.WithMessage(err, "字典创建失败")
+		}
+
+		// 创建操作日志
+		err = d.logService.CreateOperationLog(ctx, tx, OperationLogInput{
+			OperatorID:   userContext.UserId,
+			OperatorName: userContext.Username,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceDict,
+			ResourceID:   dict.ID,
+			TraceID:      userContext.TraceId,
+			Action:       constant.ActionCreate,
+			BeforeData:   "",
+			AfterData:    param,
+			Description: fmt.Sprintf("用户(%d-%s)创建了字典(%d-%s)",
+				userContext.UserId, userContext.Username, dict.ID, dict.Code),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", param, err)
+			return errors.WithMessage(err, "操作日志创建失败")
+		}
+		return nil
+
 	})
 	if err != nil {
-		xlogger.ErrorfCtx(ctx, "字典创建失败: %+v err: %v", param, err)
-		return 0, errors.WithMessage(err, "字典创建失败")
+		return 0, err
 	}
 	xlogger.InfofCtx(ctx, "用户(%d)创建字典成功: %+v", userContext.UserId, dict)
 	return dict.ID, nil
@@ -182,17 +216,41 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 	}
 
 	// 更新字典
-	dict, err := d.dictRepo.UpdateDict(ctx, &model.SystemDict{
-		ID:          param.ID,
-		Code:        param.Code,
-		Name:        param.Name,
-		Status:      &param.Status,
-		Description: &param.Description,
+	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 更新字典
+		_, err = d.dictRepo.TransactionUpdateDict(ctx, tx, &model.SystemDict{
+			ID:          param.ID,
+			Code:        param.Code,
+			Name:        param.Name,
+			Status:      &param.Status,
+			Description: &param.Description,
+		})
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "字典更新失败: %+v err: %v", param, err)
+			return errors.WithMessage(err, "字典更新失败")
+		}
+
+		// 创建操作日志
+		err = d.logService.CreateOperationLog(ctx, tx, OperationLogInput{
+			OperatorID:   userContext.UserId,
+			OperatorName: userContext.Username,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceDict,
+			ResourceID:   param.ID,
+			TraceID:      userContext.TraceId,
+			Action:       constant.ActionUpdate,
+			BeforeData:   oldDict,
+			AfterData:    param,
+			Description: fmt.Sprintf("用户(%d-%s)修改了字典(%d-%s)信息",
+				userContext.UserId, userContext.Username, param.ID, param.Code),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", param, err)
+			return errors.WithMessage(err, "操作日志创建失败")
+		}
+		return nil
 	})
-	if err != nil {
-		xlogger.ErrorfCtx(ctx, "字典更新失败: %+v err: %v", param, err)
-		return 0, errors.WithMessage(err, "字典更新失败")
-	}
-	xlogger.InfofCtx(ctx, "用户(%d)更新字典成功: old=%+v new=%+v", userContext.UserId, oldDict, dict)
-	return dict.ID, nil
+	xlogger.InfofCtx(ctx, "用户(%d)更新字典成功: old=%+v new=%+v", userContext.UserId, oldDict, param)
+	return param.ID, nil
 }
