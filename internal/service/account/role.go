@@ -152,7 +152,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 		}
 
 		// 创建操作日志
-		err = s.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
+		err = s.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -160,7 +160,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 			ResourceID:   roleObj.ID,
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionCreate,
-			BeforeData:   "",
+			BeforeData:   nil,
 			AfterData:    roleObj,
 			Description: fmt.Sprintf("用户(%d-%s)创建了角色(%d-%s)",
 				userContext.UserId, userContext.Username, roleObj.ID, role.Code),
@@ -255,7 +255,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 		}
 
 		// 创建操作日志
-		err = s.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
+		err = s.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -328,7 +328,7 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 		}
 
 		// 创建操作日志
-		err = s.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
+		err = s.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -336,8 +336,8 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 			ResourceID:   id,
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionDelete,
-			BeforeData:   "",
-			AfterData:    "",
+			BeforeData:   nil,
+			AfterData:    nil,
 			Description: fmt.Sprintf("用户(%d-%s)删除了角色(%d)",
 				userContext.UserId, userContext.Username, id),
 			IP: userContext.IP,

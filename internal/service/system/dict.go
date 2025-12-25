@@ -185,7 +185,7 @@ func (d *DictService) CreateDict(ctx context.Context, param *DictParam) (int32, 
 		}
 
 		// 创建操作日志
-		err = d.logService.CreateOperationLog(ctx, tx, OperationLogInput{
+		err = d.logService.CreateOperationLog(ctx, tx, &OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -193,7 +193,7 @@ func (d *DictService) CreateDict(ctx context.Context, param *DictParam) (int32, 
 			ResourceID:   dict.ID,
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionCreate,
-			BeforeData:   "",
+			BeforeData:   nil,
 			AfterData:    dict,
 			Description: fmt.Sprintf("用户(%d-%s)创建了字典(%d-%s)",
 				userContext.UserId, userContext.Username, dict.ID, dict.Code),
@@ -268,7 +268,7 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 		}
 
 		// 创建操作日志
-		err = d.logService.CreateOperationLog(ctx, tx, OperationLogInput{
+		err = d.logService.CreateOperationLog(ctx, tx, &OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -321,7 +321,7 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 		}
 
 		// 创建操作日志
-		err = d.logService.CreateOperationLog(ctx, tx, OperationLogInput{
+		err = d.logService.CreateOperationLog(ctx, tx, &OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -329,8 +329,8 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 			ResourceID:   id,
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionDelete,
-			BeforeData:   "",
-			AfterData:    "",
+			BeforeData:   nil,
+			AfterData:    nil,
 			Description: fmt.Sprintf("用户(%d-%s)删除了字典(%d)信息",
 				userContext.UserId, userContext.Username, id),
 			IP: userContext.IP,
@@ -418,7 +418,7 @@ func (d *DictService) CreateItem(ctx context.Context, param *DictItemParam) (int
 		}
 
 		// 创建操作日志
-		err = d.logService.CreateOperationLog(ctx, tx, OperationLogInput{
+		err = d.logService.CreateOperationLog(ctx, tx, &OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -426,7 +426,7 @@ func (d *DictService) CreateItem(ctx context.Context, param *DictItemParam) (int
 			ResourceID:   item.ID,
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionCreate,
-			BeforeData:   "",
+			BeforeData:   nil,
 			AfterData:    item,
 			Description: fmt.Sprintf("用户(%d-%s)在字典(%d)创建了item(%d-%s)",
 				userContext.UserId, userContext.Username, dict.ID, item.ID, item.ItemCode),
@@ -495,7 +495,7 @@ func (d *DictService) UpdateItem(ctx context.Context, param *DictItemParam) (int
 		}
 
 		// 创建操作日志
-		err = d.logService.CreateOperationLog(ctx, tx, OperationLogInput{
+		err = d.logService.CreateOperationLog(ctx, tx, &OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,

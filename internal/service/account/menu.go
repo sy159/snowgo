@@ -122,7 +122,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		}
 
 		// 创建操作日志
-		err = s.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
+		err = s.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -130,7 +130,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 			ResourceID:   menuObj.ID,
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionCreate,
-			BeforeData:   "",
+			BeforeData:   nil,
 			AfterData:    menuObj,
 			Description: fmt.Sprintf("用户(%d-%s)创建了%s类型的菜单(%d-%s)",
 				userContext.UserId, userContext.Username, menuObj.MenuType, menuObj.ID, menuObj.Name),
@@ -203,7 +203,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		}
 
 		// 创建操作日志
-		err = s.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
+		err = s.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -288,7 +288,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 		}
 
 		// 创建操作日志
-		err = s.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
+		err = s.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -296,8 +296,8 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 			ResourceID:   id,
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionDelete,
-			BeforeData:   "",
-			AfterData:    "",
+			BeforeData:   nil,
+			AfterData:    nil,
 			Description: fmt.Sprintf("用户(%d-%s)删除了菜单(%d)",
 				userContext.UserId, userContext.Username, id),
 			IP: userContext.IP,

@@ -78,16 +78,16 @@ func NewOperationLogService(db *repo.Repository, operationLogDao OperationLogRep
 }
 
 // CreateOperationLog 记录一条操作日志
-func (o *OperationLogService) CreateOperationLog(ctx context.Context, tx *query.Query, input OperationLogInput) error {
-	beforeJSON := ""
-	afterJSON := ""
+func (o *OperationLogService) CreateOperationLog(ctx context.Context, tx *query.Query, input *OperationLogInput) error {
+	beforeJSON := "{}"
+	afterJSON := "{}"
 
-	if input.BeforeData != nil {
+	if input.BeforeData != nil && input.BeforeData != "" {
 		if b, err := json.Marshal(input.BeforeData); err == nil {
 			beforeJSON = string(b)
 		}
 	}
-	if input.AfterData != nil {
+	if input.AfterData != nil && input.AfterData != "" {
 		if b, err := json.Marshal(input.AfterData); err == nil {
 			afterJSON = string(b)
 		}

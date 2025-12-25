@@ -198,7 +198,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		}
 
 		// 创建操作日志
-		err = u.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
+		err = u.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -206,7 +206,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 			ResourceID:   userObj.ID,
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionCreate,
-			BeforeData:   "",
+			BeforeData:   nil,
 			AfterData:    userObj,
 			Description: fmt.Sprintf("用户(%d-%s)创建了用户(%d-%s)",
 				userContext.UserId, userContext.Username, userObj.ID, userObj.Username),
@@ -300,7 +300,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		}
 
 		// 创建操作日志
-		err = u.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
+		err = u.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -431,7 +431,7 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 		}
 
 		// 创建操作日志
-		err = u.logService.CreateOperationLog(ctx, tx, system.OperationLogInput{
+		err = u.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -439,8 +439,8 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 			ResourceID:   userId,
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionDelete,
-			BeforeData:   "",
-			AfterData:    "",
+			BeforeData:   nil,
+			AfterData:    nil,
 			Description: fmt.Sprintf("用户(%d-%s)删除了用户(%d)",
 				userContext.UserId, userContext.Username, userId),
 			IP: userContext.IP,
