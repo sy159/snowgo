@@ -105,6 +105,7 @@ var (
 	DictUpdateError        = NewCode(CategorySystem, 10315, "字典更新失败")
 	DictItemListError      = NewCode(CategorySystem, 10316, "字典枚举列表获取失败")
 	DictCodeItemExistError = NewCode(CategorySystem, 10317, "字典枚举编码已存在")
+	DictItemNotFound       = NewCode(CategorySystem, 10318, "字典枚举不存在")
 )
 
 type Code interface {

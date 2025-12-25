@@ -207,7 +207,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionCreate,
 			BeforeData:   "",
-			AfterData:    userParam,
+			AfterData:    userObj,
 			Description: fmt.Sprintf("用户(%d-%s)创建了用户(%d-%s)",
 				userContext.UserId, userContext.Username, userObj.ID, userObj.Username),
 			IP: userContext.IP,

@@ -196,6 +196,12 @@ func CreateItem(c *gin.Context) {
 		return
 	}
 
+	// 额外参数校验
+	if item.DictID <= 0 {
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), "dict_id不能为空")
+		return
+	}
+
 	ctx := c.Request.Context()
 
 	container := di.GetSystemContainer(c)
@@ -213,6 +219,39 @@ func CreateItem(c *gin.Context) {
 		}
 		xlogger.ErrorfCtx(ctx, "create system dict is err: %v", err)
 		xresponse.FailByError(c, e.DictCreateError)
+		return
+	}
+	xresponse.Success(c, &gin.H{"id": itemId})
+}
+
+// UpdateDictItem 更新字典item
+func UpdateDictItem(c *gin.Context) {
+	var item system.DictItemParam
+	if err := c.ShouldBindJSON(&item); err != nil {
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
+		return
+	}
+	// 额外参数校验
+	if item.ID <= 0 {
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), "id不能为空")
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	container := di.GetSystemContainer(c)
+	itemId, err := container.DictService.UpdateItem(ctx, &item)
+	if err != nil {
+		if errors.Is(err, system.ErrDictCodeItemNotFound) {
+			xresponse.FailByError(c, e.DictItemNotFound)
+			return
+		}
+		if errors.Is(err, system.ErrDictItemCodeExist) {
+			xresponse.FailByError(c, e.DictCodeItemExistError)
+			return
+		}
+		xlogger.ErrorfCtx(ctx, "update system dict item is err: %v", err)
+		xresponse.FailByError(c, e.DictUpdateError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": itemId})

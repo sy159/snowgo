@@ -224,3 +224,28 @@ func (d *DictDao) TransactionCreateDictItem(ctx context.Context, tx *query.Query
 	}
 	return item, nil
 }
+
+// GetDictItemById 查询字典item by id
+func (d *DictDao) GetDictItemById(ctx context.Context, itemId int32) (*model.SystemDictItem, error) {
+	if itemId <= 0 {
+		return nil, errors.New("字典item id不存在")
+	}
+	m := d.repo.Query().SystemDictItem
+	item, err := m.WithContext(ctx).Where(m.ID.Eq(itemId)).First()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return item, nil
+}
+
+// TransactionUpdateDictItem 更新字典item
+func (d *DictDao) TransactionUpdateDictItem(ctx context.Context, tx *query.Query, item *model.SystemDictItem) (*model.SystemDictItem, error) {
+	if item.ID <= 0 {
+		return nil, errors.New("字典item id不存在")
+	}
+	err := tx.WithContext(ctx).SystemDictItem.Where(tx.SystemDictItem.ID.Eq(item.ID)).Save(item)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return item, nil
+}
