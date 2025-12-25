@@ -18,3 +18,9 @@ const (
 	CacheLoginFailPrefix       = "login:fail:" // 登录失败key（用户判断用户在xx时间内登录失败的次数）
 	CacheLoginFailWindowSecond = 180           // 登录失败窗口/s
 )
+
+const (
+	// SystemDictPrefix 系统字典
+	SystemDictPrefix        = "system:dict:" // 系统字典code缓存key
+	SystemDictExpirationDay = 30             // 系统字典code缓存天数
+)

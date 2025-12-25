@@ -147,6 +147,10 @@ func DeleteDictById(c *gin.Context) {
 	container := di.GetSystemContainer(c)
 	err := container.DictService.DeleteById(ctx, param.ID)
 	if err != nil {
+		if errors.Is(err, system.ErrDictCodeNotFound) {
+			xresponse.FailByError(c, e.DictNotFound)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "delete dict is err: %v", err)
 		xresponse.FailByError(c, e.DictDeleteError)
 		return
@@ -274,6 +278,10 @@ func DeleteDictItem(c *gin.Context) {
 	container := di.GetSystemContainer(c)
 	err := container.DictService.DeleteItemById(ctx, param.ID)
 	if err != nil {
+		if errors.Is(err, system.ErrDictCodeItemNotFound) {
+			xresponse.FailByError(c, e.DictItemNotFound)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "delete dict item is err: %v", err)
 		xresponse.FailByError(c, e.DictItemDeleteError)
 		return

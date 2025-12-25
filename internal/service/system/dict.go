@@ -2,6 +2,7 @@ package system
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
@@ -266,6 +267,14 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 				xlogger.ErrorfCtx(ctx, "字典枚举更新失败: %+v err: %v", param, err)
 				return errors.WithMessage(err, "字典枚举更新失败")
 			}
+
+			// 清除code对应item缓存
+			oldCacheKey := fmt.Sprintf("%s%s", constant.SystemDictPrefix, oldDict.Code)
+			newCacheKey := fmt.Sprintf("%s%s", constant.SystemDictPrefix, param.Code)
+			if _, err := d.cache.Delete(ctx, oldCacheKey, newCacheKey); err != nil {
+				xlogger.ErrorfCtx(ctx, "清除code对应item列表数据缓存失败: %v", err)
+
+			}
 		}
 
 		// 创建操作日志
@@ -303,6 +312,16 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 
 	if id <= 0 {
 		return ErrDictCodeNotFound
+	}
+
+	// 检查dict是否存在
+	dict, err := d.dictRepo.GetDictById(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrDictCodeNotFound
+		}
+		xlogger.ErrorfCtx(ctx, "获取字典(%d)信息异常: %v", dict.ID, err)
+		return errors.WithMessage(err, "字典信息查询失败")
 	}
 
 	// 删除字典
@@ -343,6 +362,12 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 		return nil
 	})
 	xlogger.InfofCtx(ctx, "用户(%d)删除字典(%d)成功", userContext.UserId, id)
+
+	// 清除code对应item缓存
+	cacheKey := fmt.Sprintf("%s%s", constant.SystemDictPrefix, dict.Code)
+	if _, err := d.cache.Delete(ctx, cacheKey); err != nil {
+		xlogger.ErrorfCtx(ctx, "清除code对应item列表数据缓存失败: %v", err)
+	}
 	return nil
 }
 
@@ -350,6 +375,15 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 func (d *DictService) GetItemListByCode(ctx context.Context, code string) ([]*ItemInfo, error) {
 	if len(code) == 0 {
 		return nil, ErrDictCodeNotFound
+	}
+
+	// 尝试从缓存读取
+	cacheKey := fmt.Sprintf("%s%s", constant.SystemDictPrefix, code)
+	if data, err := d.cache.Get(ctx, cacheKey); err == nil && data != "" {
+		var m []*ItemInfo
+		if err := json.Unmarshal([]byte(data), &m); err == nil {
+			return m, nil
+		}
 	}
 
 	itemList, err := d.dictRepo.GetItemListByDictCode(ctx, code)
@@ -369,6 +403,11 @@ func (d *DictService) GetItemListByCode(ctx context.Context, code string) ([]*It
 			CreatedAt:   item.CreatedAt,
 			UpdatedAt:   item.UpdatedAt,
 		})
+	}
+
+	// 缓存结果
+	if b, err := json.Marshal(itemInfoList); err == nil {
+		_ = d.cache.Set(ctx, cacheKey, string(b), constant.SystemDictExpirationDay*24*time.Hour)
 	}
 	return itemInfoList, nil
 }
@@ -444,6 +483,12 @@ func (d *DictService) CreateItem(ctx context.Context, param *DictItemParam) (int
 		return 0, err
 	}
 	xlogger.InfofCtx(ctx, "用户(%d)创建字典item成功: %+v", userContext.UserId, item)
+
+	// 清除code对应item缓存
+	cacheKey := fmt.Sprintf("%s%s", constant.SystemDictPrefix, dict.Code)
+	if _, err := d.cache.Delete(ctx, cacheKey); err != nil {
+		xlogger.ErrorfCtx(ctx, "清除code对应item列表数据缓存失败: %v", err)
+	}
 	return item.ID, nil
 }
 
@@ -517,6 +562,12 @@ func (d *DictService) UpdateItem(ctx context.Context, param *DictItemParam) (int
 		return nil
 	})
 	xlogger.InfofCtx(ctx, "用户(%d)更新字典item成功: old=%+v new=%+v", userContext.UserId, oldItem, param)
+
+	// 清除code对应item缓存
+	cacheKey := fmt.Sprintf("%s%s", constant.SystemDictPrefix, oldItem.DictCode)
+	if _, err := d.cache.Delete(ctx, cacheKey); err != nil {
+		xlogger.ErrorfCtx(ctx, "清除code对应item列表数据缓存失败: %v", err)
+	}
 	return param.ID, nil
 }
 
@@ -530,6 +581,15 @@ func (d *DictService) DeleteItemById(ctx context.Context, id int32) error {
 
 	if id <= 0 {
 		return ErrDictCodeItemNotFound
+	}
+	// 获取item信息
+	item, err := d.dictRepo.GetDictItemById(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrDictCodeItemNotFound
+		}
+		xlogger.ErrorfCtx(ctx, "获取字典item(%d)信息异常: %v", id, err)
+		return errors.WithMessage(err, "字典item信息查询失败")
 	}
 
 	// 删除字典item
@@ -563,5 +623,11 @@ func (d *DictService) DeleteItemById(ctx context.Context, id int32) error {
 		return nil
 	})
 	xlogger.InfofCtx(ctx, "用户(%d)删除字典item(%d)成功", userContext.UserId, id)
+
+	// 清除code对应item缓存
+	cacheKey := fmt.Sprintf("%s%s", constant.SystemDictPrefix, item.DictCode)
+	if _, err := d.cache.Delete(ctx, cacheKey); err != nil {
+		xlogger.ErrorfCtx(ctx, "清除code对应item列表数据缓存失败: %v", err)
+	}
 	return nil
 }
