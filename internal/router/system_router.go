@@ -24,9 +24,8 @@ func systemRouters(r *gin.RouterGroup) {
 		dictGroup.POST("/", middleware.PermissionAuth(constant.PermSystemDictCreate), CreateDict)
 		dictGroup.PUT("/", middleware.PermissionAuth(constant.PermSystemDictUpdate), UpdateDict)
 		dictGroup.DELETE("/", middleware.PermissionAuth(constant.PermSystemDictDelete), DeleteDictById)
-		// 字典枚举信息，不需要登录
-		r.GET("/system/dict/item", GetItemListByDictCode)
-		// 创建字典item，权限应该跟创建字典相同
+		// 字典枚举信息，// 创建字典item，权限应该跟创建字典相同
+		dictGroup.GET("/item", GetItemListByDictCode)
 		dictGroup.POST("/item", middleware.PermissionAuth(constant.PermSystemDictCreate), CreateItem)
 		dictGroup.PUT("/item", middleware.PermissionAuth(constant.PermSystemDictUpdate), UpdateDictItem)
 		dictGroup.DELETE("/item", middleware.PermissionAuth(constant.PermSystemDictDelete), DeleteDictItem)

@@ -406,8 +406,13 @@ func (d *DictService) GetItemListByCode(ctx context.Context, code string) ([]*It
 	}
 
 	// 缓存结果
+	expirationTime := constant.SystemDictExpirationDay * 24 * time.Hour
+	if len(itemInfoList) == 0 {
+		// 如果结果为空，缓存1h，防止code错误
+		expirationTime = 1 * time.Hour
+	}
 	if b, err := json.Marshal(itemInfoList); err == nil {
-		_ = d.cache.Set(ctx, cacheKey, string(b), constant.SystemDictExpirationDay*24*time.Hour)
+		_ = d.cache.Set(ctx, cacheKey, string(b), expirationTime)
 	}
 	return itemInfoList, nil
 }

@@ -153,8 +153,8 @@ CREATE TABLE `system_dict_item`
 # 插入测试数据
 # 用户数据
 INSERT INTO `user` (`username`, `tel`, `nickname`, `password`, `status`, `is_deleted`)
-VALUES ('admin', '18712345678', '如何好听', '$2a$10$XqU5GKb6wbGXjckKxQtMF.b8nn6MlC17tk2Y.ap//n8swLOQ4fZwO', 'Active',
-        0);
+VALUES ('admin', '18712345678', '如何好听', '$2a$10$XqU5GKb6wbGXjckKxQtMF.b8nn6MlC17tk2Y.ap//n8swLOQ4fZwO', 'Active', 0),
+       ('test', '18700000001', '测试用户', '$2a$10$XqU5GKb6wbGXjckKxQtMF.b8nn6MlC17tk2Y.ap//n8swLOQ4fZwO', 'Active', 0);
 
 # 菜单数据
 INSERT INTO `menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
@@ -214,64 +214,71 @@ VALUES (27, 23, 'Btn', '删除字典', '', '', 'system:dict:delete', 3);
 
 # 角色数据
 INSERT INTO `role` (`id`, `code`, `name`, `description`)
-VALUES (1, 'admin', '管理员', '平台管理员角色');
+VALUES (1, 'admin', '管理员', '平台管理员角色'),
+       (2, 'read_only', '只读', '仅具备查询与查看权限，不允许任何写操作');
 
 # 角色菜单关联数据
 INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 1);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 2);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 3);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 4);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 5);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 6);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 7);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 8);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 9);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 10);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 11);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 12);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 13);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 14);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 15);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 16);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 17);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 18);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 19);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 20);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 21);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 22);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 23);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 24);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 25);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 26);
-INSERT INTO `role_menu` (`role_id`, `menu_id`)
-VALUES (1, 27);
+VALUES (1, 1),
+       (1, 2),
+       (1, 3),
+       (1, 4),
+       (1, 5),
+       (1, 6),
+       (1, 7),
+       (1, 8),
+       (1, 9),
+       (1, 10),
+       (1, 11),
+       (1, 12),
+       (1, 13),
+       (1, 14),
+       (1, 15),
+       (1, 16),
+       (1, 17),
+       (1, 18),
+       (1, 19),
+       (1, 20),
+       (1, 21),
+       (1, 22),
+       (1, 23),
+       (1, 24),
+       (1, 25),
+       (1, 26),
+       (1, 27),
+       # 只读
+       (2, 1),
+       (2, 2),
+       (2, 3),
+       (2, 4),
+       (2, 9),
+       (2, 10),
+       (2, 11),
+       (2, 15),
+       (2, 16),
+       (2, 20),
+       (2, 21),
+       (2, 22),
+       (2, 23),
+       (2, 24);
 
 # 用户角色关联数据
 INSERT INTO `user_role` (`user_id`, `role_id`)
 VALUES (1, 1);
+INSERT INTO `user_role` (`user_id`, `role_id`)
+VALUES (2, 2);
+
+# 系统字典数据
+INSERT INTO `system_dict` (`id`, `code`, `name`, `description`)
+VALUES (1, 'status', '状态', '统一状态枚举'),
+       (2, 'operation_resource', '资源', '操作的资源枚举（用于操作日志等）');
+
+# 系统字典项数据
+INSERT INTO `system_dict_item` (`dict_id`, `dict_code`, `item_name`, `item_code`, `status`, `sort_order`, `description`)
+VALUES (1, 'status', '启用', 'Active', 'Active', 0, '状态-启用'),
+       (1, 'status', '禁用', 'Disabled', 'Active', 0, '状态-禁用'),
+       (2, 'operation_resource', '用户', 'User', 'Active', 0, '操作资源-用户相关'),
+       (2, 'operation_resource', '角色', 'Role', 'Active', 0, '操作资源-角色相关'),
+       (2, 'operation_resource', '菜单', 'Menu', 'Active', 0, '操作资源-菜单相关'),
+       (2, 'operation_resource', '字典', 'Dict', 'Active', 0, '操作资源-系统字典相关'),
+       (2, 'operation_resource', '字典枚举', 'DictItem', 'Active', 0, '操作资源-系统字典枚举相关');
