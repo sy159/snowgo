@@ -452,6 +452,9 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 	xlogger.InfofCtx(ctx, "用户删除成功: %d", userId)
 
 	// 清除用户对应角色缓存

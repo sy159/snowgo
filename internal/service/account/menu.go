@@ -309,6 +309,9 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	xlogger.InfofCtx(ctx, "菜单删除成功: %d", id)
 

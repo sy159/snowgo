@@ -298,6 +298,9 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 		}
 		return nil
 	})
+	if err != nil {
+		return 0, err
+	}
 	xlogger.InfofCtx(ctx, "用户(%d)更新字典成功: old=%+v new=%+v", userContext.UserId, oldDict, param)
 	return param.ID, nil
 }
@@ -361,6 +364,9 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 	xlogger.InfofCtx(ctx, "用户(%d)删除字典(%d)成功", userContext.UserId, id)
 
 	// 清除code对应item缓存
@@ -566,6 +572,9 @@ func (d *DictService) UpdateItem(ctx context.Context, param *DictItemParam) (int
 		}
 		return nil
 	})
+	if err != nil {
+		return 0, err
+	}
 	xlogger.InfofCtx(ctx, "用户(%d)更新字典item成功: old=%+v new=%+v", userContext.UserId, oldItem, param)
 
 	// 清除code对应item缓存
@@ -627,6 +636,9 @@ func (d *DictService) DeleteItemById(ctx context.Context, id int32) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 	xlogger.InfofCtx(ctx, "用户(%d)删除字典item(%d)成功", userContext.UserId, id)
 
 	// 清除code对应item缓存
