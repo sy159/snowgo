@@ -249,3 +249,15 @@ func (d *DictDao) TransactionUpdateDictItem(ctx context.Context, tx *query.Query
 	}
 	return item, nil
 }
+
+// TransactionDeleteItemByID 删除字典枚举 by id
+func (d *DictDao) TransactionDeleteItemByID(ctx context.Context, tx *query.Query, id int32) error {
+	if id <= 0 {
+		return errors.New("字典item id不存在")
+	}
+	_, err := tx.WithContext(ctx).SystemDictItem.Where(tx.SystemDictItem.ID.Eq(id)).Delete()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
+}

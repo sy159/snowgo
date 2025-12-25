@@ -29,5 +29,6 @@ func systemRouters(r *gin.RouterGroup) {
 		// 创建字典item，权限应该跟创建字典相同
 		dictGroup.POST("/item", middleware.PermissionAuth(constant.PermSystemDictCreate), CreateItem)
 		dictGroup.PUT("/item", middleware.PermissionAuth(constant.PermSystemDictUpdate), UpdateDictItem)
+		dictGroup.DELETE("/item", middleware.PermissionAuth(constant.PermSystemDictDelete), DeleteDictItem)
 	}
 }

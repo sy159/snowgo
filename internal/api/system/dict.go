@@ -130,7 +130,7 @@ func UpdateDict(c *gin.Context) {
 	xresponse.Success(c, &gin.H{"id": dictId})
 }
 
-// DeleteDictById 用户删除
+// DeleteDictById 字典删除
 func DeleteDictById(c *gin.Context) {
 	var param struct {
 		ID int32 `json:"id" uri:"id" form:"id" binding:"required"`
@@ -148,7 +148,7 @@ func DeleteDictById(c *gin.Context) {
 	err := container.DictService.DeleteById(ctx, param.ID)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "delete dict is err: %v", err)
-		xresponse.FailByError(c, e.UserDeleteError)
+		xresponse.FailByError(c, e.DictDeleteError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": param.ID})
@@ -218,7 +218,7 @@ func CreateItem(c *gin.Context) {
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "create system dict is err: %v", err)
-		xresponse.FailByError(c, e.DictCreateError)
+		xresponse.FailByError(c, e.DictItemCreateError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": itemId})
@@ -251,8 +251,32 @@ func UpdateDictItem(c *gin.Context) {
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "update system dict item is err: %v", err)
-		xresponse.FailByError(c, e.DictUpdateError)
+		xresponse.FailByError(c, e.DictItemUpdateError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": itemId})
+}
+
+// DeleteDictItem 字典item删除
+func DeleteDictItem(c *gin.Context) {
+	var param struct {
+		ID int32 `json:"id" uri:"id" form:"id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&param); err != nil {
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
+		return
+	}
+	if param.ID < 1 {
+		xresponse.FailByError(c, e.DictItemNotFound)
+		return
+	}
+	ctx := c.Request.Context()
+	container := di.GetSystemContainer(c)
+	err := container.DictService.DeleteItemById(ctx, param.ID)
+	if err != nil {
+		xlogger.ErrorfCtx(ctx, "delete dict item is err: %v", err)
+		xresponse.FailByError(c, e.DictItemDeleteError)
+		return
+	}
+	xresponse.Success(c, &gin.H{"id": param.ID})
 }

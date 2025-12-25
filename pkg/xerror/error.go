@@ -103,9 +103,13 @@ var (
 	DictCodeExistError     = NewCode(CategorySystem, 10313, "字典编码已存在")
 	DictCreateError        = NewCode(CategorySystem, 10314, "字典创建失败")
 	DictUpdateError        = NewCode(CategorySystem, 10315, "字典更新失败")
-	DictItemListError      = NewCode(CategorySystem, 10316, "字典枚举列表获取失败")
-	DictCodeItemExistError = NewCode(CategorySystem, 10317, "字典枚举编码已存在")
-	DictItemNotFound       = NewCode(CategorySystem, 10318, "字典枚举不存在")
+	DictDeleteError        = NewCode(CategorySystem, 10316, "字典删除失败")
+	DictItemListError      = NewCode(CategorySystem, 10317, "字典枚举列表获取失败")
+	DictCodeItemExistError = NewCode(CategorySystem, 10318, "字典枚举编码已存在")
+	DictItemNotFound       = NewCode(CategorySystem, 10319, "字典枚举不存在")
+	DictItemCreateError    = NewCode(CategorySystem, 10320, "字典枚举创建失败")
+	DictItemUpdateError    = NewCode(CategorySystem, 10321, "字典枚举更新失败")
+	DictItemDeleteError    = NewCode(CategorySystem, 10322, "字典枚举删除失败")
 )
 
 type Code interface {

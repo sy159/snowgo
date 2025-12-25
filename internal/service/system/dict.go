@@ -32,6 +32,7 @@ type DictRepo interface {
 	TransactionCreateDictItem(ctx context.Context, tx *query.Query, item *model.SystemDictItem) (*model.SystemDictItem, error)
 	GetDictItemById(ctx context.Context, itemId int32) (*model.SystemDictItem, error)
 	TransactionUpdateDictItem(ctx context.Context, tx *query.Query, item *model.SystemDictItem) (*model.SystemDictItem, error)
+	TransactionDeleteItemByID(ctx context.Context, tx *query.Query, id int32) error
 }
 
 type DictService struct {
@@ -517,4 +518,50 @@ func (d *DictService) UpdateItem(ctx context.Context, param *DictItemParam) (int
 	})
 	xlogger.InfofCtx(ctx, "用户(%d)更新字典item成功: old=%+v new=%+v", userContext.UserId, oldItem, param)
 	return param.ID, nil
+}
+
+// DeleteItemById 删除字典item
+func (d *DictService) DeleteItemById(ctx context.Context, id int32) error {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	if id <= 0 {
+		return ErrDictCodeItemNotFound
+	}
+
+	// 删除字典item
+	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 删除字典item
+		err = d.dictRepo.TransactionDeleteItemByID(ctx, tx, id)
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "字典(%d)枚举删除失败:  err: %v", id, err)
+			return errors.WithMessage(err, "字典枚举删除失败")
+		}
+
+		// 创建操作日志
+		err = d.logService.CreateOperationLog(ctx, tx, &OperationLogInput{
+			OperatorID:   userContext.UserId,
+			OperatorName: userContext.Username,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceDictItem,
+			ResourceID:   id,
+			TraceID:      userContext.TraceId,
+			Action:       constant.ActionDelete,
+			BeforeData:   nil,
+			AfterData:    nil,
+			Description: fmt.Sprintf("用户(%d-%s)删除了字典item(%d)信息",
+				userContext.UserId, userContext.Username, id),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", id, err)
+			return errors.WithMessage(err, "操作日志创建失败")
+		}
+		return nil
+	})
+	xlogger.InfofCtx(ctx, "用户(%d)删除字典item(%d)成功", userContext.UserId, id)
+	return nil
 }
