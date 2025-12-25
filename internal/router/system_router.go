@@ -26,5 +26,7 @@ func systemRouters(r *gin.RouterGroup) {
 		dictGroup.DELETE("/", middleware.PermissionAuth(constant.PermSystemDictDelete), DeleteDictById)
 		// 字典枚举信息，不需要登录
 		r.GET("/system/dict/item", GetItemListByDictCode)
+		// 创建字典item，权限应该跟创建字典相同
+		dictGroup.POST("/item", middleware.PermissionAuth(constant.PermSystemDictCreate), CreateItem)
 	}
 }

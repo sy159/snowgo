@@ -24,10 +24,11 @@ const (
 	ActionUpdate = "Update"
 	ActionDelete = "Delete"
 
-	ResourceUser = "User"
-	ResourceRole = "Role"
-	ResourceMenu = "Menu"
-	ResourceDict = "Dict"
+	ResourceUser     = "User"
+	ResourceRole     = "Role"
+	ResourceMenu     = "Menu"
+	ResourceDict     = "Dict"
+	ResourceDictItem = "DictItem"
 )
 
 // 用户相关

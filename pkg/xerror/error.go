@@ -98,12 +98,13 @@ var (
 	LogListError = NewCode(CategoryUser, 10301, "操作日志列表获取失败")
 
 	// DictNotFound 字典相关 103 11 - 103 30
-	DictNotFound       = NewCode(CategorySystem, 10311, "字典不存在")
-	DictListError      = NewCode(CategorySystem, 10312, "字典列表获取失败")
-	DictCodeExistError = NewCode(CategorySystem, 10313, "字典编码已存在")
-	DictCreateError    = NewCode(CategorySystem, 10314, "字典创建失败")
-	DictUpdateError    = NewCode(CategorySystem, 10315, "字典更新失败")
-	DictItemListError  = NewCode(CategorySystem, 10316, "字典枚举列表获取失败")
+	DictNotFound           = NewCode(CategorySystem, 10311, "字典不存在")
+	DictListError          = NewCode(CategorySystem, 10312, "字典列表获取失败")
+	DictCodeExistError     = NewCode(CategorySystem, 10313, "字典编码已存在")
+	DictCreateError        = NewCode(CategorySystem, 10314, "字典创建失败")
+	DictUpdateError        = NewCode(CategorySystem, 10315, "字典更新失败")
+	DictItemListError      = NewCode(CategorySystem, 10316, "字典枚举列表获取失败")
+	DictCodeItemExistError = NewCode(CategorySystem, 10317, "字典枚举编码已存在")
 )
 
 type Code interface {

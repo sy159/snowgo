@@ -196,3 +196,31 @@ func (d *DictDao) GetItemListByDictCode(ctx context.Context, dictCode string) ([
 	}
 	return itemList, nil
 }
+
+// IsCodeItemDuplicate 判断同一个dict下item的code是否有存在的
+func (d *DictDao) IsCodeItemDuplicate(ctx context.Context, dictId int32, itemCode string, dictItemId int32) (bool, error) {
+	m := d.repo.Query().SystemDictItem
+	dictItemQuery := m.WithContext(ctx).
+		Select(m.ID).
+		Where(m.DictID.Eq(dictId), m.ItemCode.Eq(itemCode))
+	if dictItemId > 0 {
+		dictItemQuery = dictItemQuery.Where(m.ID.Neq(dictItemId))
+	}
+	_, err := dictItemQuery.First()
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return true, errors.WithStack(err)
+	}
+	return true, nil
+}
+
+// TransactionCreateDictItem 创建字典枚举
+func (d *DictDao) TransactionCreateDictItem(ctx context.Context, tx *query.Query, item *model.SystemDictItem) (*model.SystemDictItem, error) {
+	err := tx.WithContext(ctx).SystemDictItem.Create(item)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return item, nil
+}

@@ -28,6 +28,8 @@ type DictRepo interface {
 	TransactionDeleteItemByDictID(ctx context.Context, tx *query.Query, dictId int32) error
 	TransactionUpdateItemByDictID(ctx context.Context, tx *query.Query, dictId int32, dictCode string) error
 	GetItemListByDictCode(ctx context.Context, dictCode string) ([]*model.SystemDictItem, error)
+	IsCodeItemDuplicate(ctx context.Context, dictId int32, itemCode string, dictItemId int32) (bool, error)
+	TransactionCreateDictItem(ctx context.Context, tx *query.Query, item *model.SystemDictItem) (*model.SystemDictItem, error)
 }
 
 type DictService struct {
@@ -87,9 +89,20 @@ type ItemInfo struct {
 	UpdatedAt   *time.Time `json:"updated_at"`
 }
 
+type DictItemParam struct {
+	ID          int32  `json:"id"`
+	DictID      int32  `json:"dict_id" binding:"required"`
+	ItemName    string `json:"item_name" binding:"required,max=128"`
+	ItemCode    string `json:"item_code" binding:"required,max=64"`
+	Status      string `json:"status"`
+	SortOrder   int32  `json:"sort_order"`
+	Description string `json:"description"`
+}
+
 var (
-	ErrDictCodeExist    = errors.New(e.DictCodeExistError.GetErrMsg())
-	ErrDictCodeNotFound = errors.New(e.DictNotFound.GetErrMsg())
+	ErrDictCodeExist     = errors.New(e.DictCodeExistError.GetErrMsg())
+	ErrDictCodeNotFound  = errors.New(e.DictNotFound.GetErrMsg())
+	ErrDictItemCodeExist = errors.New(e.DictCodeItemExistError.GetErrMsg())
 )
 
 // GetDictList 获取字典列表数据
@@ -136,7 +149,7 @@ func (d *DictService) GetDictList(ctx context.Context, condition *DictListCondit
 	return &DictList{List: dictInfoList, Total: total}, nil
 }
 
-// CreateDict 添加字典数据
+// CreateDict 创建字典数据
 func (d *DictService) CreateDict(ctx context.Context, param *DictParam) (int32, error) {
 	// 获取登录ctx
 	userContext, err := xauth.GetUserContext(ctx)
@@ -329,6 +342,7 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 	return nil
 }
 
+// GetItemListByCode 获取item枚举列表
 func (d *DictService) GetItemListByCode(ctx context.Context, code string) ([]*ItemInfo, error) {
 	if len(code) == 0 {
 		return nil, ErrDictCodeNotFound
@@ -353,4 +367,78 @@ func (d *DictService) GetItemListByCode(ctx context.Context, code string) ([]*It
 		})
 	}
 	return itemInfoList, nil
+}
+
+// CreateItem 创建字典数据
+func (d *DictService) CreateItem(ctx context.Context, param *DictItemParam) (int32, error) {
+	// 获取登录ctx
+	userContext, err := xauth.GetUserContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	// 检查dict是否存在
+	dict, err := d.dictRepo.GetDictById(ctx, param.DictID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, ErrDictCodeNotFound
+		}
+		xlogger.ErrorfCtx(ctx, "获取字典(%d)信息异常: %v", param.DictID, err)
+		return 0, errors.WithMessage(err, "字典信息查询失败")
+	}
+
+	// 检查code是否存在
+	isDuplicate, err := d.dictRepo.IsCodeItemDuplicate(ctx, dict.ID, param.ItemCode, 0)
+	if err != nil {
+		xlogger.ErrorfCtx(ctx, "查询item code是否存在异常: %v", err)
+		return 0, errors.WithMessage(err, "查询字典item编码是否存在异常")
+	}
+	if isDuplicate {
+		return 0, ErrDictItemCodeExist
+	}
+
+	// 创建字典item
+	var item *model.SystemDictItem
+	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 创建字典item
+		item, err = d.dictRepo.TransactionCreateDictItem(ctx, tx, &model.SystemDictItem{
+			DictID:      dict.ID,
+			DictCode:    dict.Code,
+			ItemCode:    param.ItemCode,
+			ItemName:    param.ItemName,
+			SortOrder:   param.SortOrder,
+			Description: &param.Description,
+		})
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "字典item创建失败: %+v err: %v", param, err)
+			return errors.WithMessage(err, "字典item创建失败")
+		}
+
+		// 创建操作日志
+		err = d.logService.CreateOperationLog(ctx, tx, OperationLogInput{
+			OperatorID:   userContext.UserId,
+			OperatorName: userContext.Username,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceDictItem,
+			ResourceID:   item.ID,
+			TraceID:      userContext.TraceId,
+			Action:       constant.ActionCreate,
+			BeforeData:   "",
+			AfterData:    item,
+			Description: fmt.Sprintf("用户(%d-%s)在字典(%d)创建了item(%d-%s)",
+				userContext.UserId, userContext.Username, dict.ID, item.ID, item.ItemCode),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", param, err)
+			return errors.WithMessage(err, "操作日志创建失败")
+		}
+		return nil
+
+	})
+	if err != nil {
+		return 0, err
+	}
+	xlogger.InfofCtx(ctx, "用户(%d)创建字典item成功: %+v", userContext.UserId, item)
+	return item.ID, nil
 }

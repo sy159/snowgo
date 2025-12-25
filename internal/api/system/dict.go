@@ -187,3 +187,33 @@ func GetItemListByDictCode(c *gin.Context) {
 	}
 	xresponse.Success(c, itemInfoList)
 }
+
+// CreateItem 创建字典枚举
+func CreateItem(c *gin.Context) {
+	var item system.DictItemParam
+	if err := c.ShouldBindJSON(&item); err != nil {
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	container := di.GetSystemContainer(c)
+	itemId, err := container.DictService.CreateItem(ctx, &item)
+	if err != nil {
+		// dict不存在
+		if errors.Is(err, system.ErrDictCodeNotFound) {
+			xresponse.FailByError(c, e.DictNotFound)
+			return
+		}
+		// dict item code重复
+		if errors.Is(err, system.ErrDictItemCodeExist) {
+			xresponse.FailByError(c, e.DictCodeItemExistError)
+			return
+		}
+		xlogger.ErrorfCtx(ctx, "create system dict is err: %v", err)
+		xresponse.FailByError(c, e.DictCreateError)
+		return
+	}
+	xresponse.Success(c, &gin.H{"id": itemId})
+}
