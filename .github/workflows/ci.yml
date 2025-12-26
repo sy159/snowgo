@@ -15,8 +15,11 @@ env:
   USERNAME: 1597691116@qq.com
 
 jobs:
-  build:
+  build_and_push:
     runs-on: ubuntu-22.04
+    outputs:
+      IMAGE_TAG: ${{ steps.set_tag.outputs.IMAGE_TAG }}
+      ENVIRONMENT: ${{ steps.set_tag.outputs.ENVIRONMENT }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -32,47 +35,50 @@ jobs:
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Build tag and environment
-        id: build_tag
+        id: set_tag
         run: |
           REF="${{ github.ref_name }}"
           REF_TYPE="${{ github.ref_type }}"
           echo "Selected ref: $REF ($REF_TYPE)"
 
           if [[ "$REF_TYPE" == "branch" && "$REF" == "dev" ]]; then
-            echo "IMAGE_TAG=dev-latest" >> $GITHUB_ENV
-            echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+            IMAGE_TAG="dev-latest"
+            ENVIRONMENT="dev"
           elif [[ "$REF_TYPE" == "tag" ]]; then
-            echo "IMAGE_TAG=$REF" >> $GITHUB_ENV
+            IMAGE_TAG="$REF"
             if [[ "$REF" == *-rc.* ]]; then
-              echo "ENVIRONMENT=uat" >> $GITHUB_ENV
+              ENVIRONMENT="uat"
             elif [[ "$REF" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+              ENVIRONMENT="prod"
             else
-              echo "错误：标签格式不正确 $REF"
+              echo "标签格式不正确: $REF"
               exit 1
             fi
           else
-            echo "不支持的构建类型 $REF_TYPE/$RE"
+            echo "不支持的构建类型: $REF_TYPE/$REF"
             exit 1
           fi
 
-      - name: Set Docker tags
-        run: |
-          TAGS="${IMAGE_TAG}"
-          if [[ "${ENVIRONMENT}" == "prod" ]]; then
-            TAGS="${TAGS},latest"
-          fi
-          echo "TAGS=$TAGS" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_ENV
+
+          # 设置 job 输出
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_OUTPUT
 
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/${{ env.PROJECT_NAME }}
-          tags: ${{ env.TAGS }}
+          tags: |
+            type=ref,name=${{ github.ref_name }}
+            type=sha
+            type=raw,value=${{ env.IMAGE_TAG }}
+            type=raw,value=latest
           labels: |
-            image_version=${{ env.IMAGE_TAG }}
             environment=${{ env.ENVIRONMENT }}
+            image_version=${{ env.IMAGE_TAG }}
 
       - name: Build and Push Docker image
         uses: docker/build-push-action@v6
