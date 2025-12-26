@@ -33,8 +33,6 @@ ENV CONFIG_PATH=${APP_HOME}/config \
     LOG_PATH=${APP_HOME}/logs \
     TZ=Asia/Shanghai
 
-WORKDIR ${APP_HOME}
-
 # 安装运行时依赖并设置时区、用户
 RUN apk add --no-cache \
     ca-certificates \
@@ -43,7 +41,12 @@ RUN apk add --no-cache \
     && echo "Asia/Shanghai" > /etc/timezone \
     && addgroup -S appgroup \
     && adduser -S -D -H -G appgroup -h ${APP_HOME} -s /sbin/nologin appuser \
+    && mkdir -p ${APP_HOME} \
+    && chown -R appuser:appgroup ${APP_HOME} \
+    && chmod -R 755 ${APP_HOME} \
     && rm -rf /var/cache/apk/*
+
+WORKDIR ${APP_HOME}
 
 COPY --from=builder --chown=appuser:appgroup /out/snowgo ${APP_HOME}/
 COPY --from=builder --chown=appuser:appgroup /src/config ${APP_HOME}/config/

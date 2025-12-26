@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/pkg/errors"
+	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
@@ -116,14 +117,14 @@ func (o *OperationLogService) GetOperationLogList(ctx context.Context, condition
 	var startTimePtr *time.Time
 	var endTimePtr *time.Time
 	if condition.StartTime != "" {
-		t, err := time.ParseInLocation("2006-01-02 15:04:05", condition.StartTime, time.Local)
+		t, err := time.ParseInLocation(constant.TimeFmtWithS, condition.StartTime, time.Local)
 		if err != nil {
 			return nil, errors.New("start_time格式错误，应为yyyy-MM-dd HH:mm:ss")
 		}
 		startTimePtr = &t
 	}
 	if condition.EndTime != "" {
-		t, err := time.ParseInLocation("2006-01-02 15:04:05", condition.EndTime, time.Local)
+		t, err := time.ParseInLocation(constant.TimeFmtWithS, condition.EndTime, time.Local)
 		if err != nil {
 			return nil, errors.New("end_time格式错误，应为yyyy-MM-dd HH:mm:ss")
 		}
