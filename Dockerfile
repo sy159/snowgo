@@ -26,16 +26,6 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM alpine:latest AS runtime
 #FROM debian:stable-slim AS runtime
 
-# 最小化运行时依赖
-RUN apk add --no-cache \
-    ca-certificates \
-    tzdata \
-    && ln -snf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
-    && echo "Asia/Shanghai" > /etc/timezone
-
-RUN addgroup -S appgroup && \
-    adduser -S -D -H -G appgroup -h /app -s /sbin/nologin appuser
-
 ENV APP_HOME=/app
 ENV PORT=8000
 # 环境变量示例，消费使用
@@ -45,12 +35,18 @@ ENV CONFIG_PATH=${APP_HOME}/config \
 
 WORKDIR ${APP_HOME}
 
+# 安装运行时依赖并设置时区、用户
+RUN apk add --no-cache \
+    ca-certificates \
+    tzdata \
+    && ln -snf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo "Asia/Shanghai" > /etc/timezone \
+    && addgroup -S appgroup \
+    && adduser -S -D -H -G appgroup -h ${APP_HOME} -s /sbin/nologin appuser \
+    && rm -rf /var/cache/apk/*
+
 COPY --from=builder --chown=appuser:appgroup /out/snowgo ${APP_HOME}/
 COPY --from=builder --chown=appuser:appgroup /src/config ${APP_HOME}/config/
-
-# 用户授权
-RUN chmod +x ${APP_HOME}/snowgo && \
-    chown -R appuser:appgroup ${APP_HOME}
 
 EXPOSE ${PORT}
 USER appuser
