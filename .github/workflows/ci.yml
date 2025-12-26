@@ -1,0 +1,104 @@
+name: Docker Build and Push
+
+run-name: Push image ${{ inputs.ref_type }}/${{ inputs.ref }} to Github Packages
+on:
+  workflow_dispatch:
+    inputs:
+      ref_type:
+        description: 'Type of ref: branch or tag'
+        required: true
+        default: 'branch'
+        type: choice
+        options:
+          - branch
+          - tag
+      ref:
+        description: 'Branch or tag to deploy'
+        required: true
+        default: 'dev'
+        type: string
+
+permissions:
+  packages: write
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_REPO: rhht-snow/images
+  PROJECT_NAME: snowgo
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build tag and environment
+        id: build_tag
+        run: |
+          REF="${{ github.event.inputs.ref }}"
+          REF_TYPE="${{ github.event.inputs.ref_type }}"
+          echo "Selected ref: $REF ($REF_TYPE)"
+
+          if [[ "$REF_TYPE" == "branch" && "$REF" == "dev" ]]; then
+            echo "IMAGE_TAG=dev-latest" >> $GITHUB_ENV
+            echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+          elif [[ "$REF_TYPE" == "tag" ]]; then
+            echo "IMAGE_TAG=$REF" >> $GITHUB_ENV
+            if [[ "$REF" == *-pre.* ]]; then
+              echo "ENVIRONMENT=uat" >> $GITHUB_ENV
+            else
+              echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+            fi
+          else
+            echo "::error ::Invalid ref_type/ref combination: $REF_TYPE/$REF"
+            exit 1
+          fi
+
+      - name: Set Docker tags
+        run: |
+          TAGS="${IMAGE_TAG}"
+          if [[ "${ENVIRONMENT}" == "prod" ]]; then
+            TAGS="${TAGS},latest"
+          fi
+          echo "TAGS=$TAGS" >> $GITHUB_ENV
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/${{ env.PROJECT_NAME }}
+          tags: ${{ env.TAGS }}
+          labels: |
+            image_version=${{ env.IMAGE_TAG }}
+            environment=${{ env.ENVIRONMENT }}
+
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            ENVIRONMENT=${{ env.ENVIRONMENT }}
+
+      - name: Print info
+        run: |
+          echo "IMAGE_TAG=${{ env.IMAGE_TAG }}"
+          echo "ENVIRONMENT=${{ env.ENVIRONMENT }}"
+          echo "Pushed image: ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/${{ env.PROJECT_NAME }}:${{ env.IMAGE_TAG }}"
