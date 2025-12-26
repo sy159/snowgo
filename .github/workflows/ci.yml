@@ -106,3 +106,36 @@ jobs:
           
           # 生成部署摘要
           echo "::notice title=镜像构建完成::环境: ${{ env.ENVIRONMENT }} | 标签: ${{ env.IMAGE_TAG }} | 时间: $(date)"
+
+  deploy:
+    runs-on: ubuntu-22.04
+    needs: build_and_push
+    steps:
+      - name: Set up SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SNOWGO_SERVER_IP }}
+          username: ${{ secrets.SNOWGO_SERVER_USER }}
+          key: ${{ secrets.SNOWGO_SERVER_SSH_KEY }}
+          script: |
+            cd /opt/snowgo
+  
+            # 如果 .env 不存在则创建
+            if [ ! -f .env ]; then
+              echo "ENV=${{ needs.build_and_push.outputs.ENVIRONMENT }}" > .env
+              echo "SERVICE_IMAGE_NAME=${{ env.PROJECT_NAME }}" > .env
+              echo "SERVICE_IMAGE_VERSION=${{ needs.build_and_push.outputs.IMAGE_TAG }}" >> .env
+            else
+              # 替换已有的 SERVICE_IMAGE_NAME 和 SERVICE_IMAGE_VERSION
+              sed -i "s/^SERVICE_IMAGE_NAME=.*/SERVICE_IMAGE_NAME=${{ env.PROJECT_NAME }}/" .env
+              sed -i "s/^SERVICE_IMAGE_VERSION=.*/SERVICE_IMAGE_VERSION=${{ needs.build_and_push.outputs.IMAGE_TAG }}/" .env
+            fi
+  
+            # 拉取最新镜像
+            docker compose pull snowgo-service snowgo-service2
+  
+            # 启动服务，自动替换镜像
+            docker compose up -d --remove-orphans
+  
+            # 查看服务状态
+            docker compose ps
