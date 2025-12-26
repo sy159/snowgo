@@ -58,6 +58,14 @@ jobs:
             echo "不支持的构建类型: $REF_TYPE/$REF"
             exit 1
           fi
+          
+          # prod才打latest
+          COMMIT_SHA=${GITHUB_SHA::8}   # 取前 8 位 commit SHA
+          TAGS="${IMAGE_TAG},${COMMIT_SHA}"
+          if [[ "$ENVIRONMENT" == "prod" ]]; then
+            TAGS="${TAGS},latest"
+          fi
+          echo "TAGS=$TAGS" >> $GITHUB_ENV
 
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
           echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_ENV
@@ -71,10 +79,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/${{ env.PROJECT_NAME }}
-          tags: |
-            type=raw,value=${{ env.IMAGE_TAG }}
-            type=raw,value=latest
-            type=sha
+          tags: ${{ env.TAGS }}
           labels: |
             environment=${{ env.ENVIRONMENT }}
             image_version=${{ env.IMAGE_TAG }}
