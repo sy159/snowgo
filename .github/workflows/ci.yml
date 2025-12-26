@@ -27,8 +27,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: 1597691116@qq.com
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Build tag and environment
         id: build_tag
