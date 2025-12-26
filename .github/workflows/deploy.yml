@@ -1,4 +1,4 @@
-name: Docker Build, Push and Deploy
+name: Docker Build , Push and Deploy
 
 run-name: Deploy ${{ needs.build_and_push.outputs.ENVIRONMENT }} image ${{ needs.build_and_push.outputs.IMAGE_TAG }}
 on:
@@ -118,6 +118,7 @@ jobs:
           username: ${{ secrets.SNOWGO_SERVER_USER }}
           key: ${{ secrets.SNOWGO_SERVER_SSH_KEY }}
           script: |
+            # todo 根据环境选择不同的服务器或其他操作
             cd /opt/snowgo
   
             # 组合完整镜像地址
