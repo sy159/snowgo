@@ -10,7 +10,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_REPO: rhht-snow/images
+  IMAGE_REPO: rhht-snow
   PROJECT_NAME: snowgo
 
 jobs:
