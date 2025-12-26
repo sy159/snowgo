@@ -1,22 +1,8 @@
 name: Docker Build and Push
 
-run-name: Push image ${{ inputs.ref_type }}/${{ inputs.ref }} to Github Packages
+run-name: Push image ${{ github.ref_type }}/${{ github.ref_name }} to Github Packages
 on:
   workflow_dispatch:
-    inputs:
-      ref_type:
-        description: 'Type of ref: branch or tag'
-        required: true
-        default: 'branch'
-        type: choice
-        options:
-          - branch
-          - tag
-      ref:
-        description: 'Branch or tag to deploy'
-        required: true
-        default: 'dev'
-        type: string
 
 permissions:
   packages: write
@@ -33,8 +19,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -49,8 +33,8 @@ jobs:
       - name: Build tag and environment
         id: build_tag
         run: |
-          REF="${{ github.event.inputs.ref }}"
-          REF_TYPE="${{ github.event.inputs.ref_type }}"
+          REF="${{ github.ref_name }}"
+          REF_TYPE="${{ github.ref_type }}"
           echo "Selected ref: $REF ($REF_TYPE)"
 
           if [[ "$REF_TYPE" == "branch" && "$REF" == "dev" ]]; then
@@ -58,13 +42,16 @@ jobs:
             echo "ENVIRONMENT=dev" >> $GITHUB_ENV
           elif [[ "$REF_TYPE" == "tag" ]]; then
             echo "IMAGE_TAG=$REF" >> $GITHUB_ENV
-            if [[ "$REF" == *-pre.* ]]; then
+            if [[ "$REF" == *-rc.* ]]; then
               echo "ENVIRONMENT=uat" >> $GITHUB_ENV
-            else
+            elif [[ "$REF" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+            else
+              echo "错误：标签格式不正确 $REF"
+              exit 1
             fi
           else
-            echo "::error ::Invalid ref_type/ref combination: $REF_TYPE/$REF"
+            echo "不支持的构建类型 $REF_TYPE/$RE"
             exit 1
           fi
 
@@ -99,6 +86,11 @@ jobs:
 
       - name: Print info
         run: |
-          echo "IMAGE_TAG=${{ env.IMAGE_TAG }}"
-          echo "ENVIRONMENT=${{ env.ENVIRONMENT }}"
-          echo "Pushed image: ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/${{ env.PROJECT_NAME }}:${{ env.IMAGE_TAG }}"
+          echo "✅ 构建完成!"
+          echo "📦 镜像: ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/${{ env.PROJECT_NAME }}"
+          echo "🏷️ 标签: ${{ env.IMAGE_TAG }}"
+          echo "🌍 环境: ${{ env.ENVIRONMENT }}"
+          echo "🔗 拉取命令: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/${{ env.PROJECT_NAME }}:${{ env.IMAGE_TAG }}"
+          
+          # 生成部署摘要
+          echo "::notice title=镜像构建完成::环境: ${{ env.ENVIRONMENT }} | 标签: ${{ env.IMAGE_TAG }} | 时间: $(date)"
