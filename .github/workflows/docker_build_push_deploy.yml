@@ -1,6 +1,6 @@
 name: Docker Build , Push and Deploy
 
-run-name: Deploy ${{ needs.build_and_push.outputs.ENVIRONMENT }} image ${{ needs.build_and_push.outputs.IMAGE_TAG }}
+run-name: Deploy ${{ github.ref_type }} ${{ github.ref_name }}
 on:
   workflow_dispatch:
 
