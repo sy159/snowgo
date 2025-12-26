@@ -72,10 +72,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/${{ env.PROJECT_NAME }}
           tags: |
-            type=ref,name=${{ github.ref_name }}
-            type=sha
             type=raw,value=${{ env.IMAGE_TAG }}
             type=raw,value=latest
+            type=sha
           labels: |
             environment=${{ env.ENVIRONMENT }}
             image_version=${{ env.IMAGE_TAG }}
