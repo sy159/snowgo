@@ -60,8 +60,9 @@ jobs:
           fi
           
           # prod才打latest
-          COMMIT_SHA=${GITHUB_SHA::8}   # 取前 8 位 commit SHA
-          TAGS="${IMAGE_TAG},${COMMIT_SHA}"
+          # COMMIT_SHA=${GITHUB_SHA::8}   # 取前 8 位 commit SHA
+          # TAGS="${IMAGE_TAG},${COMMIT_SHA}"
+          TAGS="${IMAGE_TAG}"
           if [[ "$ENVIRONMENT" == "prod" ]]; then
             TAGS="${TAGS},latest"
           fi
