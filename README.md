@@ -19,44 +19,6 @@
 
 
 ------------
-### 🧬 项目结构
-```
-snowgo
-├── .github                 # github cicd
-├── assets                  # 静态文件
-├── cmd                     # 项目启动入口
-│   ├── http                # http项目启动入口
-│   ├── mq-declarer         # mq声明执行入口
-│   └── consumer            # 消费启动入口
-├── config                  # 配置文件
-├── depoly                  # 部署示例：elk / monitor / rabbitmq 等
-├── docs                    # 放置swagger，db.sql等文档
-├── internal                # 应用实现（api, dal, di, router, service, worker, server）
-│   ├── api
-│   ├── constant            # 应用常量
-│   ├── dao                 # 数据处理层
-│   ├── di                  # 依赖管理
-│   ├── router              # web路由&&中间件
-│   ├── dal                 # 数据库model query定义
-│   │   ├── cmd             # 使用gen生成model跟query、使用init初始化数据
-│   │   ├── model           # 生成的model
-│   │   ├── query           # model对应的query
-│   │   ├── repo            # db的repo
-│   │   └── query_model.go  # 需要生成的model列表
-│   ├── server              # 服务相关
-│   ├── worker              # 后台工作任务
-│   └── service             # 业务处理层
-├── logs                    # 日志
-├── test                    # 测试用例
-├── pkg                     # 公共工具库（xlogger, xmq, xdatabase, xauth, xlock, ...）
-├── Makefile                # 常用构建/运行脚本
-├── Dockerfile              # API 镜像构建
-├── Dockerfile.consumser    # Consumer 镜像构建
-├── go.mod / go.sum
-└── README.md
-```
-
-------------
 ### 🚀 快速开始
 #### 环境准备
 - Go >= 1.24
@@ -72,22 +34,23 @@ cd snowgo
 #### 1. 修改配置
 修改配置文件
 ```shell
+# 推荐在本地开发使用 ENV=dev，容器环境使用 ENV=container 对应 config.container.yaml
 vim config$.{env}.yaml
+```
+#### 2. 初始化(可选)
+```shell
+make mysql-init # 如果包含初始化脚本
+make mq-init    # RabbitMQ/Pulsar 声明
 ```
 
 ------------
-#### 2. 运行项目
+#### 3. 运行项目
 ![](/assets/images/run.png)
-##### 2.1 💻 本地运行
+##### 3.1 💻 本地运行
 安装运行需要的依赖
 ```shell
 go mod download
 go mod tidy
-```
-初始化（可选：数据库、mq 声明等）
-```shell
-make mysql-init     # 初始化 MySQL（如果你有 init 脚本）
-make mq-init        # 初始化 RabbitMQ 声明
 ```
 直接运行（适合开发调试）
 ```shell
@@ -96,7 +59,7 @@ go run ./cmd/consumer  # mq消费服务(根据需求可选)
 ```
 
 ------------
-##### 2.2 🐳 Docker 运行
+##### 3.2 🐳 Docker 运行
 构建镜像
 ```shell
 # API 镜像
@@ -136,7 +99,7 @@ docker run -d \
 ```
 
 ------------
-##### 2.3 🛠 Docker Compose 部署
+##### 3.3 🛠 Docker Compose 部署
 生成项目服务docker镜像
 ```shell
 # API 镜像
@@ -158,6 +121,90 @@ vim config$.{env}.yaml
 make up
 # 停止并清理
 make down
+```
+
+
+------------
+### 🧬 项目结构
+```
+snowgo
+├── .github                 # github cicd
+├── assets                  # 静态文件
+├── cmd                     # 项目启动入口
+├── config                  # 配置文件
+├── depoly                  # 部署示例：elk / monitor / rabbitmq 等
+├── docs                    # 放置swagger，db.sql等文档
+├── internal                # 应用实现（api, dal, di, router, service, worker, server）
+│   ├── api
+│   ├── constant            # 应用常量
+│   ├── dao                 # 数据处理层
+│   ├── di                  # 依赖管理
+│   ├── router              # web路由&&中间件
+│   ├── dal                 # 数据库model query定义
+│   │   ├── cmd             # 使用gen生成model跟query、使用init初始化数据
+│   │   ├── model           # 生成的model
+│   │   ├── query           # model对应的query
+│   │   ├── repo            # db的repo
+│   │   └── query_model.go  # 需要生成的model列表
+│   ├── server              # 服务相关
+│   ├── worker              # 后台工作任务
+│   └── service             # 业务处理层
+├── logs                    # 日志
+├── test                    # 测试用例
+├── pkg                     # 公共工具库（xlogger, xmq, xdatabase, xauth, xlock, ...）
+├── Makefile                # 常用构建/运行脚本
+├── Dockerfile              # API 镜像构建
+├── Dockerfile.consumser    # Consumer 镜像构建
+├── go.mod / go.sum
+└── README.md
+```
+
+
+------------
+### 🔥 常用
+#### 🧩 服务入口说明
+| 入口 | 说明 |
+|----|----|
+| cmd/http | 对外 HTTP API 服务 |
+| cmd/consumer | MQ 消费服务（无 HTTP 能力） |
+| cmd/mq-declarer | MQ 资源声明工具（只在部署时运行） |
+
+> consumer 与 http 服务应独立部署与扩缩容。
+
+#### 📋 常用命令
+- `make api-build`  - 构建 API 镜像
+- `make api-run`    - 运行 API 容器
+- `make gen init`   - gen: 生成 model 并初始化表
+- `make gen add`    - gen: 为新表生成 model && query
+- `make gen update` - gen: 更新 model && query
+
+#### 📚 API 文档
+[项目接口 文档](https://apifox.com/apidoc/shared-becb3022-d340-491c-bdd7-1f4d4b84620f)
+
+
+------------
+### ✏️ 新业务功能开发流程
+#### ✅ 标准流程
+```
+数据库设计
+  ↓
+Gen 生成 model / query
+  ↓
+Repo / Dao 实现
+  ↓
+Service 编排业务逻辑
+  ↓
+API 层暴露接口
+  ↓
+路由 & 权限配置
+```
+#### 🗃️ 数据库与 Gen 使用规范
+> ❗ 禁止手动添加或更改 model / query 文件
+```shell
+# 新增表
+make gen add
+# 更新表
+make gen update
 ```
 
 
@@ -187,4 +234,3 @@ make down
    - [GORM 文档](https://gorm.io/zh_CN/docs/)
    - [Gen 工具](https://gorm.io/zh_CN/gen/dao.html)
    - [JWT 文档](https://jwt.io/introduction/)
-   - [项目接口 文档](https://apifox.com/apidoc/shared-becb3022-d340-491c-bdd7-1f4d4b84620f)
