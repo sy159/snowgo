@@ -36,6 +36,9 @@ type Cache interface {
 	// HDel deletes one or more fields from a hash.
 	HDel(ctx context.Context, key string, fields ...string) (int64, error)
 
+	// HIncrBy increments the value of a hash field by the given amount.
+	HIncrBy(ctx context.Context, key string, field string, increment int64) (int64, error)
+
 	// HLen returns the number of fields contained in a hash.
 	HLen(ctx context.Context, key string) (int64, error)
 

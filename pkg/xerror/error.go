@@ -89,13 +89,13 @@ var (
 	RoleUpdateError = NewCode(CategoryRole, 10243, "角色更新失败")
 	RoleDeleteError = NewCode(CategoryRole, 10244, "角色删除失败")
 	RoleListError   = NewCode(CategoryRole, 10245, "角色列表获取失败")
-	RoleInfoError   = NewCode(CategoryUser, 10246, "角色获取失败")
+	RoleInfoError   = NewCode(CategoryRole, 10246, "角色获取失败")
 )
 
 // 业务system相关 103开头
 var (
 	// LogListError 日志相关 103 01 - 103 10
-	LogListError = NewCode(CategoryUser, 10301, "操作日志列表获取失败")
+	LogListError = NewCode(CategorySystem, 10301, "操作日志列表获取失败")
 
 	// DictNotFound 字典相关 103 11 - 103 30
 	DictNotFound           = NewCode(CategorySystem, 10311, "字典不存在")
