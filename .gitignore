@@ -26,3 +26,11 @@ Thumbs.db
 *.dylib
 *.test
 *.out
+
+# Docker runtime data
+deploy/elk/*/data/
+deploy/filebeat/*/data/
+deploy/kibana/*/data/
+deploy/monitor/grafana/
+deploy/monitor/prometheus/data/
+deploy/rabbitmq/data/
