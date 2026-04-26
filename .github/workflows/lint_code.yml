@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - 'main'
+      - 'dev'
     paths-ignore:
       - '**/*.md'
       - '**/*.txt'
   pull_request:
     branches:
       - 'main'
+      - 'dev'
   workflow_dispatch:
 
 jobs:
@@ -19,6 +21,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      checks: write
 
     steps:
       - name: Checkout code

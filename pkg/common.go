@@ -16,6 +16,7 @@ import (
 var (
 	weakOnce sync.Once
 	weakRng  *mrand.Rand
+	weakMu   sync.Mutex // mrand.Rand 不是并发安全的
 	sfNode   *snowflake.Node
 	fbMu     sync.Mutex
 	fbLast   int64
@@ -49,6 +50,8 @@ func WeakRandInt63n(max int64) int64 {
 		return 0
 	}
 	weakOnce.Do(initWeakRng)
+	weakMu.Lock()
+	defer weakMu.Unlock()
 	return weakRng.Int63n(max)
 }
 

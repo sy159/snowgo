@@ -48,9 +48,12 @@ func NewJwtManager(conf *Config) (*Manager, error) {
 	if conf.Issuer == "" {
 		return nil, errors.New("jwt issuer required")
 	}
-	//if conf.AccessExpirationTime <= 0 || conf.RefreshExpirationTime <= 0 {
-	//	return nil, errors.New("expiration times must be > 0")
-	//}
+	if conf.AccessExpirationTime <= 0 {
+		return nil, errors.New("access expiration time must be > 0")
+	}
+	if conf.RefreshExpirationTime <= 0 {
+		return nil, errors.New("refresh expiration time must be > 0")
+	}
 	return &Manager{jwtConf: conf}, nil
 }
 

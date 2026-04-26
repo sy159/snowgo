@@ -76,6 +76,11 @@ func RandShuffleStr(n int, flag int) string {
 	}
 
 	charByte := []byte(chars)
+	// 请求长度不能超过字符集大小，避免越界 panic
+	if n > len(charByte) {
+		n = len(charByte)
+	}
+
 	for i := len(charByte) - 1; i > 0; i-- {
 		// 随机交换位置，实现打乱效果
 		num := common.WeakRandInt63n(int64(i + 1))

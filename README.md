@@ -1,92 +1,175 @@
-# snowgo <img src="https://img.shields.io/badge/golang-1.25-blue"/> <img src="https://img.shields.io/badge/gin-1.12.0-green"/> <img src="https://img.shields.io/badge/gorm-1.31.1-red"/>
-基于Gin + GORM的高可用、模块化 Go Web脚手架，集成常用中间件与企业级基础设施（日志、配置、鉴权、消息队列、分布式锁、codegen、Docker/Compose 支持等），旨在快速搭建中小型项目。
+# snowgo
 
-------------
-### 🔌 集成组件:
-| 🧩 模块        | 🔧 组件                 | 📝 描述                                 |
-|--------------|-----------------------|---------------------------------------|
-| 🌐 Web 框架      | Gin                   | 高性能 HTTP 框架                           |
-| ⚙️ 配置管理     | Viper                 | 灵活的配置加载支持                             |
-| 📜 日志系统     | Zap + ELK             | 支持多格式输出，可集成 ELK 进行日志分析(对敏感数据进行脱敏处理)   |
-| 🗃️ 数据访问     | GORM + Gen            | ORM 工具，支持读写分离、多数据库配置                  |
-| 🚀 缓存系统     | go-redis              | 高性能 Redis 客户端封装                       |
-| 🔐 鉴权系统     | JWT                   | 支持 access_token / refresh_token 的鉴权方案 |
-| 🛂 权限系统     | 自定义 RBAC（菜单树）         | 支持按钮/接口权限，基于菜单树结构                     |
-| 🛡️ 限流中间件   | 自研 Rate Limiter       | 支持 IP / 路由维度的限流控制                     |
-| 🔗 中间件       | 跨域、日志、异常处理            | 全面覆盖 Web 常用中间件                        |
-| 🧵 分布式能力   | Redis Lock、RabbitmqMQ | 实现分布式锁、事件驱动架构                         |
-| 📈 可观测性     | Prometheus + Grafana  | 实现服务监控指标管理等                           |
+<img src="https://img.shields.io/badge/golang-1.25-blue"/> <img src="https://img.shields.io/badge/gin-1.12.0-green"/> <img src="https://img.shields.io/badge/gorm-1.31.1-red"/>
 
+基于 **Gin + GORM Gen** 的高可用、模块化 Go Web 脚手架，集成常用中间件与企业级基础设施（日志、配置、鉴权、消息队列、分布式锁、代码生成、Docker / Compose 支持、OpenTelemetry 链路追踪、Prometheus 监控等），旨在快速搭建中小型后台管理系统。
 
-------------
-### 🚀 快速开始
-#### 环境准备
-- Go >= 1.24
-- Docker & Docker Compose（若使用容器）
+---
+
+## 特性概览
+
+| 模块 | 组件 | 描述 |
+|------|------|------|
+| Web 框架 | Gin | 高性能 HTTP 框架 |
+| 配置管理 | Viper | 多环境配置文件（dev / container / uat / prod） |
+| 日志系统 | Zap + RotateLogs + ELK | 结构化日志，支持文件轮转与脱敏输出；可选集成 ELK |
+| 数据访问 | GORM + Gen + dbresolver | ORM 工具，支持读写分离、多数据库配置；Model/Query 代码自动生成 |
+| 缓存系统 | go-redis | Redis 客户端封装，支持缓存与分布式锁 |
+| 鉴权系统 | JWT v5 | access_token / refresh_token 双 Token 鉴权，refresh_token 单用+JTI 追踪 |
+| 权限系统 | 自定义 RBAC | 基于菜单树结构的按钮/接口级权限控制 |
+| 限流中间件 | Token Bucket Limiter | 支持 IP 白名单、路由级限流、Key 级限流 |
+| 链路追踪 | OpenTelemetry + Tempo | 可选开启，trace_id 自动注入日志与 HTTP Header |
+| 性能分析 | pprof | 按需开启，内网 IP 白名单保护 |
+| 健康检查 | /healthz / /readyz | 支持 K8s liveness / readiness probe |
+| 消息队列 | RabbitMQ | 生产者/消费者封装，独立部署扩缩容 |
+| 监控告警 | Prometheus + Grafana | 服务指标采集与可视化 |
+| 代码生成 | GORM Gen | 根据数据库表自动生成 Model + Query API |
+
+---
+
+## 项目结构
+
+```
+snowgo
+├── .github/workflows/        # CI/CD：代码检查、安全扫描、Docker 构建推送
+├── assets/images/            # 文档配图
+├── cmd/
+│   ├── http/                 # HTTP API 服务入口
+│   ├── consumer/             # MQ 消费服务入口（独立部署）
+│   └── mq-declarer/          # RabbitMQ 队列/交换机声明工具（部署时运行）
+├── config/
+│   ├── config.dev.yaml       # 本地开发配置
+│   ├── config.container.yaml # Docker Compose 环境配置
+│   ├── config.uat.yaml       # UAT 环境配置
+│   ├── config.prod.yaml      # 生产环境配置
+│   ├── mysql/                # MySQL 配置与初始化脚本
+│   ├── nginx/                # Nginx 反向代理配置
+│   └── redis/                # Redis 配置文件
+├── deploy/
+│   ├── elk/                  # ELK 日志收集部署示例
+│   ├── monitor/              # Prometheus + Grafana 监控部署
+│   └── rabbitmq/             # RabbitMQ 部署示例
+├── docs/
+│   └── sql/                  # 数据库初始化 SQL
+├── internal/
+│   ├── api/                  # HTTP Handler（account / system 模块）
+│   ├── constant/             # 常量与权限定义
+│   ├── dal/                  # 数据访问层（自动生成的 Model + Query）
+│   │   ├── cmd/gen/          # GORM Gen 代码生成入口
+│   │   ├── cmd/init/         # 数据库初始化入口
+│   │   ├── model/            # 生成的 Model（禁止手动编辑）
+│   │   ├── query/            # 生成的 Query API（禁止手动编辑）
+│   │   └── repo/             # Repository 封装（读写分离）
+│   ├── dao/                  # DAO 层（account / system）
+│   ├── di/                   # 依赖注入容器
+│   ├── router/
+│   │   ├── middleware/       # 中间件（鉴权、限流、日志、链路追踪等）
+│   │   ├── router.go         # 路由初始化
+│   │   ├── account_router.go # 用户/角色/菜单路由
+│   │   ├── system_router.go  # 字典/日志路由
+│   │   └── root_router.go    # 根路由（登录、健康检查等）
+│   ├── server/               # HTTP Server 生命周期管理
+│   ├── service/              # 业务逻辑层（account / system）
+│   └── worker/               # MQ Consumer Handler
+├── pkg/                      # 公共工具库
+│   ├── xauth/                # JWT 认证
+│   ├── xcache/               # Redis 缓存
+│   ├── xcryption/            # 密码哈希（bcrypt）
+│   ├── xdatabase/            # 数据库连接管理
+│   ├── xerror/               # 业务错误码
+│   ├── xlimiter/             # 限流器
+│   ├── xlock/                # Redis 分布式锁
+│   ├── xlogger/              # Zap 日志封装（敏感字段脱敏）
+│   ├── xmq/                  # RabbitMQ 封装
+│   ├── xrequests/            # HTTP 请求客户端
+│   ├── xresponse/            # 统一响应格式
+│   ├── xstr_tool/            # 字符串工具
+│   └── xtrace/               # OpenTelemetry 链路追踪
+├── test/                     # 测试用例
+├── logs/                     # 运行日志（.gitignore）
+├── Makefile                  # 常用构建与运行命令
+├── Dockerfile                # API 服务镜像
+├── Dockerfile.consumer       # Consumer 服务镜像
+├── docker-compose.yml        # 完整服务编排（nginx + mysql + redis + app x2）
+├── .env                      # Docker Compose 环境变量
+├── go.mod / go.sum
+└── README.md
+```
+
+---
+
+## 快速开始
+
+### 环境要求
+
+- Go >= 1.25
+- Docker & Docker Compose（可选）
 - GNU Make
-#### 项目拉取
+
+### 1. 克隆项目
+
 ```shell
 git clone https://github.com/sy159/snowgo.git
 cd snowgo
 ```
-------------
 
-#### 1. 修改配置
-修改配置文件
+### 2. 修改配置
+
 ```shell
-# 推荐在本地开发使用 ENV=dev，容器环境使用 ENV=container 对应 config.container.yaml
-vim config$.{env}.yaml
-```
-#### 2. 初始化(可选)
-```shell
-make mysql-init # 如果包含初始化脚本
-make mq-init    # RabbitMQ/Pulsar 声明
+# 本地开发使用 ENV=dev，对应 config/config.dev.yaml
+# Docker Compose 环境使用 ENV=container，对应 config/config.container.yaml
+vim config/config.${ENV}.yaml
 ```
 
-------------
-#### 3. 运行项目
-![](/assets/images/run.png)
-##### 3.1 💻 本地运行
-安装运行需要的依赖
+### 3. 初始化（可选）
+
+```shell
+make mysql-init   # 初始化数据库表与数据
+make mq-init      # 声明 RabbitMQ 队列与交换机
+```
+
+### 4. 运行项目
+
+#### 本地运行
+
 ```shell
 go mod download
-go mod tidy
-```
-直接运行（适合开发调试）
-```shell
-go run ./cmd/http  # http服务
-go run ./cmd/consumer  # mq消费服务(根据需求可选)
+
+# HTTP API 服务
+go run ./cmd/http
+
+# MQ 消费服务（独立进程，按需启动）
+go run ./cmd/consumer
 ```
 
-------------
-##### 3.2 🐳 Docker 运行
-构建镜像
+#### Docker 运行
+
 ```shell
-# API 镜像
+# 构建 API 镜像
 make api-build
 # 或手动
 docker build -t snowgo:1.0.0 .
 
-# Consumer 镜像
+# 构建 Consumer 镜像
 make consumer-build
+# 或手动
 docker build -f Dockerfile.consumer -t snowgo-consumer:1.0.0 .
-
 ```
-运行单个容器
+
 ```shell
-# API
+# 运行 API 容器
 make api-run
 # 或手动
 docker run -d \
   --restart unless-stopped \
   --name snowgo-service \
-  -p 8000:8000
+  -p 8000:8000 \
   -e ENV=dev \
   -v ./config:/app/config \
   -v ./logs:/app/logs \
   snowgo:1.0.0
 
-# Consumer
+# 运行 Consumer 容器
 make consumer-run
 # 或手动
 docker run -d \
@@ -98,139 +181,142 @@ docker run -d \
   snowgo-consumer:1.0.0
 ```
 
-------------
-##### 3.3 🛠 Docker Compose 部署
-生成项目服务docker镜像
+#### Docker Compose 部署
+
 ```shell
-# API 镜像
+# 1. 构建镜像
 make api-build
-# 或手动
-docker build -t snowgo:1.0.0 .
-```
-配置.env相关信息(服务端口、使用镜像等)
-```shell
-vim .env  # 修改ENV=container，会使用config.container.yaml的配置文件，里面包含了数据库、redis、nginx
-```
-修改配置文件(地址更换完docker compose服务名)
-```shell
-vim config$.{env}.yaml
-```
-启动项目
-```shell
-# 启动 mysql/redis/nginx 等（由 docker-compose.yml 定义）
+
+# 2. 配置环境变量
+vim .env   # 修改 ENV=container，会使用 config.container.yaml
+
+# 3. 启动完整服务栈（nginx + mysql + redis + app x2）
 make up
-# 停止并清理
+
+# 4. 停止
 make down
 ```
 
+---
 
-------------
-### 🧬 项目结构
-```
-snowgo
-├── .github                 # github cicd
-├── assets                  # 静态文件
-├── cmd                     # 项目启动入口
-├── config                  # 配置文件
-├── depoly                  # 部署示例：elk / monitor / rabbitmq 等
-├── docs                    # 放置swagger，db.sql等文档
-├── internal                # 应用实现（api, dal, di, router, service, worker, server）
-│   ├── api
-│   ├── constant            # 应用常量
-│   ├── dao                 # 数据处理层
-│   ├── di                  # 依赖管理
-│   ├── router              # web路由&&中间件
-│   ├── dal                 # 数据库model query定义
-│   │   ├── cmd             # 使用gen生成model跟query、使用init初始化数据
-│   │   ├── model           # 生成的model
-│   │   ├── query           # model对应的query
-│   │   ├── repo            # db的repo
-│   │   └── query_model.go  # 需要生成的model列表
-│   ├── server              # 服务相关
-│   ├── worker              # 后台工作任务
-│   └── service             # 业务处理层
-├── logs                    # 日志
-├── test                    # 测试用例
-├── pkg                     # 公共工具库（xlogger, xmq, xdatabase, xauth, xlock, ...）
-├── Makefile                # 常用构建/运行脚本
-├── Dockerfile              # API 镜像构建
-├── Dockerfile.consumser    # Consumer 镜像构建
-├── go.mod / go.sum
-└── README.md
-```
+## 常用命令
 
-
-------------
-### 🔥 常用
-#### 🧩 服务入口说明
-| 入口 | 说明 |
-|----|----|
-| cmd/http | 对外 HTTP API 服务 |
-| cmd/consumer | MQ 消费服务（无 HTTP 能力） |
-| cmd/mq-declarer | MQ 资源声明工具（只在部署时运行） |
-
-> consumer 与 http 服务应独立部署与扩缩容。
-
-#### 📋 常用命令
-- `make api-build`  - 构建 API 镜像
-- `make api-run`    - 运行 API 容器
-- `make gen init`   - gen: 生成 model 并初始化表
-- `make gen add`    - gen: 为新表生成 model && query
-- `make gen update` - gen: 更新 model && query
-
-#### 📚 API 文档
-[项目接口 文档](https://apifox.com/apidoc/shared-becb3022-d340-491c-bdd7-1f4d4b84620f)
-
-
-------------
-### ✏️ 新业务功能开发流程
-#### ✅ 标准流程
-```
-数据库设计
-  ↓
-Gen 生成 model / query
-  ↓
-Repo / Dao 实现
-  ↓
-Service 编排业务逻辑
-  ↓
-API 层暴露接口
-  ↓
-路由 & 权限配置
-```
-#### 🗃️ 数据库与 Gen 使用规范
-> ❗ 禁止手动添加或更改 model / query 文件
 ```shell
-# 新增表
-make gen add
-# 更新表
-make gen update
+make help               # 查看所有可用命令
+
+# 开发
+make gen init           # 生成所有表的 Model 并初始化数据库
+make gen add            # 为新表生成 Model + Query（交互式）
+make gen update         # 更新已有表的 Model + Query
+make gen-query          # 重新生成 Query API
+make mysql-init         # 初始化数据库数据
+make mq-init            # 声明 RabbitMQ 拓扑
+
+# 测试
+make test               # 运行全部测试并输出覆盖率
+
+# Docker
+make api-build          # 构建 API Docker 镜像
+make api-run            # 运行 API 容器
+make api-stop           # 停止 API 容器
+make consumer-build     # 构建 Consumer Docker 镜像
+make consumer-run       # 运行 Consumer 容器
+make consumer-stop      # 停止 Consumer 容器
+make up                 # Docker Compose 启动全部服务
+make down               # Docker Compose 停止全部服务
+make restart            # Docker Compose 重启
 ```
 
+---
 
-------------
-### 📢 注意事项
-1. 🧱 数据模型管理
-    ```
-    # 如果需要定制化某个db下model就修改db的地址配置(默认使用配置的数据库地址)
-    vim /internal/dal/cmd/gen.go
-   
-    # 初始化所有的表
-    make gen init
-   
-    # 新增某些表(根据表名)
-    make gen add
-   
-    # 更新以前生成的model
-    make gen update
-   
-    # 根据model生成所有的query
-    make gen query
-    ```
+## 服务入口说明
 
-------------
-2. 📚 文档参考
-   - [Gin 官方文档](https://gin-gonic.com/)
-   - [GORM 文档](https://gorm.io/zh_CN/docs/)
-   - [Gen 工具](https://gorm.io/zh_CN/gen/dao.html)
-   - [JWT 文档](https://jwt.io/introduction/)
+| 入口 | 说明 | 部署建议 |
+|------|------|----------|
+| `cmd/http` | HTTP API 服务 | 主服务，多实例部署 |
+| `cmd/consumer` | MQ 消费服务 | 独立部署，按需扩缩容 |
+| `cmd/mq-declarer` | MQ 资源声明工具 | 部署前一次性运行 |
+
+---
+
+## 中间件清单
+
+| 中间件 | 功能 | 启用条件 |
+|--------|------|----------|
+| Recovery | Panic 恢复，防止服务崩溃 | 始终启用 |
+| TracingMiddleware | OpenTelemetry 链路追踪 Span 创建 | `EnableTrace = true` |
+| TraceAttrsMiddleware | 注入 trace_id、span 属性到上下文 | `EnableTrace = true` |
+| TraceMiddleware | trace_id 透传与日志注入 | 始终启用 |
+| InjectContainerMiddleware | DI 容器注入到 Gin Context | 始终启用 |
+| AccessLogger | 访问日志（敏感字段自动脱敏） | 始终启用 |
+| IPWhiteList | IP 白名单限制 | pprof / 自定义路由 |
+| JWTAuth | JWT Access Token 校验 | 需要登录的接口 |
+| PermissionAuth | RBAC 权限校验 | 需要权限的接口 |
+| AccessLimiter | 路由级 Token Bucket 限流 | 配置启用 |
+| KeyLimiter | IP / 用户级限流 | 配置启用 |
+| Cors | 跨域支持 | 配置启用（当前默认关闭） |
+
+---
+
+## 健康检查端点
+
+```
+GET /healthz   # Liveness probe（服务是否存活）
+GET /readyz    # Readiness probe（服务是否就绪）
+```
+
+---
+
+## 新业务功能开发流程
+
+```
+数据库表设计
+    ↓
+make gen add / make gen update   # 生成 Model + Query
+    ↓
+实现 DAO 层（直接 + 事务方法）
+    ↓
+实现 Service 层（业务逻辑、缓存、操作日志）
+    ↓
+实现 API 层（参数绑定、校验、响应转换）
+    ↓
+注册路由 + 权限配置（internal/router/*_router.go）
+    ↓
+更新 DI 容器（internal/di/container.go）
+```
+
+> **警告**：`internal/dal/model/` 与 `internal/dal/query/` 为机器生成代码，**禁止手动编辑**。后续 `make gen` 会覆盖所有手动修改。
+
+---
+
+## 环境变量
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `ENV` | 运行环境（dev / container / uat / prod） | `dev` |
+| `SNOWFLAKE_NODE` | 雪花算法节点 ID（多实例部署时需区分） | `1` |
+
+---
+
+## CI / CD
+
+项目内置 GitHub Actions 工作流：
+
+- **lint_code.yml** — 代码规范检查
+- **security.yml** — 依赖安全扫描
+- **docker_build_push_deploy.yml** — Docker 镜像构建、推送与部署
+
+---
+
+## 接口文档
+
+[Apifox 接口文档](https://apifox.com/apidoc/shared-becb3022-d340-491c-bdd7-1f4d4b84620f)
+
+---
+
+## 参考文档
+
+- [Gin 官方文档](https://gin-gonic.com/)
+- [GORM 文档](https://gorm.io/zh_CN/docs/)
+- [GORM Gen 代码生成](https://gorm.io/zh_CN/gen/dao.html)
+- [JWT 介绍](https://jwt.io/introduction/)
