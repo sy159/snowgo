@@ -27,7 +27,7 @@ func JWTAuth() func(c *gin.Context) {
 		}
 		// 按空格分割
 		parts := strings.SplitN(authHeader, " ", 2)
-		if !(len(parts) == 2 && strings.EqualFold(parts[0], "Bearer")) {
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
 			xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenIncorrectFormat.GetErrMsg())
 			c.Abort()
 			return

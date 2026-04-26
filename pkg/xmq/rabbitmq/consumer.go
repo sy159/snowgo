@@ -3,6 +3,7 @@ package rabbitmq
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"snowgo/pkg/xmq"
 	"strings"
@@ -97,7 +98,7 @@ func (c *Consumer) startWorker(ctx context.Context, u *consumerUnit) error {
 	if c == nil || c.cm == nil {
 		return fmt.Errorf("consumer not initialized")
 	}
-	for i := 0; i < u.meta.WorkerNum; i++ {
+	for i := range u.meta.WorkerNum {
 		idx := i
 		// add BEFORE launching goroutine => 避免 wg race
 		c.wg.Add(1)
@@ -263,7 +264,7 @@ func (c *Consumer) workerLoop(ctx context.Context, unit *consumerUnit, workerID 
 }
 
 // handleDeliveryInProcess: 在进程内重试，失败后记录错误日志
-func (c *Consumer) handleDeliveryInProcess(parentCtx context.Context, ch *amqp.Channel, unit *consumerUnit, d amqp.Delivery) {
+func (c *Consumer) handleDeliveryInProcess(parentCtx context.Context, _ *amqp.Channel, unit *consumerUnit, d amqp.Delivery) {
 	meta := unit.meta
 	// 处理异常情况
 	if meta.Prefetch <= 0 {
@@ -280,19 +281,16 @@ func (c *Consumer) handleDeliveryInProcess(parentCtx context.Context, ch *amqp.C
 	}
 
 	// prepare message
-	headers := map[string]interface{}{}
-	for k, v := range d.Headers {
-		headers[k] = v
-	}
+	headers := map[string]any{}
+	maps.Copy(headers, d.Headers)
 	msg := xmq.Message{
 		Body:      d.Body,
 		Headers:   headers,
 		Timestamp: d.Timestamp,
 		MessageId: d.MessageId,
 	}
-
 	var lastErr error
-	for attempt := 0; attempt < meta.RetryLimit; attempt++ {
+	for attempt := range meta.RetryLimit {
 		// 重试消费
 		handlerCtx, cancel := context.WithTimeout(parentCtx, meta.HandlerTimeout)
 		startTime := time.Now()
@@ -374,7 +372,7 @@ func (c *Consumer) Start(ctx context.Context) error {
 	c.stopCtx, c.stopCancel = context.WithCancel(ctx)
 
 	var err error
-	c.units.Range(func(_, v interface{}) bool {
+	c.units.Range(func(_, v any) bool {
 		u := v.(*consumerUnit)
 		if e := c.startWorker(c.stopCtx, u); e != nil {
 			err = fmt.Errorf("start worker for queue %s failed: %w", u.queue, e)

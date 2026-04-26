@@ -18,7 +18,7 @@ func TestRegistry(t *testing.T) {
 	// 1. 拿到连接（TestMain 已启动 Docker）
 	conn, err := amqp.Dial("amqp://snow_dev:zx.123@127.0.0.1:5672/dev")
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// 2. 构造 Registry 并注册
 	reg := rabbitmq.NewRegistry(conn).
@@ -43,7 +43,7 @@ func TestRegistry(t *testing.T) {
 	// 3. 简单验证：队列存在即可
 	ch, err := conn.Channel()
 	require.NoError(t, err)
-	defer ch.Close()
+	defer func() { _ = ch.Close() }()
 
 	// 队列存在性检查
 	queues := []string{constant.ExampleNormalQueue, constant.ExampleDelayedQueue}

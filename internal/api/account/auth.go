@@ -67,7 +67,7 @@ func Login(c *gin.Context) {
 	// 保存 refresh token 的 jti，设置过期时间（防止重放攻击、每个refresh token只能使用一次）
 	if claims, err := jwtMgr.ParseToken(token.RefreshToken); err == nil {
 		jtiKey := constant.CacheRefreshJtiPrefix + claims.ID
-		_ = container.Cache.Set(ctx, jtiKey, "1", claims.ExpiresAt.Time.Sub(claims.IssuedAt.Time))
+		_ = container.Cache.Set(ctx, jtiKey, "1", claims.ExpiresAt.Sub(claims.IssuedAt.Time))
 	}
 
 	xresponse.Success(c, gin.H{
@@ -122,7 +122,7 @@ func RefreshToken(c *gin.Context) {
 	// 保存 refresh token 的 jti，设置过期时间（防止重放攻击、每个refresh token只能使用一次）
 	if newClaims, err := jwtMgr.ParseToken(token.RefreshToken); err == nil {
 		jtiKey = constant.CacheRefreshJtiPrefix + newClaims.ID
-		_ = container.Cache.Set(ctx, jtiKey, "1", newClaims.ExpiresAt.Time.Sub(newClaims.IssuedAt.Time))
+		_ = container.Cache.Set(ctx, jtiKey, "1", newClaims.ExpiresAt.Sub(newClaims.IssuedAt.Time))
 	}
 
 	xresponse.Success(c, gin.H{

@@ -97,7 +97,8 @@ func Init(basePath string) {
 	accessWriter := stdoutWithPrefix
 	errorWriter := stdoutWithPrefix
 	// console控制台输出，file输出到文件 multi控制台跟日志文件同时输出
-	if writer == FileWriter {
+	switch writer {
+	case FileWriter:
 		debugWriter = getTimeWriter(filepath.Join(basePath, "debug/debug.log"), logMaxAge)
 		infoWriter = getTimeWriter(filepath.Join(basePath, "info/info.log"), logMaxAge)
 		accessWriter = getTimeWriter(filepath.Join(basePath, "access/access.log"), accountMaxAge)
@@ -108,7 +109,7 @@ func Init(basePath string) {
 		//infoWriter := getSizeWriter("./logs/info/info.log")
 		//accessWriter := getSizeWriter("./logs/access/access.log")
 		//errorWriter := getSizeWriter("./logs/error/error.log")
-	} else if writer == MultiWriter {
+	case MultiWriter:
 		debugWriter = getTimeWriter(filepath.Join(basePath, "debug/debug.log"), logMaxAge)
 		infoWriter = getTimeWriter(filepath.Join(basePath, "info/info.log"), logMaxAge)
 		accessWriter = getTimeWriter(filepath.Join(basePath, "access/access.log"), accountMaxAge)
@@ -292,7 +293,7 @@ func Debug(msg string, fields ...zap.Field) {
 }
 
 // Debugf SugaredLogger.Debugf uses fmt.Sprintf to log a templated message.
-func Debugf(template string, args ...interface{}) {
+func Debugf(template string, args ...any) {
 	zap.S().Debugf(template, args...)
 }
 
@@ -302,7 +303,7 @@ func Info(msg string, fields ...zap.Field) {
 }
 
 // Infof SugaredLogger.Infof uses fmt.Sprintf to log a templated message.
-func Infof(template string, args ...interface{}) {
+func Infof(template string, args ...any) {
 	zap.S().Infof(template, args...)
 }
 
@@ -312,7 +313,7 @@ func Error(msg string, fields ...zap.Field) {
 }
 
 // Errorf SugaredLogger.Errorf uses fmt.Sprintf to log a templated message.
-func Errorf(template string, args ...interface{}) {
+func Errorf(template string, args ...any) {
 	zap.S().Errorf(template, args...)
 }
 
@@ -322,7 +323,7 @@ func Panic(msg string, fields ...zap.Field) {
 }
 
 // Panicf SugaredLogger.Panicf uses fmt.Sprintf to log a templated message.
-func Panicf(template string, args ...interface{}) {
+func Panicf(template string, args ...any) {
 	zap.S().Panicf(template, args...)
 }
 
@@ -332,7 +333,7 @@ func Fatal(msg string, fields ...zap.Field) {
 }
 
 // Fatalf SugaredLogger.Fatalf uses fmt.Sprintf to log a templated message.
-func Fatalf(template string, args ...interface{}) {
+func Fatalf(template string, args ...any) {
 	zap.S().Fatalf(template, args...)
 }
 
@@ -366,12 +367,12 @@ func mergeFieldsWithTrace(ctx context.Context, fields []zap.Field) []zap.Field {
 }
 
 // InfofCtx 使用 fmt 风格的 Info（接受 format + args），内部自动把 trace 加入
-func InfofCtx(ctx context.Context, template string, args ...interface{}) {
+func InfofCtx(ctx context.Context, template string, args ...any) {
 	zap.L().With(getTraceField(ctx)).Sugar().Infof(template, args...)
 }
 
 // ErrorfCtx 使用 fmt 风格的 Error（接受 format + args）
-func ErrorfCtx(ctx context.Context, template string, args ...interface{}) {
+func ErrorfCtx(ctx context.Context, template string, args ...any) {
 	zap.L().With(getTraceField(ctx)).Sugar().Errorf(template, args...)
 }
 

@@ -41,12 +41,12 @@ func (r *Registry) Add(declare MQDeclare) *Registry {
 }
 
 // RegisterAll 注册所有 Exchange + Queue + Binding
-func (r *Registry) RegisterAll(ctx context.Context) error {
+func (r *Registry) RegisterAll(_ context.Context) error {
 	ch, err := r.Conn.Channel()
 	if err != nil {
 		return fmt.Errorf("open channel: %w", err)
 	}
-	defer ch.Close()
+	defer func() { _ = ch.Close() }()
 
 	for _, ex := range r.Declares {
 		// 延时交换机需要特殊 arg

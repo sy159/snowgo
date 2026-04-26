@@ -2,7 +2,7 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-	. "snowgo/internal/api/system"
+	"snowgo/internal/api/system"
 	"snowgo/internal/constant"
 	"snowgo/internal/router/middleware"
 )
@@ -14,20 +14,20 @@ func systemRouters(r *gin.RouterGroup) {
 	logGroup := systemGroup.Group("/log")
 	{
 		// 操作日志
-		logGroup.GET("/operation", middleware.PermissionAuth(constant.PermSystemOperationLogList), GetOperationLogList)
+		logGroup.GET("/operation", middleware.PermissionAuth(constant.PermSystemOperationLogList), system.GetOperationLogList)
 	}
 
 	dictGroup := systemGroup.Group("/dict")
 	{
 		// 字典管理
-		dictGroup.GET("/", middleware.PermissionAuth(constant.PermSystemDictList), GetDictList)
-		dictGroup.POST("/", middleware.PermissionAuth(constant.PermSystemDictCreate), CreateDict)
-		dictGroup.PUT("/", middleware.PermissionAuth(constant.PermSystemDictUpdate), UpdateDict)
-		dictGroup.DELETE("/", middleware.PermissionAuth(constant.PermSystemDictDelete), DeleteDictById)
+		dictGroup.GET("/", middleware.PermissionAuth(constant.PermSystemDictList), system.GetDictList)
+		dictGroup.POST("/", middleware.PermissionAuth(constant.PermSystemDictCreate), system.CreateDict)
+		dictGroup.PUT("/", middleware.PermissionAuth(constant.PermSystemDictUpdate), system.UpdateDict)
+		dictGroup.DELETE("/", middleware.PermissionAuth(constant.PermSystemDictDelete), system.DeleteDictById)
 		// 字典枚举信息，// 创建字典item，权限应该跟创建字典相同
-		dictGroup.GET("/item", GetItemListByDictCode)
-		dictGroup.POST("/item", middleware.PermissionAuth(constant.PermSystemDictCreate), CreateItem)
-		dictGroup.PUT("/item", middleware.PermissionAuth(constant.PermSystemDictUpdate), UpdateDictItem)
-		dictGroup.DELETE("/item", middleware.PermissionAuth(constant.PermSystemDictDelete), DeleteDictItem)
+		dictGroup.GET("/item", system.GetItemListByDictCode)
+		dictGroup.POST("/item", middleware.PermissionAuth(constant.PermSystemDictCreate), system.CreateItem)
+		dictGroup.PUT("/item", middleware.PermissionAuth(constant.PermSystemDictUpdate), system.UpdateDictItem)
+		dictGroup.DELETE("/item", middleware.PermissionAuth(constant.PermSystemDictDelete), system.DeleteDictItem)
 	}
 }
