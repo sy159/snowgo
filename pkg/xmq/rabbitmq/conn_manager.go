@@ -822,10 +822,7 @@ drained:
 	timeout := time.After(15 * time.Second)
 	tick := time.NewTicker(50 * time.Millisecond)
 	defer tick.Stop()
-	for {
-		if atomic.LoadInt64(&m.inflight) == 0 {
-			break
-		}
+	for atomic.LoadInt64(&m.inflight) != 0 {
 		select {
 		case <-timeout:
 			// force return, some inflight didn't finish

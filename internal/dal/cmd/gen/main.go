@@ -34,13 +34,14 @@ func main() {
 		fmt.Println("db conn is error:", err)
 		return
 	}
-	if os.Args[1] == "add" {
+	switch os.Args[1] {
+	case "add":
 		genModel(db)
-	} else if os.Args[1] == "update" {
+	case "update":
 		genModelByOldTables(db)
-	} else if os.Args[1] == "init" {
+	case "init":
 		genAllModel(db)
-	} else if os.Args[1] == "query" {
+	case "query":
 		genQuery()
 	}
 }

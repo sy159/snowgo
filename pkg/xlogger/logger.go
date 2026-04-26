@@ -269,7 +269,7 @@ func getTimeWriter(filename string, maxAgeDay uint32) zapcore.WriteSyncer {
 		maxAgeDay = 365 * 30
 	}
 	hook, err := rotatelogs.New(
-		strings.Replace(filename, ".log", "", -1)+"-%Y-%m-%d.log",    // 分割的新文件名(没有使用go的format格式, %Y%m%d%H%M%S）
+		strings.ReplaceAll(filename, ".log", "")+"-%Y-%m-%d.log",     // 分割的新文件名(没有使用go的format格式, %Y%m%d%H%M%S）
 		rotatelogs.WithLinkName(filename),                            // 生成软链，指向最新日志文件
 		rotatelogs.WithMaxAge(time.Duration(maxAgeDay)*24*time.Hour), // 文件最多保留时间
 		rotatelogs.WithRotationTime(24*time.Hour),                    // 文件分割间隔
