@@ -4,9 +4,9 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/bwmarrin/snowflake"
-	"k8s.io/utils/env"
 	"math/big"
 	mrand "math/rand"
+	"os"
 	"reflect"
 	"strconv"
 	"sync"
@@ -24,7 +24,12 @@ var (
 
 func init() {
 	// 单机固定 NodeID=1（如需多节点，可从 env 配置）
-	nodeID, _ := env.GetInt("SNOWFLAKE_NODE", 1)
+	nodeID := 1
+	if v := os.Getenv("SNOWFLAKE_NODE"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			nodeID = n
+		}
+	}
 	n, err := snowflake.NewNode(int64(nodeID))
 	if err != nil {
 		panic("Failed to initialize snowflake node: " + err.Error())

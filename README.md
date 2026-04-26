@@ -1,4 +1,4 @@
-# snowgo <img src="https://img.shields.io/badge/golang-1.24-blue"/> <img src="https://img.shields.io/badge/gin-1.11.0-green"/> <img src="https://img.shields.io/badge/gorm-1.31.1-red"/>
+# snowgo <img src="https://img.shields.io/badge/golang-1.25-blue"/> <img src="https://img.shields.io/badge/gin-1.12.0-green"/> <img src="https://img.shields.io/badge/gorm-1.31.1-red"/>
 基于Gin + GORM的高可用、模块化 Go Web脚手架，集成常用中间件与企业级基础设施（日志、配置、鉴权、消息队列、分布式锁、codegen、Docker/Compose 支持等），旨在快速搭建中小型项目。
 
 ------------

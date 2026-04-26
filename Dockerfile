@@ -1,4 +1,4 @@
-FROM golang:1.24.11-alpine AS builder
+FROM golang:1.25.0-alpine AS builder
 
 # private repository
 # RUN go env -w GOPRIVATE=github.com/sy159
