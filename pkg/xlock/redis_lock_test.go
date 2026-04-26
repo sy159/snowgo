@@ -19,7 +19,7 @@ func TestRedisLock(t *testing.T) {
 		DB:       0,
 		PoolSize: 5,
 	})
-	defer rdb.Close()
+	defer func() { _ = rdb.Close() }()
 	// 初始化配置文件
 	config.Init("../../config")
 	xlogger.Init("./logs")

@@ -24,7 +24,7 @@ func TestConsumer_ProcessMessage_WhenQueueExists(t *testing.T) {
 	defer cancel()
 
 	conn := mustDialOrSkip(t)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// declare topology
 	reg := rabbitmq.NewRegistry(conn).

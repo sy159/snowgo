@@ -46,7 +46,7 @@ func DeclareTopology(ctx context.Context, conn *amqp.Connection) error {
 	// 简单重试：3 次，间隔逐步增长
 	var lastErr error
 	backoffList := []time.Duration{200 * time.Millisecond, 500 * time.Millisecond, 1000 * time.Millisecond}
-	for i := 0; i < len(backoffList); i++ {
+	for i := range backoffList {
 		if err := reg.RegisterAll(ctx); err != nil {
 			lastErr = err
 			select {
@@ -83,7 +83,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("dial rabbitmq failed: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if err := DeclareTopology(ctx, conn); err != nil {
 		log.Fatalf("declare topology failed: %v", err)

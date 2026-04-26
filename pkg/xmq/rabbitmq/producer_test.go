@@ -35,7 +35,7 @@ func TestProducer_Publish(t *testing.T) {
 	defer cancel()
 
 	conn := mustDialOrSkip(t)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	reg := rabbitmq.NewRegistry(conn).
 		Add(rabbitmq.MQDeclare{
@@ -65,14 +65,14 @@ func TestProducer_Publish(t *testing.T) {
 	)
 	producer, err := rabbitmq.NewProducer(ctx, config)
 	require.NoError(t, err)
-	defer producer.Close(ctx)
+	defer func() { _ = producer.Close(ctx) }()
 
 	// 普通消息
-	msg := &xmq.Message{Body: []byte("hello"), Headers: map[string]interface{}{"k": "v"}}
+	msg := &xmq.Message{Body: []byte("hello"), Headers: map[string]any{"k": "v"}}
 	assert.NoError(t, producer.Publish(ctx, constant.NormalExchange, constant.ExampleNormalRoutingKey, msg))
 
 	// 延迟消息
-	dmsg := &xmq.Message{Body: []byte("hello-delayed"), Headers: map[string]interface{}{"k": "d"}}
+	dmsg := &xmq.Message{Body: []byte("hello-delayed"), Headers: map[string]any{"k": "d"}}
 	assert.NoError(t, producer.PublishDelayed(ctx, constant.DelayedExchange, constant.ExampleDelayedRoutingKey, dmsg, 1000))
 }
 
@@ -82,7 +82,7 @@ func BenchmarkProducerPublish(b *testing.B) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	conn := mustDialOrSkip(&testing.T{})
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	reg := rabbitmq.NewRegistry(conn).
 		Add(rabbitmq.MQDeclare{
@@ -102,7 +102,7 @@ func BenchmarkProducerPublish(b *testing.B) {
 	if err != nil {
 		b.Fatalf("NewProducer failed: %v", err)
 	}
-	defer p.Close(ctx)
+	defer func() { _ = p.Close(ctx) }()
 
 	var success uint64
 	var fail uint64
@@ -110,7 +110,7 @@ func BenchmarkProducerPublish(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			benchMsg := &xmq.Message{Body: []byte(fmt.Sprintf("bench-message-%d", success)), Headers: map[string]interface{}{"k": "b"}}
+			benchMsg := &xmq.Message{Body: fmt.Appendf(nil, "bench-message-%d", success), Headers: map[string]any{"k": "b"}}
 			if err := p.Publish(ctx, exchange, constant.ExampleNormalRoutingKey, benchMsg); err != nil {
 				atomic.AddUint64(&fail, 1)
 			} else {

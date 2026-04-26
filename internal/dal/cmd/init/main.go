@@ -23,7 +23,7 @@ func main() {
 	if err != nil {
 		fmt.Println("连接数据库失败: ", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// 读取 SQL 文件内容
 	content, err := os.ReadFile("docs/sql/init.sql")
