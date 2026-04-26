@@ -12,12 +12,18 @@ on:
     branches:
       - 'main'
       - 'dev'
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
-    timeout-minutes: 10
+    timeout-minutes: 8
     permissions:
       contents: read
       pull-requests: read
@@ -41,4 +47,4 @@ jobs:
         with:
           version: v2.1.0
           only-new-issues: ${{ github.event_name == 'pull_request' }}
-          args: --out-format=colored-line-number --timeout=5m
+          args: --timeout=5m
