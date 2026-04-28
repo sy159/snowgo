@@ -66,7 +66,7 @@ func BuildJwtManager(config config.JwtConfig) (*jwt.Manager, error) {
 		len(config.Issuer) == 0 ||
 		config.AccessExpirationTime == 0 ||
 		config.RefreshExpirationTime == 0 {
-		return nil, errors.New("Please initialize jwt config first, jwt config is empty ")
+		return nil, errors.New("please initialize jwt config first, jwt config is empty")
 	}
 	jwtManager, err := jwt.NewJwtManager(&jwt.Config{
 		JwtSecret:             config.JwtSecret,
@@ -80,7 +80,7 @@ func BuildJwtManager(config config.JwtConfig) (*jwt.Manager, error) {
 // BuildRepository 构建db操作
 func BuildRepository(db *gorm.DB, dbMap map[string]*gorm.DB) (*repo.Repository, error) {
 	if db == nil {
-		return nil, errors.New("Please initialize mysql first ")
+		return nil, errors.New("please initialize mysql first")
 	}
 	return repo.NewRepository(db, dbMap), nil
 }
@@ -88,7 +88,7 @@ func BuildRepository(db *gorm.DB, dbMap map[string]*gorm.DB) (*repo.Repository, 
 // BuildRedisCache 构建缓存操作
 func BuildRedisCache(rdb *redis.Client) (xcache.Cache, error) {
 	if rdb == nil {
-		return nil, errors.New("Please initialize redis first ")
+		return nil, errors.New("please initialize redis first")
 	}
 	return xcache.NewRedisCache(rdb), nil
 }
@@ -96,7 +96,7 @@ func BuildRedisCache(rdb *redis.Client) (xcache.Cache, error) {
 // BuildLock 构建锁
 func BuildLock(rdb *redis.Client, logger xlock.Logger) (xlock.Lock, error) {
 	if rdb == nil {
-		return nil, errors.New("Please initialize redis first ")
+		return nil, errors.New("please initialize redis first")
 	}
 	return xlock.NewRedisLock(rdb, logger), nil
 }
@@ -104,7 +104,7 @@ func BuildLock(rdb *redis.Client, logger xlock.Logger) (xlock.Lock, error) {
 // BuildProducer 构建mq生产者
 func BuildProducer(cfg *rabbitmq.ProducerConnConfig) (xmq.Producer, error) {
 	if cfg == nil {
-		return nil, errors.New("Please initialize producer first ")
+		return nil, errors.New("please initialize producer first")
 	}
 	return rabbitmq.NewProducer(context.Background(), cfg)
 }

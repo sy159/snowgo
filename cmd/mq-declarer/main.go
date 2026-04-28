@@ -33,11 +33,12 @@ func DeclareTopology(ctx context.Context, conn *amqp.Connection) error {
 		})
 	// 构建 log 信息
 	var logBuilder strings.Builder
+	logBuilder.Grow(1024)
 	logBuilder.WriteString("==== MQ Topology Registration ====\n")
 	for idx, mq := range reg.Declares {
-		logBuilder.WriteString(fmt.Sprintf("[Exchange %d] Name: %s | Type: %s\n", idx+1, mq.Name, mq.Type))
+		_, _ = fmt.Fprintf(&logBuilder, "[Exchange %d] Name: %s | Type: %s\n", idx+1, mq.Name, mq.Type)
 		for qIdx, q := range mq.Queues {
-			logBuilder.WriteString(fmt.Sprintf("    [Queue %d] Name: %s | RoutingKeys: %v\n", qIdx+1, q.Name, q.RoutingKeys))
+			_, _ = fmt.Fprintf(&logBuilder, "    [Queue %d] Name: %s | RoutingKeys: %v\n", qIdx+1, q.Name, q.RoutingKeys)
 		}
 		logBuilder.WriteString("\n")
 	}

@@ -121,11 +121,11 @@ func (m *Manager) GenerateRefreshToken(userId int32, username string) (string, s
 func (m *Manager) GenerateTokens(userId int32, username string) (token *Token, err error) {
 	refreshToken, refreshJti, refreshExp, err := m.GenerateRefreshToken(userId, username)
 	if err != nil {
-		return nil, fmt.Errorf("Generate Refresh Token error: %w ", err)
+		return nil, fmt.Errorf("generate refresh token error: %w", err)
 	}
 	accessToken, accessExp, err := m.GenerateAccessToken(userId, username, refreshJti)
 	if err != nil {
-		return nil, fmt.Errorf("Generate Access Token error: %w ", err)
+		return nil, fmt.Errorf("generate access token error: %w", err)
 	}
 	return &Token{
 		AccessToken:   accessToken,
@@ -159,7 +159,7 @@ func (m *Manager) ParseToken(tokenStr string) (*Claims, error) {
 func (m *Manager) RefreshTokens(refreshToken string) (token *Token, err error) {
 	claims, err := m.ParseToken(refreshToken)
 	if err != nil {
-		return nil, fmt.Errorf("Parse Refresh Token error: %w ", err)
+		return nil, fmt.Errorf("parse refresh token error: %w", err)
 	}
 
 	// 检查令牌类型是否为 refresh
@@ -170,12 +170,12 @@ func (m *Manager) RefreshTokens(refreshToken string) (token *Token, err error) {
 	// 生成新的刷新令牌
 	newRefreshToken, refreshJti, refreshExp, err := m.GenerateRefreshToken(claims.UserId, claims.Username)
 	if err != nil {
-		return nil, fmt.Errorf("Generate Refresh Token error: %w ", err)
+		return nil, fmt.Errorf("generate refresh token error: %w", err)
 	}
 	// 生成新的访问令牌
 	accessToken, accessExp, err := m.GenerateAccessToken(claims.UserId, claims.Username, refreshJti)
 	if err != nil {
-		return nil, fmt.Errorf("Generate Access Token error: %w ", err)
+		return nil, fmt.Errorf("generate access token error: %w", err)
 	}
 	return &Token{
 		AccessToken:   accessToken,

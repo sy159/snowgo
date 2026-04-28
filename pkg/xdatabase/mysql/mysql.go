@@ -26,7 +26,7 @@ type MyDB struct {
 // NewMysql 创建mysql db
 func NewMysql(cfg config.MysqlConfig, otherCfg config.OtherDBConfig) (*MyDB, error) {
 	if len(cfg.DSN) == 0 && len(cfg.MainsDSN) == 0 && len(cfg.SlavesDSN) == 0 {
-		return nil, errors.New("Please initialize mysql configuration first ")
+		return nil, errors.New("please initialize mysql configuration first")
 	}
 	db, err := connectMysql(cfg)
 	if err != nil {
