@@ -182,8 +182,25 @@ A feature is only complete when:
 |--------|---------|
 | `main` | Production-ready. Protected. All merges via PR. |
 | `dev` | Integration branch. Features merge here first. |
-| `feature/*` | Individual features. Branch from `dev`, PR back to `dev`. |
+| `feature/*` | All non-hotfix development work (new features, refactors, optimizations, chore, docs, etc.). Branch from `dev`, PR back to `dev`. |
 | `hotfix/*` | Urgent production fixes. Branch from `main`, PR to both `main` and `dev`. |
+| `release/*` | Release stabilization. Branch from `dev`, PR to `main`. |
+
+#### Branch Naming Convention
+
+Format: `<type>/<short-description>`
+
+| Type | Usage | Example |
+|------|-------|---------|
+| `feature` | Any development work that is not an urgent fix | `feature/user-role-assignment`, `feature/dependency-optimization` |
+| `hotfix` | Urgent production fixes | `hotfix/auth-panic-on-nil` |
+| `release` | Release stabilization | `release/v1.2.0` |
+
+Rules:
+- Use `kebab-case` for the description part.
+- Keep descriptions concise but descriptive (2-4 words).
+- All non-hotfix work (refactor, chore, docs, perf, etc.) uses `feature/` prefix.
+- `hotfix/` is reserved for production-critical fixes only.
 
 ### 4.2 Commit Message Convention
 

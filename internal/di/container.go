@@ -2,9 +2,10 @@ package di
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
-	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"snowgo/config"
@@ -65,7 +66,7 @@ func BuildJwtManager(config config.JwtConfig) (*jwt.Manager, error) {
 		len(config.Issuer) == 0 ||
 		config.AccessExpirationTime == 0 ||
 		config.RefreshExpirationTime == 0 {
-		return nil, errors.New("Please initialize jwt config first, jwt config is empty")
+		return nil, errors.New("Please initialize jwt config first, jwt config is empty ")
 	}
 	jwtManager, err := jwt.NewJwtManager(&jwt.Config{
 		JwtSecret:             config.JwtSecret,
@@ -79,7 +80,7 @@ func BuildJwtManager(config config.JwtConfig) (*jwt.Manager, error) {
 // BuildRepository 构建db操作
 func BuildRepository(db *gorm.DB, dbMap map[string]*gorm.DB) (*repo.Repository, error) {
 	if db == nil {
-		return nil, errors.New("Please initialize mysql first")
+		return nil, errors.New("Please initialize mysql first ")
 	}
 	return repo.NewRepository(db, dbMap), nil
 }
@@ -87,7 +88,7 @@ func BuildRepository(db *gorm.DB, dbMap map[string]*gorm.DB) (*repo.Repository, 
 // BuildRedisCache 构建缓存操作
 func BuildRedisCache(rdb *redis.Client) (xcache.Cache, error) {
 	if rdb == nil {
-		return nil, errors.New("Please initialize redis first")
+		return nil, errors.New("Please initialize redis first ")
 	}
 	return xcache.NewRedisCache(rdb), nil
 }
@@ -95,7 +96,7 @@ func BuildRedisCache(rdb *redis.Client) (xcache.Cache, error) {
 // BuildLock 构建锁
 func BuildLock(rdb *redis.Client, logger xlock.Logger) (xlock.Lock, error) {
 	if rdb == nil {
-		return nil, errors.New("Please initialize redis first")
+		return nil, errors.New("Please initialize redis first ")
 	}
 	return xlock.NewRedisLock(rdb, logger), nil
 }
@@ -103,7 +104,7 @@ func BuildLock(rdb *redis.Client, logger xlock.Logger) (xlock.Lock, error) {
 // BuildProducer 构建mq生产者
 func BuildProducer(cfg *rabbitmq.ProducerConnConfig) (xmq.Producer, error) {
 	if cfg == nil {
-		return nil, errors.New("Please initialize producer first")
+		return nil, errors.New("Please initialize producer first ")
 	}
 	return rabbitmq.NewProducer(context.Background(), cfg)
 }
@@ -143,7 +144,7 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 	// mysql db
 	myDB, err := mysql.NewMysql(*opt.mysqlCfg, *opt.otherDBCfg)
 	if err != nil {
-		return nil, errors.WithMessage(err, "mysql init err")
+		return nil, fmt.Errorf("mysql init err: %w", err)
 	}
 	container.db.MyDB = myDB
 	container.closeMgr.Register(myDB) // 自动注册关闭 清理资源
@@ -151,7 +152,7 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 	// redis db
 	rdb, err := xredis.NewRedis(*opt.redisCfg)
 	if err != nil {
-		return nil, errors.WithMessage(err, "redis init err")
+		return nil, fmt.Errorf("redis init err: %w", err)
 	}
 	container.db.RDB = rdb
 	container.closeMgr.Register(rdb) // 自动注册关闭 清理资源
@@ -159,7 +160,7 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 	if opt.jwtCfg != nil {
 		jwtManager, err := BuildJwtManager(*opt.jwtCfg)
 		if err != nil {
-			return nil, errors.WithMessage(err, "jwt init err")
+			return nil, fmt.Errorf("jwt init err: %w", err)
 		}
 		container.JwtManager = jwtManager
 	}
@@ -167,7 +168,7 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 	if opt.producerCfg != nil {
 		producer, err := BuildProducer(opt.producerCfg)
 		if err != nil {
-			return nil, errors.WithMessage(err, "producer init err")
+			return nil, fmt.Errorf("producer init err: %w", err)
 		}
 		container.Producer = producer
 		container.closeMgr.RegisterCtx(producer) // 自动注册关闭 清理资源
@@ -176,18 +177,18 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 	// 构造db、redis操作
 	repository, err := BuildRepository(myDB.DB, myDB.DbMap)
 	if err != nil {
-		return nil, errors.WithMessage(err, "repo init err")
+		return nil, fmt.Errorf("repo init err: %w", err)
 	}
 
 	redisCache, err := BuildRedisCache(rdb)
 	if err != nil {
-		return nil, errors.WithMessage(err, "redis cache init err")
+		return nil, fmt.Errorf("redis cache init err: %w", err)
 	}
 	container.Cache = redisCache
 
 	lock, err := BuildLock(rdb, zap.S())
 	if err != nil {
-		return nil, errors.WithMessage(err, "lock init err")
+		return nil, fmt.Errorf("lock init err: %w", err)
 	}
 	container.Lock = lock
 

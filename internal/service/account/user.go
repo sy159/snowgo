@@ -3,8 +3,8 @@ package account
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"gorm.io/gorm"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
@@ -139,7 +139,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 	isDuplicate, err := u.userDao.IsNameTelDuplicate(ctx, userParam.Username, userParam.Tel, 0)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "查询用户名或电话是否存在异常: %v", err)
-		return 0, errors.WithMessage(err, "查询用户名或电话是否存在异常")
+		return 0, fmt.Errorf("查询用户名或电话是否存在异常: %w", err)
 	}
 	if isDuplicate {
 		return 0, ErrUserNameTelExist
@@ -151,7 +151,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		roleLen, err := u.userDao.CountRoleByIds(ctx, userParam.RoleIds)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "查询角色数量存在异常: %v", err)
-			return 0, errors.WithMessage(err, "查询角色数量存在异常")
+			return 0, fmt.Errorf("查询角色数量存在异常: %w", err)
 		}
 		if roleLen != int64(len(userParam.RoleIds)) {
 			return 0, errors.New("设置的角色不存在")
@@ -162,7 +162,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 	pwd, err := xcryption.HashPassword(userParam.Password)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "密码加密异常: %v", err)
-		return 0, errors.WithMessage(err, "密码加密异常")
+		return 0, fmt.Errorf("密码加密异常: %w", err)
 	}
 	activeStatus := constant.UserStatusActive
 	var userObj *model.User
@@ -178,7 +178,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "用户创建失败: %+v err: %v", userParam, err)
-			return errors.WithMessage(err, "用户创建失败")
+			return fmt.Errorf("用户创建失败: %w", err)
 		}
 
 		// 创建用户-role关联, 设置roleId才去创建
@@ -193,7 +193,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 			err = u.userDao.TransactionCreateUserRoleInBatches(ctx, tx, userRoles)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "用户与角色关联关系创建失败: %+v err: %v", userParam, err)
-				return errors.WithMessage(err, "用户与角色关联关系创建失败")
+				return fmt.Errorf("用户与角色关联关系创建失败: %w", err)
 			}
 		}
 
@@ -214,7 +214,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", userParam, err)
-			return errors.WithMessage(err, "操作日志创建失败")
+			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 
 		return nil
@@ -242,14 +242,14 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 	oldUser, err := u.userDao.GetUserById(ctx, userParam.ID)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "获取用户(%d)信息异常: %v", userParam.ID, err)
-		return 0, errors.WithMessage(err, "用户信息查询失败")
+		return 0, fmt.Errorf("用户信息查询失败: %w", err)
 	}
 
 	// 检查用户名，或者电话是否存在
 	isDuplicate, err := u.userDao.IsNameTelDuplicate(ctx, userParam.Username, userParam.Tel, userParam.ID)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "查询用户名或电话是否存在异常: %v", err)
-		return 0, errors.WithMessage(err, "查询用户名或电话是否存在异常")
+		return 0, fmt.Errorf("查询用户名或电话是否存在异常: %w", err)
 	}
 	if isDuplicate {
 		return 0, ErrUserNameTelExist
@@ -261,7 +261,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		roleLen, err := u.userDao.CountRoleByIds(ctx, userParam.RoleIds)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "查询角色数量存在异常: %v", err)
-			return 0, errors.WithMessage(err, "查询角色数量存在异常")
+			return 0, fmt.Errorf("查询角色数量存在异常: %w", err)
 		}
 		if roleLen != int64(len(userParam.RoleIds)) {
 			return 0, errors.New("设置的角色不存在")
@@ -273,14 +273,14 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		err = u.userDao.TransactionUpdateUser(ctx, tx, userParam.ID, userParam.Username, userParam.Tel, userParam.Nickname)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "用户更新失败: %+v err: %v", userParam, err)
-			return errors.WithMessage(err, "用户更新失败")
+			return fmt.Errorf("用户更新失败: %w", err)
 		}
 
 		// 删除用户关联角色
 		err = u.userDao.TransactionDeleteUserRole(ctx, tx, userParam.ID)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "用户与角色关联关系删除失败: %v", err)
-			return errors.WithMessage(err, "用户与角色关联关系删除失败")
+			return fmt.Errorf("用户与角色关联关系删除失败: %w", err)
 		}
 
 		// 创建用户-role关联, 设置roleId才去创建
@@ -295,7 +295,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 			err = u.userDao.TransactionCreateUserRoleInBatches(ctx, tx, userRoles)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "用户与角色关联关系创建失败: %+v err: %v", userParam, err)
-				return errors.WithMessage(err, "用户与角色关联关系创建失败")
+				return fmt.Errorf("用户与角色关联关系创建失败: %w", err)
 			}
 		}
 
@@ -316,7 +316,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", userParam, err)
-			return errors.WithMessage(err, "操作日志创建失败")
+			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 
 		return nil
@@ -346,13 +346,13 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 			return nil, ErrUserNotFound
 		}
 		xlogger.ErrorfCtx(ctx, "获取用户(%d)信息异常: %v", userId, err)
-		return nil, errors.WithMessage(err, "用户信息查询失败")
+		return nil, fmt.Errorf("用户信息查询失败: %w", err)
 	}
 
 	// 查询角色信息
 	roleList, err := u.userDao.GetRoleListByUserId(ctx, userId)
 	if err != nil {
-		return nil, errors.WithMessage(err, "用户角色信息查询失败")
+		return nil, fmt.Errorf("用户角色信息查询失败: %w", err)
 	}
 	roles := make([]*UserRole, 0, len(roleList))
 	for _, role := range roleList {
@@ -387,7 +387,7 @@ func (u *UserService) GetUserList(ctx context.Context, condition *UserListCondit
 	})
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "获取用户信息列表异常: %v", err)
-		return nil, errors.WithMessage(err, "用户信息列表查询失败")
+		return nil, fmt.Errorf("用户信息列表查询失败: %w", err)
 	}
 	userInfoList := make([]*UserInfo, 0, len(userList))
 	for _, user := range userList {
@@ -420,14 +420,14 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 		err := u.userDao.TransactionDeleteById(ctx, tx, userId)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "用户删除异常: %v", err)
-			return errors.WithMessage(err, "用户删除异常")
+			return fmt.Errorf("用户删除异常: %w", err)
 		}
 
 		// 删除用户-角色关联关系
 		err = u.userDao.TransactionDeleteUserRole(ctx, tx, userId)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "用户与角色关联关系删除失败: %v", err)
-			return errors.WithMessage(err, "用户与角色关联关系删除失败")
+			return fmt.Errorf("用户与角色关联关系删除失败: %w", err)
 		}
 
 		// 创建操作日志
@@ -447,7 +447,7 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %v", err)
-			return errors.WithMessage(err, "操作日志创建失败")
+			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 
 		return nil
@@ -481,19 +481,19 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 			return ErrUserNotFound
 		}
 		xlogger.ErrorfCtx(ctx, "获取用户(%d)信息异常: %v", userId, err)
-		return errors.WithMessage(err, "用户信息查询失败")
+		return fmt.Errorf("用户信息查询失败: %w", err)
 	}
 
 	// 密码加密
 	pwd, err := xcryption.HashPassword(password)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "密码加密异常: %v", err)
-		return errors.WithMessage(err, "密码加密异常")
+		return fmt.Errorf("密码加密异常: %w", err)
 	}
 	err = u.userDao.ResetPwdById(ctx, userId, pwd)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "修改用户(%d)密码异常: %v", userId, err)
-		return errors.WithMessage(err, "用户信息查询失败")
+		return fmt.Errorf("用户信息查询失败: %w", err)
 	}
 	xlogger.InfofCtx(ctx, "登录用户(%d-%s)重置用户(%d)密码成功", userContext.UserId, userContext.Username, userId)
 	return nil
@@ -508,7 +508,7 @@ func (u *UserService) Authenticate(ctx context.Context, username, password strin
 	user, err := u.userDao.GetUserByUsername(ctx, username)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "获取用户(%s)信息异常: %v", username, err)
-		return nil, errors.WithMessage(err, "用户信息查询失败")
+		return nil, fmt.Errorf("用户信息查询失败: %w", err)
 	}
 
 	// 密码加密
@@ -546,14 +546,14 @@ func (u *UserService) GetRoleIdsByUserId(ctx context.Context, userId int32) ([]i
 	roleIds, err := u.userDao.GetRoleIdsByUserId(ctx, userId)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "查询用户角色id失败 uid=%d: %v", userId, err)
-		return roleIds, errors.WithMessage(err, "查询用户角色id失败")
+		return roleIds, fmt.Errorf("查询用户角色id失败: %w", err)
 	}
 
 	// 写缓存
 	roleIdsBytes, err := json.Marshal(&roleIds)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "缓存用户角色id失败 uid=%d, roleIds: %v, %v", userId, roleIds, err)
-		return roleIds, errors.WithMessage(err, "缓存用户角色id失败")
+		return roleIds, fmt.Errorf("缓存用户角色id失败: %w", err)
 	}
 	_ = u.cache.Set(ctx, cacheKey, string(roleIdsBytes), constant.CacheUserRoleExpirationDay*24*time.Hour)
 

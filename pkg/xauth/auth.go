@@ -2,7 +2,7 @@ package xauth
 
 import (
 	"context"
-	"github.com/pkg/errors"
+	"errors"
 	e "snowgo/pkg/xerror"
 )
 

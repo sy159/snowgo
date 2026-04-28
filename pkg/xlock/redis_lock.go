@@ -2,10 +2,10 @@ package xlock
 
 import (
 	"context"
-	v8 "github.com/go-redis/redis/v8"
+	"errors"
 	"github.com/go-redsync/redsync/v4"
-	"github.com/go-redsync/redsync/v4/redis/goredis/v8"
-	"github.com/pkg/errors"
+	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
+	"github.com/redis/go-redis/v9"
 	common "snowgo/pkg"
 	"time"
 )
@@ -15,7 +15,7 @@ type RedisLock struct {
 	logger Logger
 }
 
-func NewRedisLock(client *v8.Client, logger Logger) Lock {
+func NewRedisLock(client *redis.Client, logger Logger) Lock {
 	if logger == nil {
 		logger = &defaultLogger{} // fmt.Printf 封装
 	}
@@ -163,7 +163,7 @@ func newRedisLockContext(mutex *redsync.Mutex, err error) LockContext {
 func (lc *RedisLockContext) Unlock(ctx context.Context) (bool, error) {
 	ok, err := lc.mutex.UnlockContext(ctx)
 	if err != nil || !ok {
-		return false, errors.WithStack(err)
+		return false, err
 	}
 	return true, nil
 }
@@ -171,7 +171,7 @@ func (lc *RedisLockContext) Unlock(ctx context.Context) (bool, error) {
 func (lc *RedisLockContext) Extend(ctx context.Context) (bool, error) {
 	ok, err := lc.mutex.ExtendContext(ctx)
 	if err != nil || !ok {
-		return false, errors.WithStack(err)
+		return false, err
 	}
 	return true, nil
 }

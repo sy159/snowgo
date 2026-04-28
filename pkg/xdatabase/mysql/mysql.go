@@ -2,8 +2,8 @@ package mysql
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -26,11 +26,11 @@ type MyDB struct {
 // NewMysql 创建mysql db
 func NewMysql(cfg config.MysqlConfig, otherCfg config.OtherDBConfig) (*MyDB, error) {
 	if len(cfg.DSN) == 0 && len(cfg.MainsDSN) == 0 && len(cfg.SlavesDSN) == 0 {
-		return nil, errors.New("Please initialize mysql configuration first")
+		return nil, errors.New("Please initialize mysql configuration first ")
 	}
 	db, err := connectMysql(cfg)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	myDB := &MyDB{
 		DB:    db,
@@ -39,7 +39,7 @@ func NewMysql(cfg config.MysqlConfig, otherCfg config.OtherDBConfig) (*MyDB, err
 	for k, v := range otherCfg.DBMap {
 		otherDb, err := connectMysql(v)
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, err
 		}
 		myDB.DbMap[k] = otherDb
 	}
@@ -218,12 +218,12 @@ func (m *MyDB) CheckDBAlive(ctx context.Context) (bool, error) {
 		}
 		sqlDB, err := db.DB()
 		if err != nil {
-			return false, errors.WithStack(err)
+			return false, err
 		}
 		// 尝试执行简单的查询来检查连接是否存活
 		err = sqlDB.PingContext(ctx)
 		if err != nil {
-			return false, errors.WithStack(err)
+			return false, err
 		}
 	}
 	return true, nil

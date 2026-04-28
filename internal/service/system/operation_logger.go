@@ -3,7 +3,8 @@ package system
 import (
 	"context"
 	"encoding/json"
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
@@ -143,7 +144,7 @@ func (o *OperationLogService) GetOperationLogList(ctx context.Context, condition
 	})
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "获取操作日志信息列表异常: %v", err)
-		return nil, errors.WithMessage(err, "操作日志信息列表查询失败")
+		return nil, fmt.Errorf("操作日志信息列表查询失败: %w", err)
 	}
 	logList := make([]*OperationLog, 0, len(operationLogList))
 	for _, operationLog := range operationLogList {

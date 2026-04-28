@@ -1,12 +1,13 @@
 package jwt
 
 import (
+	"errors"
+	"fmt"
 	"github.com/google/uuid"
 	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -120,11 +121,11 @@ func (m *Manager) GenerateRefreshToken(userId int32, username string) (string, s
 func (m *Manager) GenerateTokens(userId int32, username string) (token *Token, err error) {
 	refreshToken, refreshJti, refreshExp, err := m.GenerateRefreshToken(userId, username)
 	if err != nil {
-		return nil, errors.Wrap(err, "Generate Refresh Token error")
+		return nil, fmt.Errorf("Generate Refresh Token error: %w ", err)
 	}
 	accessToken, accessExp, err := m.GenerateAccessToken(userId, username, refreshJti)
 	if err != nil {
-		return nil, errors.Wrap(err, "Generate Access Token error")
+		return nil, fmt.Errorf("Generate Access Token error: %w ", err)
 	}
 	return &Token{
 		AccessToken:   accessToken,
@@ -158,27 +159,23 @@ func (m *Manager) ParseToken(tokenStr string) (*Claims, error) {
 func (m *Manager) RefreshTokens(refreshToken string) (token *Token, err error) {
 	claims, err := m.ParseToken(refreshToken)
 	if err != nil {
-		return nil, errors.Wrap(err, "Parse Refresh Token error")
+		return nil, fmt.Errorf("Parse Refresh Token error: %w ", err)
 	}
 
-	// 手动检查刷新令牌是否过期，ParseToken已经校验过时间
-	//if claims.ExpiresAt.Time.Before(time.Now()) {
-	//	return "", "", ErrTokenExpired
-	//}
 	// 检查令牌类型是否为 refresh
 	if !claims.IsRefreshToken() {
 		return nil, ErrInvalidTokenType
 	}
 
-	// 生成新的刷新令牌(这里如果重新生成，refresh token的过期时间又要重新算，如果沿用以前的，就是严格按照refresh token过期时间来)
+	// 生成新的刷新令牌
 	newRefreshToken, refreshJti, refreshExp, err := m.GenerateRefreshToken(claims.UserId, claims.Username)
 	if err != nil {
-		return nil, errors.Wrap(err, "Generate Refresh Token error")
+		return nil, fmt.Errorf("Generate Refresh Token error: %w ", err)
 	}
 	// 生成新的访问令牌
 	accessToken, accessExp, err := m.GenerateAccessToken(claims.UserId, claims.Username, refreshJti)
 	if err != nil {
-		return nil, errors.Wrap(err, "Generate Access Token error")
+		return nil, fmt.Errorf("Generate Access Token error: %w ", err)
 	}
 	return &Token{
 		AccessToken:   accessToken,
@@ -200,10 +197,6 @@ func (cm *Claims) IsRefreshToken() bool {
 
 // ValidAccessToken 校验 access token（类型 + 时间 + issuer）
 func (cm *Claims) ValidAccessToken() error {
-	// 检查到期时间 解析的时候已经校验了
-	//if cm.ExpiresAt.Time.Before(time.Now()) {
-	//	return ErrTokenExpired
-	//}
 	// 检查令牌类型
 	if cm.GrantType != accessType {
 		return ErrInvalidTokenType

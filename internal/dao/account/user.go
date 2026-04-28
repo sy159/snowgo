@@ -2,7 +2,7 @@ package account
 
 import (
 	"context"
-	"github.com/pkg/errors"
+	"errors"
 	"gorm.io/gen"
 	"gorm.io/gorm"
 	"snowgo/internal/dal/model"
@@ -35,7 +35,7 @@ type UserListCondition struct {
 func (u *UserDao) CreateUser(ctx context.Context, user *model.User) (*model.User, error) {
 	err := u.repo.Query().WithContext(ctx).User.Create(user)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return user, nil
 }
@@ -44,7 +44,7 @@ func (u *UserDao) CreateUser(ctx context.Context, user *model.User) (*model.User
 func (u *UserDao) TransactionCreateUser(ctx context.Context, tx *query.Query, user *model.User) (*model.User, error) {
 	err := tx.WithContext(ctx).User.Create(user)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return user, nil
 }
@@ -57,7 +57,7 @@ func (u *UserDao) TransactionUpdateUser(ctx context.Context, tx *query.Query, us
 		tx.User.Nickname.Value(nickname),
 	)
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -66,7 +66,7 @@ func (u *UserDao) TransactionUpdateUser(ctx context.Context, tx *query.Query, us
 func (u *UserDao) TransactionCreateUserRole(ctx context.Context, tx *query.Query, userRole *model.UserRole) error {
 	err := tx.WithContext(ctx).UserRole.Create(userRole)
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -75,7 +75,7 @@ func (u *UserDao) TransactionCreateUserRole(ctx context.Context, tx *query.Query
 func (u *UserDao) TransactionCreateUserRoleInBatches(ctx context.Context, tx *query.Query, userRoleList []*model.UserRole) error {
 	err := tx.WithContext(ctx).UserRole.CreateInBatches(userRoleList, 100)
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -84,7 +84,7 @@ func (u *UserDao) TransactionCreateUserRoleInBatches(ctx context.Context, tx *qu
 func (u *UserDao) TransactionDeleteUserRole(ctx context.Context, tx *query.Query, userId int32) error {
 	_, err := tx.WithContext(ctx).UserRole.Where(tx.UserRole.UserID.Eq(userId)).Delete()
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -96,7 +96,7 @@ func (u *UserDao) TransactionDeleteById(ctx context.Context, tx *query.Query, us
 	}
 	_, err := tx.User.WithContext(ctx).Where(tx.User.ID.Eq(userId)).UpdateSimple(tx.User.IsDeleted.Value(true))
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -127,7 +127,7 @@ func (u *UserDao) GetRoleIdsByUserId(ctx context.Context, userId int32) ([]int32
 	m := u.repo.Query().UserRole
 	err := m.WithContext(ctx).Select(m.RoleID).Where(m.UserID.Eq(userId)).Scan(&roleIds)
 	if err != nil {
-		return roleIds, errors.WithStack(err)
+		return roleIds, err
 	}
 	return roleIds, nil
 }
@@ -147,7 +147,7 @@ func (u *UserDao) IsNameTelDuplicate(ctx context.Context, username, tel string, 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
 		}
-		return true, errors.WithStack(err)
+		return true, err
 	}
 	return true, nil
 }
@@ -163,7 +163,7 @@ func (u *UserDao) IsExistByRoleId(ctx context.Context, roleId int32) (bool, erro
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
 		}
-		return true, errors.WithStack(err)
+		return true, err
 	}
 	return true, nil
 }
@@ -182,7 +182,7 @@ func (u *UserDao) GetUserById(ctx context.Context, userId int32) (*model.User, e
 	m := u.repo.Query().User
 	user, err := m.WithContext(ctx).Where(m.ID.Eq(userId), m.IsDeleted.Is(false)).First()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return user, nil
 }
@@ -195,7 +195,7 @@ func (u *UserDao) GetUserByUsername(ctx context.Context, username string) (*mode
 	m := u.repo.Query().User
 	user, err := m.WithContext(ctx).Where(m.Username.Eq(username), m.IsDeleted.Is(false)).First()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return user, nil
 }
@@ -214,7 +214,7 @@ func (u *UserDao) GetUserList(ctx context.Context, condition *UserListCondition)
 		).
 		FindByPage(int(condition.Offset), int(condition.Limit))
 	if err != nil {
-		return nil, 0, errors.WithStack(err)
+		return nil, 0, err
 	}
 	return userList, total, nil
 }
@@ -287,7 +287,7 @@ func (u *UserDao) DeleteById(ctx context.Context, userId int32) error {
 	m := u.repo.Query().User
 	_, err := m.WithContext(ctx).Where(m.ID.Eq(userId)).UpdateSimple(m.IsDeleted.Value(true))
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -305,7 +305,7 @@ func (u *UserDao) UpdateUser(ctx context.Context, user *model.User) (*model.User
 	m := u.repo.Query().User
 	err := m.WithContext(ctx).Where(m.ID.Eq(user.ID)).Save(user)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return user, nil
 }
@@ -318,7 +318,7 @@ func (u *UserDao) ResetPwdById(ctx context.Context, userId int32, password strin
 	m := u.repo.Query().User
 	_, err := m.WithContext(ctx).Where(m.ID.Eq(userId)).UpdateSimple(m.Password.Value(password))
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }

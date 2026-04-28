@@ -1,8 +1,8 @@
 package jwt_test
 
 import (
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"snowgo/pkg/xauth/jwt"
 	"strings"
 	"testing"
@@ -71,14 +71,14 @@ func TestJwt(t *testing.T) {
 		expiredManager, _ := jwt.NewJwtManager(&jwt.Config{
 			JwtSecret:             "Tphdi%Aapi5iXsX67F7MX5ZRJxZF*6wK",
 			Issuer:                "test-snow",
-			AccessExpirationTime:  0,
-			RefreshExpirationTime: 0,
+			AccessExpirationTime:  1,
+			RefreshExpirationTime: 1,
 		})
 		accessToken, _, err := expiredManager.GenerateAccessToken(userId, username, "123")
 		if err != nil {
 			t.Fatalf("generate expired access token error: %v", err)
 		}
-
+		time.Sleep(time.Minute)
 		_, err = expiredManager.ParseToken(accessToken)
 		if !errors.Is(err, jwt.ErrTokenExpired) {
 			t.Fatalf("expected ErrTokenExpired, got: %v", err)

@@ -8,8 +8,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -64,7 +64,7 @@ func AesCBCEncrypt(plainText, key string) (string, error) {
 	// 创建 AES 密码块
 	block, err := aes.NewCipher(keyByte)
 	if err != nil {
-		return "", errors.Wrap(err, "创建 AES 密码块失败")
+		return "", fmt.Errorf("创建 AES 密码块失败: %w", err)
 	}
 
 	// 填充明文
@@ -73,7 +73,7 @@ func AesCBCEncrypt(plainText, key string) (string, error) {
 	// 生成随机 IV
 	iv := make([]byte, block.BlockSize())
 	if _, err := rand.Read(iv); err != nil {
-		return "", errors.Wrap(err, "生成 IV 失败")
+		return "", fmt.Errorf("生成 IV 失败: %w", err)
 	}
 
 	// 使用 CBC 模式加密
@@ -91,7 +91,7 @@ func AesCBCDecrypt(cipherText, key string) (string, error) {
 	// 解码 Base64 密文
 	cipherByte, err := base64.StdEncoding.DecodeString(cipherText)
 	if err != nil {
-		return "", errors.Wrap(err, "解码 Base64 密文失败")
+		return "", fmt.Errorf("解码 Base64 密文失败: %w", err)
 	}
 
 	// 检查密钥长度是否有效
@@ -103,7 +103,7 @@ func AesCBCDecrypt(cipherText, key string) (string, error) {
 	// 创建 AES 密码块
 	block, err := aes.NewCipher(keyByte)
 	if err != nil {
-		return "", errors.Wrap(err, "创建 AES 密码块失败")
+		return "", fmt.Errorf("创建 AES 密码块失败: %w", err)
 	}
 
 	blockSize := block.BlockSize()
@@ -123,7 +123,7 @@ func AesCBCDecrypt(cipherText, key string) (string, error) {
 	// 去除填充
 	plainText, err = pkcs7UnPadding(plainText)
 	if err != nil {
-		return "", errors.Wrap(err, "去除填充失败")
+		return "", fmt.Errorf("去除填充失败: %w", err)
 	}
 
 	return string(plainText), nil

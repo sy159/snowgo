@@ -2,7 +2,7 @@ package system
 
 import (
 	"context"
-	"github.com/pkg/errors"
+	"errors"
 	"gorm.io/gen"
 	"gorm.io/gorm"
 	"snowgo/internal/dal/model"
@@ -39,7 +39,7 @@ func (d *DictDao) GetDictById(ctx context.Context, dictId int32) (*model.SystemD
 	m := d.repo.Query().SystemDict
 	dict, err := m.WithContext(ctx).Where(m.ID.Eq(dictId)).First()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return dict, nil
 }
@@ -56,7 +56,7 @@ func (d *DictDao) GetDictList(ctx context.Context, condition *DictListCondition)
 		).
 		FindByPage(int(condition.Offset), int(condition.Limit))
 	if err != nil {
-		return nil, 0, errors.WithStack(err)
+		return nil, 0, err
 	}
 	return dictList, total, nil
 }
@@ -116,7 +116,7 @@ func (d *DictDao) IsCodeDuplicate(ctx context.Context, code string, dictId int32
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
 		}
-		return true, errors.WithStack(err)
+		return true, err
 	}
 	return true, nil
 }
@@ -125,7 +125,7 @@ func (d *DictDao) IsCodeDuplicate(ctx context.Context, code string, dictId int32
 func (d *DictDao) TransactionCreateDict(ctx context.Context, tx *query.Query, dict *model.SystemDict) (*model.SystemDict, error) {
 	err := tx.WithContext(ctx).SystemDict.Create(dict)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return dict, nil
 }
@@ -137,7 +137,7 @@ func (d *DictDao) TransactionUpdateDict(ctx context.Context, tx *query.Query, di
 	}
 	err := tx.WithContext(ctx).SystemDict.Where(tx.SystemDict.ID.Eq(dict.ID)).Save(dict)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return dict, nil
 }
@@ -149,7 +149,7 @@ func (d *DictDao) TransactionDeleteById(ctx context.Context, tx *query.Query, id
 	}
 	_, err := tx.WithContext(ctx).SystemDict.Where(tx.SystemDict.ID.Eq(id)).Delete()
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -161,7 +161,7 @@ func (d *DictDao) TransactionDeleteItemByDictID(ctx context.Context, tx *query.Q
 	}
 	_, err := tx.WithContext(ctx).SystemDictItem.Where(tx.SystemDictItem.DictID.Eq(dictId)).Delete()
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -175,7 +175,7 @@ func (d *DictDao) TransactionUpdateItemByDictID(ctx context.Context, tx *query.Q
 		Where(tx.SystemDictItem.DictID.Eq(dictId)).
 		UpdateSimple(tx.SystemDictItem.DictCode.Value(dictCode))
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -192,7 +192,7 @@ func (d *DictDao) GetItemListByDictCode(ctx context.Context, dictCode string) ([
 		Find()
 
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return itemList, nil
 }
@@ -211,7 +211,7 @@ func (d *DictDao) IsCodeItemDuplicate(ctx context.Context, dictId int32, itemCod
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
 		}
-		return true, errors.WithStack(err)
+		return true, err
 	}
 	return true, nil
 }
@@ -220,7 +220,7 @@ func (d *DictDao) IsCodeItemDuplicate(ctx context.Context, dictId int32, itemCod
 func (d *DictDao) TransactionCreateDictItem(ctx context.Context, tx *query.Query, item *model.SystemDictItem) (*model.SystemDictItem, error) {
 	err := tx.WithContext(ctx).SystemDictItem.Create(item)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return item, nil
 }
@@ -233,7 +233,7 @@ func (d *DictDao) GetDictItemById(ctx context.Context, itemId int32) (*model.Sys
 	m := d.repo.Query().SystemDictItem
 	item, err := m.WithContext(ctx).Where(m.ID.Eq(itemId)).First()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return item, nil
 }
@@ -245,7 +245,7 @@ func (d *DictDao) TransactionUpdateDictItem(ctx context.Context, tx *query.Query
 	}
 	err := tx.WithContext(ctx).SystemDictItem.Where(tx.SystemDictItem.ID.Eq(item.ID)).Save(item)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return item, nil
 }
@@ -257,7 +257,7 @@ func (d *DictDao) TransactionDeleteItemByID(ctx context.Context, tx *query.Query
 	}
 	_, err := tx.WithContext(ctx).SystemDictItem.Where(tx.SystemDictItem.ID.Eq(id)).Delete()
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }

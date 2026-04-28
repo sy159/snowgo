@@ -3,8 +3,8 @@ package account
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
@@ -118,7 +118,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		menuObj, err = s.menuDao.TransactionCreateMenu(ctx, tx, menu)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "创建菜单失败: %v", err)
-			return errors.WithMessage(err, "创建菜单失败")
+			return fmt.Errorf("创建菜单失败: %w", err)
 		}
 
 		// 创建操作日志
@@ -138,7 +138,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %v err: %v", menuObj, err)
-			return errors.WithMessage(err, "操作日志创建失败")
+			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 
 		return nil
@@ -171,7 +171,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 	// 获取原始角色信息（可选）
 	oldMenu, err := s.menuDao.GetById(ctx, p.ID)
 	if err != nil {
-		return errors.WithMessage(err, "菜单不存在")
+		return fmt.Errorf("菜单不存在: %w", err)
 	}
 
 	// 校验父节点
@@ -199,7 +199,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		menuObj, err := s.menuDao.TransactionUpdateMenu(ctx, tx, mn)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "更新菜单失败: %v", err)
-			return errors.WithMessage(err, "更新菜单失败")
+			return fmt.Errorf("更新菜单失败: %w", err)
 		}
 
 		// 创建操作日志
@@ -219,7 +219,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %v err: %v", p, err)
-			return errors.WithMessage(err, "操作日志创建失败")
+			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 
 		return nil
@@ -273,7 +273,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 	// 如果被角色使用，也不能删除
 	isUsed, err := s.menuDao.IsUsedMenuByIds(ctx, []int32{id})
 	if err != nil {
-		return errors.WithMessage(err, "查询角色是否被使用失败")
+		return fmt.Errorf("查询角色是否被使用失败: %w", err)
 	}
 	if isUsed {
 		return errors.New("该菜单权限已被使用，无法删除")
@@ -284,7 +284,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 		err = s.menuDao.TransactionDeleteById(ctx, tx, id)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "删除菜单失败: %v", err)
-			return errors.WithMessage(err, "删除菜单失败")
+			return fmt.Errorf("删除菜单失败: %w", err)
 		}
 
 		// 创建操作日志
@@ -304,7 +304,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %v", err)
-			return errors.WithMessage(err, "操作日志创建失败")
+			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 
 		return nil
@@ -336,7 +336,7 @@ func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 	menus, err := s.menuDao.GetAllMenus(ctx)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "获取全部菜单失败: %v", err)
-		return nil, errors.WithMessage(err, "获取全部菜单失败")
+		return nil, fmt.Errorf("获取全部菜单失败: %w", err)
 	}
 
 	// 构造 map[id]MenuInfo

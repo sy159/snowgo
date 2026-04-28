@@ -2,7 +2,7 @@ package account
 
 import (
 	"context"
-	"github.com/pkg/errors"
+	"errors"
 	"gorm.io/gorm"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
@@ -21,7 +21,7 @@ func NewMenuDao(repo *repo.Repository) *MenuDao {
 func (d *MenuDao) CreateMenu(ctx context.Context, menu *model.Menu) (*model.Menu, error) {
 	err := d.repo.Query().WithContext(ctx).Menu.Create(menu)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return menu, nil
 }
@@ -30,7 +30,7 @@ func (d *MenuDao) CreateMenu(ctx context.Context, menu *model.Menu) (*model.Menu
 func (d *MenuDao) TransactionCreateMenu(ctx context.Context, tx *query.Query, menu *model.Menu) (*model.Menu, error) {
 	err := tx.WithContext(ctx).Menu.Create(menu)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return menu, nil
 }
@@ -45,7 +45,7 @@ func (d *MenuDao) UpdateMenu(ctx context.Context, menu *model.Menu) (*model.Menu
 		Where(m.ID.Eq(menu.ID)).
 		Save(menu)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return menu, nil
 }
@@ -57,7 +57,7 @@ func (d *MenuDao) TransactionUpdateMenu(ctx context.Context, tx *query.Query, me
 	}
 	err := tx.WithContext(ctx).Menu.Where(tx.Menu.ID.Eq(menu.ID)).Save(menu)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return menu, nil
 }
@@ -72,7 +72,7 @@ func (d *MenuDao) DeleteById(ctx context.Context, id int32) error {
 		Where(m.ID.Eq(id)).
 		Delete()
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -84,7 +84,7 @@ func (d *MenuDao) TransactionDeleteById(ctx context.Context, tx *query.Query, id
 	}
 	_, err := tx.WithContext(ctx).Menu.Where(tx.Menu.ID.Eq(id)).Delete()
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -99,7 +99,7 @@ func (d *MenuDao) GetById(ctx context.Context, id int32) (*model.Menu, error) {
 		Where(m.ID.Eq(id)).
 		First()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return menu, nil
 }
@@ -109,7 +109,7 @@ func (d *MenuDao) GetByParentId(ctx context.Context, parentId int32) ([]*model.M
 	m := d.repo.Query().Menu
 	menus, err := m.WithContext(ctx).Where(m.ParentID.Eq(parentId)).Find()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return menus, nil
 }
@@ -118,7 +118,7 @@ func (d *MenuDao) GetByParentId(ctx context.Context, parentId int32) ([]*model.M
 func (d *MenuDao) GetAllMenus(ctx context.Context) ([]*model.Menu, error) {
 	menus, err := d.repo.Query().WithContext(ctx).Menu.Find()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return menus, nil
 }
@@ -134,7 +134,7 @@ func (d *MenuDao) IsUsedMenuByIds(ctx context.Context, menuIds []int32) (bool, e
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
 		}
-		return true, errors.WithStack(err)
+		return true, err
 	}
 	return true, nil
 }
@@ -148,7 +148,7 @@ func (d *MenuDao) GetRoleIdsByIds(ctx context.Context, menuId int32) ([]int32, e
 	m := d.repo.Query().RoleMenu
 	err := m.WithContext(ctx).Where(m.MenuID.Eq(menuId)).Select(m.RoleID).Pluck(m.RoleID, &roleIds)
 	if err != nil {
-		return roleIds, errors.WithStack(err)
+		return roleIds, err
 	}
 	return roleIds, nil
 }

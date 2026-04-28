@@ -3,7 +3,7 @@ package xlock_test
 import (
 	"context"
 	"fmt"
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"snowgo/config"
 	"snowgo/pkg/xlock"
@@ -30,7 +30,7 @@ func TestRedisLock(t *testing.T) {
 		ctx := context.TODO()
 		key := "test-lock-with-tries"
 		// Simulate an existing lock
-		_ = rdb.SetNX(ctx, key, "locked", 500*time.Millisecond).Val()
+		_ = rdb.SetArgs(ctx, key, "locked", redis.SetArgs{Mode: "NX", TTL: 500 * time.Millisecond}).Val()
 		//if !initialLock {
 		//	t.Fatalf("Failed to simulate existing lock")
 		//}
@@ -47,7 +47,7 @@ func TestRedisLock(t *testing.T) {
 		key := "test-lock-with-tries-time"
 
 		// Simulate an existing lock
-		_ = rdb.SetNX(ctx, key, "locked", 1900*time.Millisecond).Val()
+		_ = rdb.SetArgs(ctx, key, "locked", redis.SetArgs{Mode: "NX", TTL: 1900 * time.Millisecond}).Val()
 		//if !initialLock {
 		//	t.Fatalf("Failed to simulate existing lock")
 		//}
@@ -74,7 +74,7 @@ func TestRedisLock(t *testing.T) {
 		key := "test-try-lock"
 
 		// Simulate an existing lock
-		_ = rdb.SetNX(ctx, key, "locked", 1*time.Second).Val()
+		_ = rdb.SetArgs(ctx, key, "locked", redis.SetArgs{Mode: "NX", TTL: 1 * time.Second}).Val()
 		//if !initialLock {
 		//	t.Fatalf("Failed to simulate existing lock")
 		//}
@@ -91,7 +91,7 @@ func TestRedisLock(t *testing.T) {
 		key := "test-retry-lock"
 
 		// Simulate an existing lock
-		_ = rdb.SetNX(ctx, key, "locked", 10*time.Second).Val()
+		_ = rdb.SetArgs(ctx, key, "locked", redis.SetArgs{Mode: "NX", TTL: 10 * time.Second}).Val()
 		//if !initialLock {
 		//	t.Fatalf("Failed to simulate existing lock")
 		//}
@@ -108,7 +108,7 @@ func TestRedisLock(t *testing.T) {
 		key := "test-unlock"
 
 		// Simulate an existing lock
-		_ = rdb.SetNX(ctx, key, "locked", 1*time.Second).Val()
+		_ = rdb.SetArgs(ctx, key, "locked", redis.SetArgs{Mode: "NX", TTL: 1 * time.Second}).Val()
 		//if !initialLock {
 		//	t.Fatalf("Failed to simulate existing lock")
 		//}

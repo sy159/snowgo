@@ -2,8 +2,8 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"net/http"
 	"snowgo/config"
 	"snowgo/internal/di"

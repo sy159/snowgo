@@ -2,8 +2,8 @@ package xcache
 
 import (
 	"context"
-	"github.com/go-redis/redis/v8"
-	"github.com/pkg/errors"
+	"errors"
+	"github.com/redis/go-redis/v9"
 	"time"
 )
 
@@ -15,11 +15,11 @@ func NewRedisCache(client *redis.Client) Cache {
 	return &RedisCache{client: client}
 }
 
-// Eval 在 Redis 上执行 lua 脚本并返回结果（包装错误）
+// Eval 在 Redis 上执行 lua 脚本并返回结果
 func (r *RedisCache) Eval(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error) {
 	res, err := r.client.Eval(ctx, script, keys, args...).Result()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return res, nil
 }
@@ -31,23 +31,19 @@ func (r *RedisCache) Get(ctx context.Context, key string) (string, error) {
 		return "", nil
 	}
 	if err != nil {
-		return "", errors.WithStack(err)
+		return "", err
 	}
 	return result, nil
 }
 
 func (r *RedisCache) Set(ctx context.Context, key string, value string, expiration time.Duration) error {
-	err := r.client.Set(ctx, key, value, expiration).Err()
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	return nil
+	return r.client.Set(ctx, key, value, expiration).Err()
 }
 
 func (r *RedisCache) Delete(ctx context.Context, keys ...string) (int64, error) {
 	result, err := r.client.Del(ctx, keys...).Result()
 	if err != nil {
-		return 0, errors.WithStack(err)
+		return 0, err
 	}
 	return result, nil
 }
@@ -56,7 +52,7 @@ func (r *RedisCache) Delete(ctx context.Context, keys ...string) (int64, error) 
 func (r *RedisCache) IncrBy(ctx context.Context, key string, increment int64) (int64, error) {
 	result, err := r.client.IncrBy(ctx, key, increment).Result()
 	if err != nil {
-		return 0, errors.WithStack(err)
+		return 0, err
 	}
 	return result, nil
 }
@@ -65,17 +61,13 @@ func (r *RedisCache) IncrBy(ctx context.Context, key string, increment int64) (i
 func (r *RedisCache) DecrBy(ctx context.Context, key string, decrement int64) (int64, error) {
 	result, err := r.client.DecrBy(ctx, key, decrement).Result()
 	if err != nil {
-		return 0, errors.WithStack(err)
+		return 0, err
 	}
 	return result, nil
 }
 
 func (r *RedisCache) HSet(ctx context.Context, key string, field string, value string) error {
-	err := r.client.HSet(ctx, key, field, value).Err()
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	return nil
+	return r.client.HSet(ctx, key, field, value).Err()
 }
 
 func (r *RedisCache) HGet(ctx context.Context, key string, field string) (string, error) {
@@ -84,7 +76,7 @@ func (r *RedisCache) HGet(ctx context.Context, key string, field string) (string
 		return "", nil
 	}
 	if err != nil {
-		return "", errors.WithStack(err)
+		return "", err
 	}
 	return result, nil
 }
@@ -92,7 +84,7 @@ func (r *RedisCache) HGet(ctx context.Context, key string, field string) (string
 func (r *RedisCache) HGetAll(ctx context.Context, key string) (map[string]string, error) {
 	m, err := r.client.HGetAll(ctx, key).Result()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return m, nil
 }
@@ -100,7 +92,7 @@ func (r *RedisCache) HGetAll(ctx context.Context, key string) (map[string]string
 func (r *RedisCache) HDel(ctx context.Context, key string, fields ...string) (int64, error) {
 	n, err := r.client.HDel(ctx, key, fields...).Result()
 	if err != nil {
-		return 0, errors.WithStack(err)
+		return 0, err
 	}
 	return n, nil
 }
@@ -108,7 +100,7 @@ func (r *RedisCache) HDel(ctx context.Context, key string, fields ...string) (in
 func (r *RedisCache) HLen(ctx context.Context, key string) (int64, error) {
 	n, err := r.client.HLen(ctx, key).Result()
 	if err != nil {
-		return 0, errors.WithStack(err)
+		return 0, err
 	}
 	return n, nil
 }
@@ -116,35 +108,29 @@ func (r *RedisCache) HLen(ctx context.Context, key string) (int64, error) {
 func (r *RedisCache) HIncrBy(ctx context.Context, key string, field string, increment int64) (int64, error) {
 	result, err := r.client.HIncrBy(ctx, key, field, increment).Result()
 	if err != nil {
-		return 0, errors.WithStack(err)
+		return 0, err
 	}
 	return result, nil
 }
 
 func (r *RedisCache) ZAdd(ctx context.Context, key string, score float64, member string) error {
-	z := &redis.Z{
+	z := redis.Z{
 		Score:  score,
 		Member: member,
 	}
-	if err := r.client.ZAdd(ctx, key, z).Err(); err != nil {
-		return errors.WithStack(err)
-	}
-	return nil
+	return r.client.ZAdd(ctx, key, z).Err()
 }
 
 // ZRem 删除有序集合的成员
 func (r *RedisCache) ZRem(ctx context.Context, key string, members ...string) error {
-	if err := r.client.ZRem(ctx, key, members).Err(); err != nil {
-		return errors.WithStack(err)
-	}
-	return nil
+	return r.client.ZRem(ctx, key, members).Err()
 }
 
 // ZRange 根据分数从小到大排序，根据开始跟结束为止进行数据返回0, -1
 func (r *RedisCache) ZRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
 	res, err := r.client.ZRange(ctx, key, start, stop).Result()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return res, nil
 }
@@ -153,7 +139,7 @@ func (r *RedisCache) ZRange(ctx context.Context, key string, start, stop int64) 
 func (r *RedisCache) ZCard(ctx context.Context, key string) (int64, error) {
 	val, err := r.client.ZCard(ctx, key).Result()
 	if err != nil {
-		return 0, errors.WithStack(err)
+		return 0, err
 	}
 	return val, nil
 }
@@ -161,23 +147,19 @@ func (r *RedisCache) ZCard(ctx context.Context, key string) (int64, error) {
 func (r *RedisCache) Exists(ctx context.Context, key string) (bool, error) {
 	exists, err := r.client.Exists(ctx, key).Result()
 	if err != nil {
-		return false, errors.WithStack(err)
+		return false, err
 	}
-	return exists > 0, err
+	return exists > 0, nil
 }
 
 func (r *RedisCache) Expire(ctx context.Context, key string, expiration time.Duration) error {
-	err := r.client.Expire(ctx, key, expiration).Err()
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	return nil
+	return r.client.Expire(ctx, key, expiration).Err()
 }
 
 func (r *RedisCache) TTL(ctx context.Context, key string) (time.Duration, error) {
 	d, err := r.client.TTL(ctx, key).Result()
 	if err != nil {
-		return 0, errors.WithStack(err)
+		return 0, err
 	}
 	return d, nil
 }
