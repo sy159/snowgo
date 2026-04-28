@@ -1,20 +1,8 @@
 # CLAUDE_CODING.md
 
-> **Version**: 1.3.0
-> **Last Updated**: 2026-04-26
-> Coding standards, naming conventions, error handling, logging, input validation, and concurrency rules for `snowgo`.
+> Coding standards for snowgo.
 >
 > [Back to CLAUDE.md](./CLAUDE.md)
-
----
-
-## Table of Contents
-
-1. [Naming](#1-naming)
-2. [Error Handling](#2-error-handling)
-3. [Logging](#3-logging)
-4. [Input Validation](#4-input-validation)
-5. [Concurrency](#5-concurrency)
 
 ---
 
@@ -22,74 +10,69 @@
 
 | Category | Rule | Example |
 |----------|------|---------|
-| Packages | lowercase, no underscores | `account`, `system`, `xlogger` |
-| Files | snake_case | `user_service.go`, `account_router.go` |
-| Interfaces | describe behavior | `UserRepo` (not `IUser`) |
-| Structs | noun-based | `UserService`, `DictParam` |
-| Methods | verb-based | `CreateUser`, `GetUserList`, `ValidatePassword` |
-| Constants | CamelCase exported, camelCase unexported | `CacheUserRolePrefix`, `defaultLimit` |
-| DTOs (API) | `{Entity}Info`, `{Entity}List`, `{Entity}Param` | `UserInfo`, `UserList`, `UserParam` |
-| DTOs (Service) | Avoid `json` tags unless crossing boundaries | — |
+| Packages | lowercase, no underscores | account, system, xlogger |
+| Files | snake_case | user_service.go |
+| Interfaces | describe behavior | UserRepo |
+| Structs | noun-based | UserService, DictParam |
+| Methods | verb-based | CreateUser, GetUserList |
+| Constants | CamelCase exported, camelCase unexported | CacheUserRolePrefix, defaultLimit |
+| DTOs (API) | {Entity}Info, {Entity}List, {Entity}Param | UserInfo, UserList, UserParam |
+| DTOs (Service) | avoid json tags unless crossing boundaries | UserCondition |
+| Struct tags | json + form + binding | - |
 
 ---
 
-## 2. Error Handling (MANDATORY)
+## 2. Constants Management
 
-### Layer Rules
+All constants live in `internal/constant/`. Unified management for:
+
+| File | Scope |
+|------|-------|
+| `constant.go` | General constants (status values, default limits, etc.) |
+| `cache_key.go` | Redis cache key prefixes (e.g., `CacheMenuTree`, `CacheUserRolePrefix`) |
+| `permission.go` | RBAC permission strings (e.g., `PermUserList`) |
+| `mq.go` | RabbitMQ exchange, queue, routing key names |
+
+Never define constants inline or in service/API layers. Error codes live separately in `pkg/xerror/` with 5-digit scheme.
+
+---
+
+## 3. Error Handling (MANDATORY)
 
 | Layer | Rule |
 |-------|------|
-| API | `xresponse.FailByError(c, e.SomeError)` for client errors; `xresponse.Fail(c, code, msg)` for edge cases. |
-| Service | Define sentinel errors: `var ErrUserNotFound = errors.New(e.UserNotFound.GetErrMsg())`. Compare with `errors.Is(err, ErrUserNotFound)` — **never compare error strings.** |
-| Cross-layer | Wrap with `errors.WithMessage(err, "context")` when propagating. Log at origin; wrap when crossing. |
-| DAO | Return `errors.WithStack(err)` for raw GORM errors. Never swallow errors. |
-| Global | **Never panic in API/Service/DAO.** Only `xlogger.Panic` for fatal init failures (e.g., DB connection impossible). |
+| API | xresponse.FailByError for business errors; xresponse.Fail for validation errors |
+| Service | Define sentinel errors using registered error codes from pkg/xerror/. Compare with errors.Is. Wrap infra errors with fmt.Errorf("%w"). |
+| DAO | Return errors directly - errors.New for validation, raw GORM errors for DB failures |
+| Global | Never panic in API/Service/DAO. Only xlogger.Panic for fatal init failures |
 
-### HTTP Status Codes
+Error codes live in pkg/xerror/. Pattern: 5-digit integer (e.g., 10201, 20101) registered via xerror.NewCode(category, code, msg). Business errors start with 1, system errors start with 2. New codes must be registered in the global registry.
 
-| Code | Usage |
-|------|-------|
-| 400 | Validation errors |
-| 401 | Authentication failure |
-| 403 | Permission denied |
-| 404 | Missing resource |
-| 429 | Rate limited |
-| 500 | Unexpected server errors |
+HTTP status: 400 validation, 401 auth, 403 permission, 404 not found, 429 rate limit, 500 server error.
 
 ---
 
-## 3. Logging (MANDATORY)
+## 4. Logging (MANDATORY)
 
-- **Always** use `xlogger.InfofCtx(ctx, ...)` / `xlogger.ErrorfCtx(ctx, ...)` so `trace_id` is automatically injected.
-- **Never** use `fmt.Printf` / `log.Println` in production code. Console output allowed only in middleware access logs for dev readability.
+- Always use xlogger.InfofCtx / xlogger.ErrorfCtx for trace_id injection.
+- Never use fmt.Printf / log.Println in production code.
+- Warn level is reserved for access logs via xlogger.Access(). Not used in business logic.
+- Info: business events. Error: anomalies. Debug: disabled in production.
 
-### Log Levels
-
-| Level | When to use |
-|-------|-------------|
-| `Info` | Business events (user created, login success) |
-| `Error` | Failures requiring investigation. Include `zap.Error(err)` field. |
-| `Debug` | Verbose diagnostics (disabled in production) |
-
-### Sensitive Data Masking
-
-Access logs auto-mask: `password`, `token`, `secret`, `access_token`, `refresh_token`, `phone`, `id_card`, `email`.
-
-- To add new sensitive fields, update `middleware.sensitiveRoots` in `internal/router/middleware/`.
+Sensitive fields auto-masked in access logs: password, token, secret, access_token, refresh_token, phone, id_card, email. Add new fields via middleware.sensitiveRoots.
 
 ---
 
-## 4. Input Validation (MANDATORY)
+## 5. Input Validation (MANDATORY)
 
-- **API layer is the gate.** All user input must be validated before reaching Service.
-- Use Gin binding tags: `binding:"required,max=64"`.
-- Add **explicit validation** for business rules (password complexity, ID > 0, enum values).
-- **Never trust frontend.** Re-validate permissions server-side.
+- API layer is the gate. Validate before reaching Service.
+- Use Gin binding tags: binding:"required,max=64". Add explicit validation for business rules. Never trust frontend.
+- Common tags: required, max=N, min=N, email, oneof=A B.
 
 ---
 
-## 5. Concurrency
+## 6. Concurrency
 
-- **No goroutines in Service/DAO** unless justified (e.g., background cache warm-up).
-- If spawning goroutines, propagate `context.Context` and handle cancellation/timeout.
-- Use `xlock.RedisLock` for distributed critical sections. Always `defer unlock()`.
+- No goroutines in Service/DAO unless justified.
+- Propagate context.Context and handle cancellation/timeout.
+- Use xlock.RedisLock for distributed critical sections. Callback-based API — lock and unlock are managed internally via fn callback.
