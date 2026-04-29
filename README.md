@@ -258,6 +258,12 @@ make up
 make down
 ```
 
+# 启动 API 服务
+go run ./cmd/http
+
+# 运行效果
+![](assets/images/run.png)
+
 ---
 
 ## 🛠️ 常用命令
