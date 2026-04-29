@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // InitTracer 初始化 OTLP Tracer，失败时退化为 noop，保证不 panic
@@ -23,14 +24,25 @@ func InitTracer(serviceName, serviceVersion, env, tempoAddr string) func(context
 	defer cancel()
 
 	if tempoAddr == "" {
-		zap.S().Fatalf("tempo endpoint is empty, please set cfg.Application.TempoEndpoint")
+		zap.S().Warnf("[otlp] tempo endpoint is empty, fallback to noop tracer")
+		otel.SetTextMapPropagator(
+			propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}),
+		)
+		otel.SetErrorHandler(otel.ErrorHandlerFunc(func(err error) {
+			if err != nil {
+				zap.S().Errorf("[otlp] otel internal error (noop): %v", err)
+			}
+		}))
+		tp := sdktrace.NewTracerProvider()
+		otel.SetTracerProvider(tp)
+		return func(context.Context) error { return nil }
 	}
 
 	// 创建 exporter
 	exp, err := otlptrace.New(ctx,
 		otlptracegrpc.NewClient(
 			otlptracegrpc.WithEndpoint(tempoAddr),
-			otlptracegrpc.WithInsecure(),
+			otlptracegrpc.WithTLSCredentials(insecure.NewCredentials()),
 		),
 	)
 	if err != nil {

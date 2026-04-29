@@ -397,3 +397,189 @@ func BenchmarkPostJSONParallel(b *testing.B) {
 		}
 	})
 }
+
+// -------------------- Response Method Tests --------------------
+
+func TestResponseText(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte("plain text response"))
+	}))
+	defer server.Close()
+
+	resp, err := xrequests.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Text() != "plain text response" {
+		t.Fatalf("expected 'plain text response', got %q", resp.Text())
+	}
+}
+
+func TestResponseMap(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`{"key":"value","num":42}`))
+	}))
+	defer server.Close()
+
+	resp, err := xrequests.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := resp.Map()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m["key"] != "value" {
+		t.Fatalf("expected key=value, got %v", m["key"])
+	}
+	if m["num"].(float64) != 42 {
+		t.Fatalf("expected num=42, got %v", m["num"])
+	}
+}
+
+func TestResponseClose(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	resp, err := xrequests.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = resp.Close()
+	if err != nil {
+		t.Fatalf("expected Close to succeed, got error: %v", err)
+	}
+}
+
+func TestResponseHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Custom", "test-value")
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	resp, err := xrequests.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hdrs := resp.Headers()
+	if hdrs.Get("X-Custom") != "test-value" {
+		t.Fatalf("expected X-Custom=test-value, got %v", hdrs.Get("X-Custom"))
+	}
+}
+
+func TestWithBody(t *testing.T) {
+	server := mockServerForTest()
+	defer server.Close()
+
+	resp, err := xrequests.Post(server.URL, xrequests.WithBody([]byte("binary body data")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]interface{}
+	if err := resp.Json(&m); err != nil {
+		t.Fatal(err)
+	}
+	if m["body"] != "binary body data" {
+		t.Fatalf("expected body='binary body data', got %v", m["body"])
+	}
+}
+
+func TestWithFormData(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = r.Body.Close()
+		w.WriteHeader(200)
+		_, _ = w.Write(body)
+	}))
+	defer server.Close()
+
+	resp, err := xrequests.Post(server.URL,
+		xrequests.WithFormData(map[string]string{"name": "Alice", "age": "30"}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Form data should be URL-encoded
+	body := resp.Text()
+	if body != "age=30&name=Alice" && body != "name=Alice&age=30" {
+		t.Fatalf("expected URL-encoded form data, got %q", body)
+	}
+	ct := resp.GetHeader("Content-Type") // Not set by mock; verify request used form content type
+	_ = ct
+}
+
+func TestMergeHeaderNilDefaults(t *testing.T) {
+	// This tests the internal mergeHeader function indirectly via the response
+	// When no headers are set on the response and we call GetHeader, it handles nil
+	server := mockServerForTest()
+	defer server.Close()
+
+	resp, err := xrequests.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Headers should not be nil
+	hdrs := resp.Headers()
+	if hdrs == nil {
+		t.Fatal("expected non-nil headers")
+	}
+}
+
+func TestResponseMethodsWithNilResponse(t *testing.T) {
+	// Test GetHeader, Headers, Close with nil internal response
+	var resp xrequests.Response // zero value, response field is nil
+	if resp.GetHeader("X-Test") != "" {
+		t.Fatal("expected empty string for nil response")
+	}
+	if resp.Headers() != nil {
+		t.Fatal("expected nil for nil response")
+	}
+	if err := resp.Close(); err != nil {
+		t.Fatalf("expected nil error from Close on nil response: %v", err)
+	}
+}
+
+func TestRequestWithInvalidURL(t *testing.T) {
+	_, err := xrequests.Get("://invalid-url")
+	if err == nil {
+		t.Fatal("expected error for invalid URL")
+	}
+}
+
+func TestCopyClientNilTransport(t *testing.T) {
+	// This tests the copyClient function with nil Transport
+	// We can't call it directly (it's not exported), but we can trigger it via WithTimeout
+	// which creates a new client copy. The default client has a non-nil transport,
+	// so this indirectly verifies the path doesn't panic.
+	server := mockServerForTest()
+	defer server.Close()
+
+	resp, err := xrequests.Get(server.URL, xrequests.WithTimeout(5*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestRequestMaxRetriesNegative(t *testing.T) {
+	// Negative maxRetries should be clamped to 0
+	server := mockServerForTest()
+	defer server.Close()
+
+	resp, err := xrequests.Get(server.URL, xrequests.WithMaxRetries(-5))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}

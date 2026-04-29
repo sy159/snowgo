@@ -86,6 +86,12 @@ func TestRandShuffleStr(t *testing.T) {
 	if len(result) != 0 {
 		t.Errorf("RandShuffleStr(8, 0) should return empty string")
 	}
+
+	// 测试长度超过字符集大小时会被截断
+	result = xstr_tool.RandShuffleStr(1000, xstr_tool.DigitFlag) // digits only = 10 chars
+	if len(result) != 10 {
+		t.Errorf("RandShuffleStr(1000, DigitFlag) length should be capped at 10, got %d", len(result))
+	}
 }
 
 // 测试判断字符串是否无重复字符功能

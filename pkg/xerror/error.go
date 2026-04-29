@@ -24,8 +24,8 @@ var (
 	HttpFound               = NewCode(CategoryHttp, 302, "Found")                 // 临时重定向
 	HttpBadRequest          = NewCode(CategoryHttp, 400, "Bad Request")           // 请求数据有问题
 	HttpUnauthorized        = NewCode(CategoryHttp, 401, "Unauthorized")          // 用户未认证或认证失败
-	HttpForbidden           = NewCode(CategoryHttp, 403, "Forbidden")             // 用户未认证或认证失败
-	HttpNotFound            = NewCode(CategoryHttp, 404, "Not Found")             // 用户未认证或认证失败
+	HttpForbidden           = NewCode(CategoryHttp, 403, "Forbidden")             // 用户无权限访问
+	HttpNotFound            = NewCode(CategoryHttp, 404, "Not Found")             // 请求的资源不存在
 	HttpInternalServerError = NewCode(CategoryHttp, 500, "Internal Server Error") // 服务器异常
 	HttpBadGateway          = NewCode(CategoryHttp, 502, "Bad Gateway")           // 网关错误
 	HttpServiceUnavailable  = NewCode(CategoryHttp, 503, "Service Unavailable")   // 服务器暂时处于超负载或正在进行停机维护，现在无法处理请求
@@ -114,6 +114,7 @@ var (
 
 type Code interface {
 	i() // 避免被其他包实现
+	error
 	GetErrCode() int
 	GetErrMsg() string
 	GetCategory() string
@@ -160,6 +161,11 @@ func GetCodes() []Code {
 }
 
 func (c *code) i() {}
+
+// Error 实现 error 接口
+func (c *code) Error() string {
+	return c.ErrMsg
+}
 
 // GetErrCode 获取错误code
 func (c *code) GetErrCode() int {

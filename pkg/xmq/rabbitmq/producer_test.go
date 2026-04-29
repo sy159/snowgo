@@ -56,7 +56,7 @@ func TestProducer_Publish(t *testing.T) {
 	err := reg.RegisterAll(ctx)
 	assert.NoError(t, err)
 
-	producerLogger := xlogger.NewLogger("./logs", "rabbitmq-producer", xlogger.WithFileMaxAgeDays(30))
+	producerLogger := xlogger.NewLogger(t.TempDir(), "rabbitmq-producer", xlogger.WithFileMaxAgeDays(30))
 	config := rabbitmq.NewProducerConnConfig(
 		rabbitURL(),
 		rabbitmq.WithProducerLogger(producerLogger),
@@ -96,7 +96,7 @@ func BenchmarkProducerPublish(b *testing.B) {
 	err := reg.RegisterAll(ctx)
 	assert.NoError(b, err)
 
-	producerLogger := xlogger.NewLogger("./logs", "rabbitmq-producer", xlogger.WithFileMaxAgeDays(30))
+	producerLogger := xlogger.NewLogger(b.TempDir(), "rabbitmq-producer", xlogger.WithFileMaxAgeDays(30))
 	cfg := rabbitmq.NewProducerConnConfig(rabbitURL(), rabbitmq.WithProducerLogger(producerLogger))
 	p, err := rabbitmq.NewProducer(ctx, cfg)
 	if err != nil {

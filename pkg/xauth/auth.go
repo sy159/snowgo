@@ -2,7 +2,7 @@ package xauth
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	e "snowgo/pkg/xerror"
 )
 
@@ -48,7 +48,7 @@ func GetContext(ctx context.Context) *Context {
 func GetUserContext(ctx context.Context) (*UserContext, error) {
 	userId, ok := ctx.Value(XUserId).(int32)
 	if !ok || userId <= 0 {
-		return nil, errors.New(e.HttpForbidden.GetErrMsg())
+		return nil, fmt.Errorf("%w", e.HttpForbidden)
 	}
 	traceId, _ := ctx.Value(XTraceId).(string)
 	iP, _ := ctx.Value(XIp).(string)

@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -33,7 +34,7 @@ func init() {
 	}
 	n, err := snowflake.NewNode(int64(nodeID))
 	if err != nil {
-		panic("Failed to initialize snowflake node: " + err.Error())
+		panic("failed to initialize snowflake node: " + err.Error())
 	}
 	sfNode = n
 }
@@ -121,6 +122,13 @@ func StructToMap(in interface{}, tagName string) (map[string]interface{}, error)
 		fi := t.Field(i)
 		tagValue := fi.Tag.Get(tagName)
 		if tagValue == "" {
+			continue
+		}
+		// 解析 tag 值，如 "name,omitempty" → "name"
+		if idx := strings.Index(tagValue, ","); idx != -1 {
+			tagValue = tagValue[:idx]
+		}
+		if tagValue == "-" {
 			continue
 		}
 		out[tagValue] = v.Field(i).Interface()

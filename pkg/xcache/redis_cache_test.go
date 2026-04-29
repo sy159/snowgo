@@ -2,7 +2,6 @@ package xcache_test
 
 import (
 	"context"
-	"fmt"
 	"snowgo/pkg/xcache"
 	"testing"
 	"time"
@@ -23,6 +22,205 @@ func setupTestRedis() *redis.Client {
 func teardownTestRedis(client *redis.Client) {
 	//client.FlushDB(context.Background())
 	_ = client.Close()
+}
+
+func TestRedisCacheGetNonExistentKey(t *testing.T) {
+	client := setupTestRedis()
+	defer teardownTestRedis(client)
+	cache := xcache.NewRedisCache(client)
+	ctx := context.Background()
+
+	// Get a key that doesn't exist
+	got, err := cache.Get(ctx, "non-existent-key-12345")
+	if err != nil {
+		t.Fatalf("Get non-existent key error: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("expected empty string for non-existent key, got %q", got)
+	}
+}
+
+func TestRedisCacheDeleteNonExistentKey(t *testing.T) {
+	client := setupTestRedis()
+	defer teardownTestRedis(client)
+	cache := xcache.NewRedisCache(client)
+	ctx := context.Background()
+
+	num, err := cache.Delete(ctx, "non-existent-key-12345")
+	if err != nil {
+		t.Fatalf("Delete non-existent key error: %v", err)
+	}
+	if num != 0 {
+		t.Fatalf("expected 0 for non-existent key delete, got %d", num)
+	}
+}
+
+func TestRedisCacheIncrByDecrByEdgeCases(t *testing.T) {
+	client := setupTestRedis()
+	defer teardownTestRedis(client)
+	cache := xcache.NewRedisCache(client)
+	ctx := context.Background()
+
+	key := "test-incr-decr-edge"
+	_ = cache.Set(ctx, key, "not-a-number", 5*time.Minute)
+
+	// Try to increment a non-numeric value
+	_, err := cache.IncrBy(ctx, key, 1)
+	if err == nil {
+		t.Fatal("expected error when incrementing non-numeric value")
+	}
+}
+
+func TestRedisCacheEvalError(t *testing.T) {
+	client := setupTestRedis()
+	defer teardownTestRedis(client)
+	cache := xcache.NewRedisCache(client)
+	ctx := context.Background()
+
+	// Invalid Lua script should return an error
+	_, err := cache.Eval(ctx, "invalid lua script {{{", []string{"test-key"})
+	if err == nil {
+		t.Fatal("expected error for invalid Lua script")
+	}
+}
+
+func TestRedisCacheHGetNonExistentField(t *testing.T) {
+	client := setupTestRedis()
+	defer teardownTestRedis(client)
+	cache := xcache.NewRedisCache(client)
+	ctx := context.Background()
+
+	hashKey := "test-hget-nonexist"
+	got, err := cache.HGet(ctx, hashKey, "non-existent-field")
+	if err != nil {
+		t.Fatalf("HGet non-existent field error: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("expected empty string for non-existent field, got %q", got)
+	}
+}
+
+func TestRedisCacheHDelNonExistentField(t *testing.T) {
+	client := setupTestRedis()
+	defer teardownTestRedis(client)
+	cache := xcache.NewRedisCache(client)
+	ctx := context.Background()
+
+	hashKey := "test-hdel-nonexist"
+	delNum, err := cache.HDel(ctx, hashKey, "non-existent-field")
+	if err != nil {
+		t.Fatalf("HDel non-existent field error: %v", err)
+	}
+	if delNum != 0 {
+		t.Fatalf("expected 0 for non-existent field delete, got %d", delNum)
+	}
+}
+
+func TestRedisCacheZRangeError(t *testing.T) {
+	client := setupTestRedis()
+	defer teardownTestRedis(client)
+	cache := xcache.NewRedisCache(client)
+	ctx := context.Background()
+
+	zKey := "test-zrange-error"
+	_ = cache.Set(ctx, zKey, "not-a-zset", 5*time.Minute)
+
+	// Try to range a key that is not a zset
+	_, err := cache.ZRange(ctx, zKey, 0, -1)
+	if err == nil {
+		t.Fatal("expected error when ranging over a non-zset key")
+	}
+}
+
+func TestRedisCacheZCardError(t *testing.T) {
+	client := setupTestRedis()
+	defer teardownTestRedis(client)
+	cache := xcache.NewRedisCache(client)
+	ctx := context.Background()
+
+	zKey := "test-zcard-error"
+	_ = cache.Set(ctx, zKey, "not-a-zset", 5*time.Minute)
+
+	_, err := cache.ZCard(ctx, zKey)
+	if err == nil {
+		t.Fatal("expected error when getting card of a non-zset key")
+	}
+}
+
+func TestRedisCacheExistsError(t *testing.T) {
+	client := setupTestRedis()
+	defer teardownTestRedis(client)
+	cache := xcache.NewRedisCache(client)
+	ctx := context.Background()
+
+	exists, err := cache.Exists(ctx, "some-key")
+	if err != nil {
+		t.Fatalf("Exists error: %v", err)
+	}
+	if exists {
+		t.Fatal("key should not exist")
+	}
+}
+
+func TestRedisCacheTTLError(t *testing.T) {
+	client := setupTestRedis()
+	defer teardownTestRedis(client)
+	cache := xcache.NewRedisCache(client)
+	ctx := context.Background()
+
+	// TTL on non-existent key
+	ttl, err := cache.TTL(ctx, "non-existent-ttl-key")
+	if err != nil {
+		t.Fatalf("TTL error: %v", err)
+	}
+	if ttl > 0 {
+		t.Fatalf("expected TTL <= 0 for non-existent key, got %v", ttl)
+	}
+}
+
+func TestRedisCacheHGetAllError(t *testing.T) {
+	client := setupTestRedis()
+	defer teardownTestRedis(client)
+	cache := xcache.NewRedisCache(client)
+	ctx := context.Background()
+
+	hashKey := "test-hgetall-error"
+	_ = cache.Set(ctx, hashKey, "not-a-hash", 5*time.Minute)
+
+	_, err := cache.HGetAll(ctx, hashKey)
+	if err == nil {
+		t.Fatal("expected error when getting all fields of a non-hash key")
+	}
+}
+
+func TestRedisCacheHLenError(t *testing.T) {
+	client := setupTestRedis()
+	defer teardownTestRedis(client)
+	cache := xcache.NewRedisCache(client)
+	ctx := context.Background()
+
+	hashKey := "test-hlen-error"
+	_ = cache.Set(ctx, hashKey, "not-a-hash", 5*time.Minute)
+
+	_, err := cache.HLen(ctx, hashKey)
+	if err == nil {
+		t.Fatal("expected error when getting length of a non-hash key")
+	}
+}
+
+func TestRedisCacheHIncrByError(t *testing.T) {
+	client := setupTestRedis()
+	defer teardownTestRedis(client)
+	cache := xcache.NewRedisCache(client)
+	ctx := context.Background()
+
+	hIncrKey := "test-hincr-error"
+	_ = cache.Set(ctx, hIncrKey, "not-a-hash", 5*time.Minute)
+
+	_, err := cache.HIncrBy(ctx, hIncrKey, "field", 1)
+	if err == nil {
+		t.Fatal("expected error when incrementing field of a non-hash key")
+	}
 }
 
 func TestRedisCache(t *testing.T) {
@@ -51,7 +249,7 @@ return cnt
 		if err != nil {
 			t.Fatalf("Eval failed: %v", err)
 		}
-		fmt.Println("Eval INCR:", res)
+		t.Logf("Eval INCR: %v", res)
 
 		cnt, ok := res.(int64)
 		if !ok || cnt != 1 {
@@ -241,6 +439,47 @@ return cnt
 			if members[i] != m {
 				t.Fatalf("ZRange order incorrect after remove at index %d: got %v want %v", i, members[i], m)
 			}
+		}
+	})
+
+	// =========================
+	// 8. HIncrBy
+	// =========================
+	t.Run("HIncrBy", func(t *testing.T) {
+		hIncrKey := "test-hincr-key"
+		_, _ = redisCache.HDel(ctx, hIncrKey, "counter")
+
+		val, err := redisCache.HIncrBy(ctx, hIncrKey, "counter", 5)
+		if err != nil || val != 5 {
+			t.Fatalf("HIncrBy failed: %v val=%d", err, val)
+		}
+		val, err = redisCache.HIncrBy(ctx, hIncrKey, "counter", -3)
+		if err != nil || val != 2 {
+			t.Fatalf("HIncrBy decrement failed: %v val=%d", err, val)
+		}
+	})
+
+	// =========================
+	// 9. Expire
+	// =========================
+	t.Run("Expire", func(t *testing.T) {
+		expKey := "test-expire-key"
+		_ = redisCache.Set(ctx, expKey, "value", 0)
+
+		err := redisCache.Expire(ctx, expKey, 2*time.Second)
+		if err != nil {
+			t.Fatalf("Expire failed: %v", err)
+		}
+
+		ttl, err := redisCache.TTL(ctx, expKey)
+		if err != nil || ttl <= 0 {
+			t.Fatalf("TTL after Expire failed: %v ttl=%v", err, ttl)
+		}
+
+		time.Sleep(3 * time.Second)
+		exists, _ := redisCache.Exists(ctx, expKey)
+		if exists {
+			t.Fatal("Key should have expired after Expire")
 		}
 	})
 

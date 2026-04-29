@@ -95,7 +95,11 @@ func prepareRequestBody(opts *requestOptions) error {
 func createHTTPRequest(method, urlStr string, opts *requestOptions) (*http.Request, error) {
 	if opts.request != nil {
 		req := opts.request.Clone(opts.ctx)
-		req.URL, _ = url.Parse(urlStr) // 统一用外部拼好的 URL
+		parsedURL, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, fmt.Errorf("parse url failed: %w", err)
+		}
+		req.URL = parsedURL
 
 		// 把 opts.bodyBytes 写进去
 		if len(opts.body) > 0 {
