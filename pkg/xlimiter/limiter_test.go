@@ -45,8 +45,11 @@ func TestTokenBucket_Allow(t *testing.T) {
 
 	t.Run("burst allows initial requests", func(t *testing.T) {
 		tb, _ := NewTokenBucket("test:allow", 10, 2)
-		if !tb.Allow() || !tb.Allow() {
-			t.Fatal("first two Allow() calls should succeed")
+		if !tb.Allow() {
+			t.Fatal("first Allow() call should succeed")
+		}
+		if !tb.Allow() {
+			t.Fatal("second Allow() call should succeed")
 		}
 		if tb.Allow() {
 			t.Fatal("third Allow() should fail (burst exhausted)")
