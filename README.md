@@ -1,12 +1,19 @@
-# snowgo
+<div align="center">
 
-<img src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go" alt="Go"/> <img src="https://img.shields.io/badge/Gin-1.12.0-000000?style=for-the-badge" alt="Gin"/> <img src="https://img.shields.io/badge/GORM-1.31.1-007ACC?style=for-the-badge" alt="GORM"/> <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License"/>
+<h1>snowgo</h1>
 
-<p align="center">
-  基于 <b>Gin + GORM Gen</b> 的高可用、模块化 Go Web 脚手架
-  <br/>
-  企业级基础设施集成，快速构建后台管理系统与 RESTful API 服务
+<p>基于 <b>Gin + GORM Gen</b> 的高可用、模块化 Go Web 脚手架，企业级基础设施集成，快速构建后台管理系统与 RESTful API 服务</p>
+
+<p>
+  <a href="https://github.com/sy159/snowgo/actions/workflows/lint_code.yml"><img src="https://github.com/sy159/snowgo/actions/workflows/lint_code.yml/badge.svg" alt="Lint" /></a>
+  <a href="https://github.com/sy159/snowgo/actions/workflows/security.yml"><img src="https://github.com/sy159/snowgo/actions/workflows/security.yml/badge.svg" alt="Security" /></a>
+  <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.25+-00ADD8" alt="Go" /></a>
+  <a href="https://pkg.go.dev/github.com/gin-gonic/gin"><img src="https://img.shields.io/badge/Gin-1.12.0-000000" alt="Gin" /></a>
+  <a href="https://pkg.go.dev/gorm.io/gorm"><img src="https://img.shields.io/badge/GORM-1.31.1-007ACC" alt="GORM" /></a>
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="License" />
 </p>
+
+</div>
 
 ---
 
