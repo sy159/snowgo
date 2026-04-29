@@ -1,33 +1,81 @@
 # snowgo
 
-<img src="https://img.shields.io/badge/golang-1.25-blue"/> <img src="https://img.shields.io/badge/gin-1.12.0-green"/> <img src="https://img.shields.io/badge/gorm-1.31.1-red"/>
+<img src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go" alt="Go"/> <img src="https://img.shields.io/badge/Gin-1.12.0-000000?style=for-the-badge" alt="Gin"/> <img src="https://img.shields.io/badge/GORM-1.31.1-007ACC?style=for-the-badge" alt="GORM"/> <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License"/>
 
-基于 **Gin + GORM Gen** 的高可用、模块化 Go Web 脚手架，集成常用中间件与企业级基础设施（日志、配置、鉴权、消息队列、分布式锁、代码生成、Docker / Compose 支持、OpenTelemetry 链路追踪、Prometheus 监控等），旨在快速搭建中小型后台管理系统。
+<p align="center">
+  基于 <b>Gin + GORM Gen</b> 的高可用、模块化 Go Web 脚手架
+  <br/>
+  企业级基础设施集成，快速构建后台管理系统与 RESTful API 服务
+</p>
 
 ---
 
-## 特性概览
+## 📑 目录
+
+- [✨ 特性概览](#-特性概览)
+- [🏗️ 架构设计](#️-架构设计)
+- [📂 项目结构](#-项目结构)
+- [🚀 快速开始](#-快速开始)
+- [🛠️ 常用命令](#️-常用命令)
+- [🔌 服务入口](#-服务入口)
+- [🧩 中间件清单](#-中间件清单)
+- [🏥 健康检查](#-健康检查)
+- [📐 新业务功能开发流程](#-新业务功能开发流程)
+- [🌍 环境变量](#-环境变量)
+- [🔄 CI / CD](#--ci--cd)
+- [📖 文档 & 参考](#-文档--参考)
+- [📄 许可证](#-许可证)
+
+---
+
+## ✨ 特性概览
 
 | 模块 | 组件 | 描述 |
-|------|------|------|
-| Web 框架 | Gin | 高性能 HTTP 框架 |
-| 配置管理 | Viper | 多环境配置文件（dev / container / uat / prod） |
-| 日志系统 | Zap + RotateLogs + ELK | 结构化日志，支持文件轮转与脱敏输出；可选集成 ELK |
-| 数据访问 | GORM + Gen + dbresolver | ORM 工具，支持读写分离、多数据库配置；Model/Query 代码自动生成 |
-| 缓存系统 | go-redis | Redis 客户端封装，支持缓存与分布式锁 |
-| 鉴权系统 | JWT v5 | access_token / refresh_token 双 Token 鉴权，refresh_token 单用+JTI 追踪 |
-| 权限系统 | 自定义 RBAC | 基于菜单树结构的按钮/接口级权限控制 |
-| 限流中间件 | Token Bucket Limiter | 支持 IP 白名单、路由级限流、Key 级限流 |
-| 链路追踪 | OpenTelemetry + Tempo | 可选开启，trace_id 自动注入日志与 HTTP Header |
-| 性能分析 | pprof | 按需开启，内网 IP 白名单保护 |
-| 健康检查 | /healthz / /readyz | 支持 K8s liveness / readiness probe |
-| 消息队列 | RabbitMQ | 生产者/消费者封装，独立部署扩缩容 |
-| 监控告警 | Prometheus + Grafana | 服务指标采集与可视化 |
-| 代码生成 | GORM Gen | 根据数据库表自动生成 Model + Query API |
+|:----:|:----:|------|
+| 🌐 Web 框架 | Gin | 高性能 HTTP 框架 |
+| ⚙️ 配置管理 | Viper | 多环境配置文件（dev / container / uat / prod） |
+| 📜 日志系统 | Zap + RotateLogs + ELK | 结构化日志，支持文件轮转与脱敏输出；可选集成 ELK |
+| 🗄️ 数据访问 | GORM + Gen + dbresolver | ORM 工具，支持读写分离、多数据库配置；Model/Query 代码自动生成 |
+| 🚀 缓存系统 | go-redis | Redis 客户端封装，支持缓存与分布式锁 |
+| 🔐 鉴权系统 | JWT v5 | access_token / refresh_token 双 Token 鉴权，refresh_token 单用+JTI 追踪 |
+| 🛂 权限系统 | 自定义 RBAC | 基于菜单树结构的按钮/接口级权限控制 |
+| 🛡️ 限流中间件 | Token Bucket Limiter | 支持 IP 白名单、路由级限流、Key 级限流 |
+| 🔗 链路追踪 | OpenTelemetry + Tempo | 可选开启，trace_id 自动注入日志与 HTTP Header |
+| 📊 性能分析 | pprof | 按需开启，内网 IP 白名单保护 |
+| 🏥 健康检查 | /healthz / /readyz | 支持 K8s liveness / readiness probe |
+| 📨 消息队列 | RabbitMQ | 生产者/消费者封装，独立部署扩缩容 |
+| 📈 监控告警 | Prometheus + Grafana | 服务指标采集与可视化 |
+| 🔨 代码生成 | GORM Gen | 根据数据库表自动生成 Model + Query API |
 
 ---
 
-## 项目结构
+## 🏗️ 架构设计
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    HTTP API / Router                     │
+│         (Gin + Middleware + JWTAuth + RBAC)              │
+├─────────────┬─────────────┬─────────────┬───────────────┤
+│   API 层    │  Service层  │   DAO 层    │    DAL 层     │
+│  参数校验    │ 业务编排    │ 数据访问    │ GORM Gen      │
+│  响应格式化  │ 缓存/事务   │ 封装 GORM   │ Model/Query   │
+├─────────────┴─────────────┴─────────────┴───────────────┤
+│                    基础设施层                             │
+│    MySQL (读写分离)  │  Redis (缓存/锁)  │  RabbitMQ     │
+│    OpenTelemetry 追踪 │  Prometheus 监控  │  Zap 日志     │
+└─────────────────────────────────────────────────────────┘
+```
+
+**分层规则**：Router → API → Service → DAO → DAL → MySQL / Redis
+
+- 每层只调用下一层，禁止跨层调用
+- API 只调用 Service（不调 DAO），Service 只调用 DAO（不调 GORM Gen 直接）
+- 多表写操作必须使用事务；操作日志在事务内同步写入
+- 缓存失效在 DB 提交后执行，禁止在事务中操作缓存
+
+---
+
+## 📂 项目结构
 
 ```
 snowgo
@@ -87,6 +135,10 @@ snowgo
 │   └── xtrace/               # OpenTelemetry 链路追踪
 ├── test/                     # 测试用例
 ├── logs/                     # 运行日志（.gitignore）
+├── CLAUDE.md                 # AI 辅助开发指南
+├── CLAUDE_CODING.md          # 编码规范
+├── CLAUDE_ARCHITECTURE.md    # 架构设计与数据库规范
+├── CLAUDE_OPERATIONS.md      # 安全、测试、Git 工作流
 ├── Makefile                  # 常用构建与运行命令
 ├── Dockerfile                # API 服务镜像
 ├── Dockerfile.consumer       # Consumer 服务镜像
@@ -98,13 +150,13 @@ snowgo
 
 ---
 
-## 快速开始
+## 🚀 快速开始
 
 ### 环境要求
 
-- Go >= 1.25
-- Docker & Docker Compose（可选）
-- GNU Make
+- **Go** >= 1.25
+- **Docker & Docker Compose**（可选）
+- **GNU Make**
 
 ### 1. 克隆项目
 
@@ -168,7 +220,9 @@ docker run -d \
   -v ./config:/app/config \
   -v ./logs:/app/logs \
   snowgo:1.0.0
+```
 
+```shell
 # 运行 Consumer 容器
 make consumer-run
 # 或手动
@@ -199,7 +253,7 @@ make down
 
 ---
 
-## 常用命令
+## 🛠️ 常用命令
 
 ```shell
 make help               # 查看所有可用命令
@@ -229,7 +283,7 @@ make restart            # Docker Compose 重启
 
 ---
 
-## 服务入口说明
+## 🔌 服务入口
 
 | 入口 | 说明 | 部署建议 |
 |------|------|----------|
@@ -239,7 +293,7 @@ make restart            # Docker Compose 重启
 
 ---
 
-## 中间件清单
+## 🧩 中间件清单
 
 | 中间件 | 功能 | 启用条件 |
 |--------|------|----------|
@@ -258,7 +312,7 @@ make restart            # Docker Compose 重启
 
 ---
 
-## 健康检查端点
+## 🏥 健康检查
 
 ```
 GET /healthz   # Liveness probe（服务是否存活）
@@ -267,7 +321,7 @@ GET /readyz    # Readiness probe（服务是否就绪）
 
 ---
 
-## 新业务功能开发流程
+## 📐 新业务功能开发流程
 
 ```
 数据库表设计
@@ -285,11 +339,11 @@ make gen add / make gen update   # 生成 Model + Query
 更新 DI 容器（internal/di/container.go）
 ```
 
-> **警告**：`internal/dal/model/` 与 `internal/dal/query/` 为机器生成代码，**禁止手动编辑**。后续 `make gen` 会覆盖所有手动修改。
+> ⚠️ **警告**：`internal/dal/model/` 与 `internal/dal/query/` 为机器生成代码，**禁止手动编辑**。后续 `make gen` 会覆盖所有手动修改。
 
 ---
 
-## 环境变量
+## 🌍 环境变量
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
@@ -298,7 +352,7 @@ make gen add / make gen update   # 生成 Model + Query
 
 ---
 
-## CI / CD
+## 🔄 CI / CD
 
 项目内置 GitHub Actions 工作流：
 
@@ -308,15 +362,21 @@ make gen add / make gen update   # 生成 Model + Query
 
 ---
 
-## 接口文档
+## 📖 文档 & 参考
 
-[Apifox 接口文档](https://apifox.com/apidoc/shared-becb3022-d340-491c-bdd7-1f4d4b84620f)
+### 接口文档
 
----
+- [Apifox 接口文档](https://apifox.com/apidoc/shared-becb3022-d340-491c-bdd7-1f4d4b84620f)
 
-## 参考文档
+### 参考资源
 
 - [Gin 官方文档](https://gin-gonic.com/)
 - [GORM 文档](https://gorm.io/zh_CN/docs/)
 - [GORM Gen 代码生成](https://gorm.io/zh_CN/gen/dao.html)
 - [JWT 介绍](https://jwt.io/introduction/)
+
+---
+
+## 📄 许可证
+
+本项目基于 [MIT License](./LICENSE) 开源发布。
