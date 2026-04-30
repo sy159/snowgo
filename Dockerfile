@@ -23,15 +23,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     go build -trimpath -ldflags="-s -w" -o /out/snowgo ./cmd/http
 
 
-FROM alpine:latest AS runtime
+FROM alpine:3.21 AS runtime
 #FROM debian:stable-slim AS runtime
-
-ENV APP_HOME=/app
-ENV PORT=8000
-# 环境变量示例，消费使用
-ENV CONFIG_PATH=${APP_HOME}/config \
-    LOG_PATH=${APP_HOME}/logs \
-    TZ=Asia/Shanghai
 
 # 安装运行时依赖并设置时区
 RUN apk add --no-cache \
@@ -42,14 +35,20 @@ RUN apk add --no-cache \
     && echo "Asia/Shanghai" > /etc/timezone \
     && rm -rf /var/cache/apk/*
 
+# config通过docker-compose volume挂载，不打进镜像
+ENV APP_HOME=/app \
+    PORT=8000 \
+    CONFIG_PATH=/app/config \
+    LOG_PATH=/app/logs \
+    TZ=Asia/Shanghai
+
 WORKDIR ${APP_HOME}
 
 COPY --from=builder /out/snowgo ${APP_HOME}/
-COPY --from=builder /src/config ${APP_HOME}/config/
 
 EXPOSE ${PORT}
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/health || exit 1
+    CMD curl -f http://localhost:${PORT}/healthz || exit 1
 
 ENTRYPOINT ["/app/snowgo"]

@@ -8,10 +8,16 @@ logs/
 
 # Docker runtime data (deploy directory)
 deploy/
+.github/
+
+# Documentation
+docs/
+assets/
 
 # AI agent files
 .claude/
 .agents/
+CLAUDE*.md
 
 # IDE / Editor files
 .idea/
