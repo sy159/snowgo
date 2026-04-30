@@ -271,27 +271,36 @@ go run ./cmd/http
 ```shell
 make help               # 查看所有可用命令
 
+# 构建
+make api-build          # 构建 API Docker 镜像
+make consumer-build     # 构建 Consumer Docker 镜像
+make build-all          # 构建全部 Docker 镜像
+
 # 开发
-make gen init           # 生成所有表的 Model 并初始化数据库
-make gen add            # 为新表生成 Model + Query（交互式）
-make gen update         # 更新已有表的 Model + Query
+make gen do=init        # 生成所有表的 Model 并初始化数据库
+make gen do=update      # 更新已有表的 Model + Query
 make gen-query          # 重新生成 Query API
 make mysql-init         # 初始化数据库数据
 make mq-init            # 声明 RabbitMQ 拓扑
 
-# 测试
-make test               # 运行全部测试并输出覆盖率
+# 代码质量
+make test               # 运行全部测试（含 race 检测）并输出覆盖率
+make test-verbose       # 详细输出模式运行测试
+make lint               # golangci-lint 代码检查（自动安装）
+make fmt                # 格式化 Go 代码
+make tidy               # 清理 go.mod 无用依赖
 
-# Docker
-make api-build          # 构建 API Docker 镜像
+# Docker 容器
 make api-run            # 运行 API 容器
 make api-stop           # 停止 API 容器
-make consumer-build     # 构建 Consumer Docker 镜像
 make consumer-run       # 运行 Consumer 容器
 make consumer-stop      # 停止 Consumer 容器
-make up                 # Docker Compose 启动全部服务
-make down               # Docker Compose 停止全部服务
-make restart            # Docker Compose 重启
+
+# Docker Compose
+make up                 # 启动全部服务（nginx + mysql + redis + app）
+make up-logs            # 启动并实时跟踪日志
+make down               # 停止全部服务
+make restart            # 重启全部服务
 ```
 
 ---
@@ -362,6 +371,9 @@ make gen add / make gen update   # 生成 Model + Query
 |------|------|--------|
 | `ENV` | 运行环境（dev / container / uat / prod） | `dev` |
 | `SNOWFLAKE_NODE` | 雪花算法节点 ID（多实例部署时需区分） | `1` |
+| `SERVICE_IMAGE_NAME` | API 服务镜像名称 | `snowgo` |
+| `SERVICE_IMAGE_VERSION` | API 服务镜像版本 | `1.0.0` |
+| `GOPRIVATE` | 私有仓库地址（构建时传递） | 空 |
 
 ---
 

@@ -7,7 +7,7 @@ services:
     restart: always
     logging:
       options:
-        max-size: '10m'
+        max-size: '50m'
         max-file: '10'
     volumes:
       - /etc/localtime:/etc/localtime
@@ -19,7 +19,7 @@ services:
       - snowgo_network
 
   snowgo-mysql:
-    image: mysql:5.7
+    image: mysql:8.0
     container_name: snowgo-mysql
     ports:
       - ${MYSQL_PORT:-3307}:3306
@@ -71,7 +71,7 @@ services:
     restart: always
     logging:
       options:
-        max-size: '5m'
+        max-size: '50m'
         max-file: '10'
     environment:
       ENV: ${ENV:-container}
@@ -79,7 +79,7 @@ services:
     privileged: true
     volumes:
       - /etc/localtime:/etc/localtime
-      - ./config:/app/config
+      - ./config:/app/config:ro
       - ./logs/app1:/app/logs
     networks:
       - snowgo_network
@@ -96,7 +96,7 @@ services:
     restart: always
     logging:
       options:
-        max-size: '5m'
+        max-size: '50m'
         max-file: '10'
     environment:
       ENV: ${ENV:-container}
@@ -104,7 +104,7 @@ services:
     privileged: true
     volumes:
       - /etc/localtime:/etc/localtime
-      - ./config:/app/config
+      - ./config:/app/config:ro
       - ./logs/app2:/app/logs
     networks:
       - snowgo_network

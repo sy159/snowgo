@@ -11,6 +11,8 @@ CONSUMER_VERSION ?= 1.0.0
 
 COMPOSE_FILE ?= docker-compose.yml
 
+GOPRIVATE ?=
+
 .PHONY: help
 help: ## Show this help
 	@awk 'BEGIN { \
@@ -23,22 +25,39 @@ help: ## Show this help
 	}' $(MAKEFILE_LIST)
 
 .PHONY: mysql-init
-mysql-init:  ## Init database schema/data
+mysql-init: ## Init database schema/data
 	@echo "开始初始化数据库..."
 	@go run ./internal/dal/cmd/init/main.go
 
 .PHONY: mq-init
-mq-init:  ## Init rabbitmq declare
+mq-init: ## Init rabbitmq declare
 	@echo "开始初始化rabbitmq声明..."
 	@go run ./cmd/mq-declarer
 
+# --- Build targets ---
+
 .PHONY: api-build
-api-build:  ## Build API docker image
+api-build: ## Build API docker image
 	@echo "Building API image..."
-	docker build -t $(API_IMAGE):$(API_VERSION) .
+	docker build \
+		--build-arg GOPRIVATE=$(GOPRIVATE) \
+		-t $(API_IMAGE):$(API_VERSION) .
+
+.PHONY: consumer-build
+consumer-build: ## Build consumer docker image
+	@echo "Building consumer image..."
+	docker build \
+		--build-arg GOPRIVATE=$(GOPRIVATE) \
+		-f Dockerfile.consumer \
+		-t $(CONSUMER_IMAGE):$(CONSUMER_VERSION) .
+
+.PHONY: build-all
+build-all: api-build consumer-build ## Build all docker images
+
+# --- Run targets ---
 
 .PHONY: api-run
-api-run:  api-stop  ## Run API container
+api-run: api-stop ## Run API container
 	@echo "Running API container..."
 	docker run -d \
 		--restart unless-stopped \
@@ -50,19 +69,13 @@ api-run:  api-stop  ## Run API container
 		$(API_IMAGE):$(API_VERSION)
 
 .PHONY: api-stop
-api-stop:  ## Stop API container
+api-stop: ## Stop API container
 	@echo "Stopping API container..."
 	@docker stop $(API_NAME) 2>/dev/null || true
 	@docker rm $(API_NAME) 2>/dev/null || true
 
-.PHONY: consumer-build
-consumer-build:  ## Build consumer docker image
-	@echo "Building consumer image..."
-	docker build -f Dockerfile.consumer \
-		-t $(CONSUMER_IMAGE):$(CONSUMER_VERSION) .
-
 .PHONY: consumer-run
-consumer-run:  consumer-stop  ## Run consumer container
+consumer-run: consumer-stop ## Run consumer container
 	@echo "Running consumer container..."
 	docker run -d \
 		--restart unless-stopped \
@@ -73,17 +86,24 @@ consumer-run:  consumer-stop  ## Run consumer container
 		$(CONSUMER_IMAGE):$(CONSUMER_VERSION)
 
 .PHONY: consumer-stop
-consumer-stop:    ## Stop consumer container
+consumer-stop: ## Stop consumer container
 	@echo "Stopping consumer container..."
-	docker stop $(CONSUMER_NAME) 2>/dev/null || true
-	docker rm $(CONSUMER_NAME) 2>/dev/null || true
+	@docker stop $(CONSUMER_NAME) 2>/dev/null || true
+	@docker rm $(CONSUMER_NAME) 2>/dev/null || true
+
+# --- Docker Compose ---
 
 .PHONY: up
-up:  ## Start all services via docker-compose
+up: ## Start all services via docker-compose
+	@echo "Starting services..."
 	docker compose -f $(COMPOSE_FILE) up -d
 
+.PHONY: up-logs
+up-logs: up ## Start services and follow logs
+	docker compose -f $(COMPOSE_FILE) logs -f
+
 .PHONY: restart
-restart:  ## Restart all services via docker-compose
+restart: ## Restart all services via docker-compose
 	docker compose -f $(COMPOSE_FILE) restart
 
 .PHONY: down
@@ -94,18 +114,35 @@ down: ## Stop all services via docker-compose
 start: up
 stop: down
 
+# --- Test & Lint ---
+
 .PHONY: test
-test:
-	go test ./... -cover
+test: ## Run unit tests with race detector
+	go test -race -count=1 -cover ./...
 
+.PHONY: test-verbose
+test-verbose: ## Run tests with verbose output
+	go test -race -v -count=1 ./...
 
-# 生成model
+.PHONY: lint
+lint: ## Run golangci-lint
+	@command -v golangci-lint >/dev/null 2>&1 || { echo "Installing golangci-lint..."; go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest; }
+	golangci-lint run ./...
+
+.PHONY: fmt
+fmt: ## Format Go code
+	gofmt -s -w $(shell find . -name '*.go' -not -path './vendor/*')
+
+.PHONY: tidy
+tidy: ## Clean up go.mod dependencies
+	go mod tidy
+
+# --- Code Generation ---
+
 .PHONY: gen
-gen: do ?= init
-gen:  ## Generate DAL code
-	go run ./internal/dal/cmd/gen/main.go $(do) && make gen-query
-	# git add ./internal/dal/
+gen: ## Generate DAL code (usage: make gen do=init|query)
+	@go run ./internal/dal/cmd/gen/main.go $(do) && make gen-query
 
 .PHONY: gen-query
-gen-query:  ## Generate Query code
-	go run ./internal/dal/cmd/gen/main.go query
+gen-query: ## Generate Query code
+	@go run ./internal/dal/cmd/gen/main.go query

@@ -37,6 +37,7 @@ ENV CONFIG_PATH=${APP_HOME}/config \
 RUN apk add --no-cache \
     ca-certificates \
     tzdata \
+    curl \
     && ln -snf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \
     && rm -rf /var/cache/apk/*
@@ -47,5 +48,8 @@ COPY --from=builder /out/snowgo ${APP_HOME}/
 COPY --from=builder /src/config ${APP_HOME}/config/
 
 EXPOSE ${PORT}
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
 ENTRYPOINT ["/app/snowgo"]
