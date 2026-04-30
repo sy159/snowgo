@@ -46,5 +46,9 @@ Thumbs.db
 # Go module cache
 go.sum.tmp
 
-# Config secrets (prod configs excluded from image)
+# Config secrets (prod/container configs excluded from image)
 config/*.prod.yaml
+config/*.container.yaml
+
+# Environment files with real credentials
+.env
