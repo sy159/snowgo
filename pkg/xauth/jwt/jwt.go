@@ -190,7 +190,7 @@ func (cm *Claims) IsAccessToken() bool {
 	return cm.GrantType == accessType
 }
 
-// IsRefreshToken 判断是否是 access token
+// IsRefreshToken 判断是否是 refresh token
 func (cm *Claims) IsRefreshToken() bool {
 	return cm.GrantType == refreshType
 }

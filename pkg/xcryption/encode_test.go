@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"snowgo/pkg/xcryption"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -44,7 +45,7 @@ func BenchmarkId2CodeConcurrent(b *testing.B) {
 	total := 100000   // 总生成数量
 
 	var wg sync.WaitGroup
-	errCount := 0
+	var errCount int64
 	start := time.Now()
 
 	for i := 0; i < concurrency; i++ {
@@ -56,10 +57,8 @@ func BenchmarkId2CodeConcurrent(b *testing.B) {
 				minLen := 6 + rand.Intn(6) // 随机 minLength 6~11
 				code := xcryption.Id2Code(id, minLen)
 				decoded, err := xcryption.Code2Id(code)
-				if err != nil {
-					errCount++
-				} else if decoded != id {
-					errCount++
+				if err != nil || decoded != id {
+					atomic.AddInt64(&errCount, 1)
 				}
 			}
 		}()
@@ -77,7 +76,7 @@ func TestRandomStress(t *testing.T) {
 	concurrency := 20
 	total := 50000
 	var wg sync.WaitGroup
-	errCount := 0
+	var errCount int64
 
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
@@ -89,7 +88,7 @@ func TestRandomStress(t *testing.T) {
 				code := xcryption.Id2Code(id, minLen)
 				decoded, err := xcryption.Code2Id(code)
 				if err != nil || decoded != id {
-					errCount++
+					atomic.AddInt64(&errCount, 1)
 				}
 			}
 		}()

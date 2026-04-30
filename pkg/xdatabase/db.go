@@ -35,8 +35,9 @@ func (d *BaseRepository) GetBaseRepository(dbName string) *BaseRepository {
 // Use 使用read or w db
 func (d *BaseRepository) Use(op dbresolver.Operation) *BaseRepository {
 	return &BaseRepository{
-		db: d.db,
-		op: op,
+		db:    d.db,
+		dbMap: d.dbMap,
+		op:    op,
 	}
 }
 

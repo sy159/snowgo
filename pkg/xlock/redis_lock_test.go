@@ -74,7 +74,8 @@ func TestRedisLock(t *testing.T) {
 	})
 
 	t.Run("ReTryLock", func(t *testing.T) {
-		ctx := context.TODO()
+		ctx, cancel := context.WithTimeout(context.TODO(), 3*time.Second)
+		defer cancel()
 		key := "test-retry-lock"
 		_ = rdb.SetArgs(ctx, key, "locked", redis.SetArgs{Mode: "NX", TTL: 10 * time.Second}).Val()
 
@@ -82,7 +83,11 @@ func TestRedisLock(t *testing.T) {
 			t.Logf("err=%v", lc.Err())
 			return nil
 		})
-		t.Logf("err=%v", err)
+		if err == nil {
+			t.Log("ReTryLock acquired lock")
+		} else {
+			t.Logf("ReTryLock err=%v", err)
+		}
 	})
 
 	t.Run("Extend", func(t *testing.T) {

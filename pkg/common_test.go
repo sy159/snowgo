@@ -3,6 +3,8 @@ package common
 import (
 	"os"
 	"os/exec"
+	"strconv"
+	"sync"
 	"testing"
 )
 
@@ -223,4 +225,132 @@ func TestStructToMap(t *testing.T) {
 			t.Fatalf("expected 1 field, got %d: %v", len(m), m)
 		}
 	})
+}
+
+// ========================
+// Benchmark
+// ========================
+
+func BenchmarkGenerateID(b *testing.B) {
+	b.Run("snowflake", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			GenerateID()
+		}
+	})
+
+	b.Run("snowflake_parallel", func(b *testing.B) {
+		b.RunParallel(func(pb *testing.PB) {
+			for pb.Next() {
+				GenerateID()
+			}
+		})
+	})
+}
+
+func BenchmarkGenerateID_Fallback(b *testing.B) {
+	orig := sfNode
+	sfNode = nil
+	b.Cleanup(func() { sfNode = orig })
+
+	b.Run("serial", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			GenerateID()
+		}
+	})
+
+	b.Run("parallel", func(b *testing.B) {
+		b.RunParallel(func(pb *testing.PB) {
+			for pb.Next() {
+				GenerateID()
+			}
+		})
+	})
+}
+
+func BenchmarkWeakRandInt63n(b *testing.B) {
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			WeakRandInt63n(1000)
+		}
+	})
+}
+
+func BenchmarkSecureRandInt63n(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = SecureRandInt63n(1000)
+	}
+}
+
+func BenchmarkStructToMap(b *testing.B) {
+	type benchStruct struct {
+		Name  string `json:"name"`
+		Age   int    `json:"age"`
+		Email string `json:"email"`
+	}
+	s := benchStruct{Name: "Alice", Age: 25, Email: "a@b.com"}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = StructToMap(s, "json")
+	}
+}
+
+// ========================
+// 并发压测
+// ========================
+
+func TestGenerateID_ConcurrentStress(t *testing.T) {
+	var wg sync.WaitGroup
+	ids := make(chan string, 10000)
+	concurrency := 50
+	perGoroutine := 200
+
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < perGoroutine; j++ {
+				ids <- GenerateID()
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(ids)
+	}()
+
+	seen := make(map[string]bool, concurrency*perGoroutine)
+	for id := range ids {
+		if seen[id] {
+			t.Fatalf("duplicate ID detected: %s", id)
+		}
+		seen[id] = true
+
+		if _, err := strconv.ParseInt(id, 10, 64); err != nil {
+			t.Fatalf("non-numeric ID: %s", id)
+		}
+	}
+	if len(seen) != concurrency*perGoroutine {
+		t.Fatalf("expected %d unique IDs, got %d", concurrency*perGoroutine, len(seen))
+	}
+}
+
+func TestWeakRandInt63n_ConcurrentStress(t *testing.T) {
+	var wg sync.WaitGroup
+	concurrency := 50
+	perGoroutine := 1000
+
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < perGoroutine; j++ {
+				got := WeakRandInt63n(1000)
+				if got < 0 || got >= 1000 {
+					panic("WeakRandInt63n out of range")
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }

@@ -75,3 +75,15 @@ func TestDev(t *testing.T) {
 		t.Errorf("Expected non-dev environment, but got %s", xenv.Env())
 	}
 }
+
+func BenchmarkEnv(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = xenv.Env()
+	}
+}
+
+func BenchmarkProd(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = xenv.Prod()
+	}
+}

@@ -108,7 +108,8 @@ func TestFail(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, float64(400), resp["code"])
 	assert.Equal(t, "Bad Request", resp["msg"])
-	assert.NotNil(t, resp["data"])
+	// Fail passes nil data which becomes empty struct {} in JSON
+	assert.Equal(t, map[string]interface{}{}, resp["data"])
 	assert.NotNil(t, resp["timestamp"])
 }
 
@@ -128,6 +129,7 @@ func TestFailByError(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, float64(500), resp["code"])
 	assert.Equal(t, "Internal Server Error", resp["msg"])
-	assert.NotNil(t, resp["data"])
+	// FailByError passes nil data which becomes empty struct {} in JSON
+	assert.Equal(t, map[string]interface{}{}, resp["data"])
 	assert.NotNil(t, resp["timestamp"])
 }

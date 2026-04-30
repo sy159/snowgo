@@ -4,6 +4,7 @@ import (
 	"errors"
 	"snowgo/pkg/xauth/jwt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -208,4 +209,52 @@ func TestJwt(t *testing.T) {
 		}
 	})
 
+}
+
+// ========================
+// Benchmark
+// ========================
+
+var benchMgr *jwt.Manager
+
+func init() {
+	benchMgr, _ = jwt.NewJwtManager(&jwt.Config{
+		JwtSecret:             "benchmark-secret-key-32bytes!!",
+		Issuer:                "bench",
+		AccessExpirationTime:  10 * time.Minute,
+		RefreshExpirationTime: 30 * time.Minute,
+	})
+}
+
+func BenchmarkGenerateAccessToken(b *testing.B) {
+	var uid int32
+	b.RunParallel(func(pb *testing.PB) {
+		id := atomic.AddInt32(&uid, 1)
+		for pb.Next() {
+			_, _, _ = benchMgr.GenerateAccessToken(id, "user", "refresh-jti")
+		}
+	})
+}
+
+func BenchmarkGenerateTokens(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = benchMgr.GenerateTokens(1, "benchuser")
+	}
+}
+
+func BenchmarkParseToken(b *testing.B) {
+	token, _, _ := benchMgr.GenerateAccessToken(1, "benchuser", "jti")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = benchMgr.ParseToken(token)
+	}
+}
+
+func BenchmarkRefreshTokens(b *testing.B) {
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, refreshToken, _, _ := benchMgr.GenerateRefreshToken(1, "benchuser")
+			_, _ = benchMgr.RefreshTokens(refreshToken)
+		}
+	})
 }

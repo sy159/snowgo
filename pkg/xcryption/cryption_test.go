@@ -120,14 +120,14 @@ func BenchmarkCrypto(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		encrypt, err := xcryption.AesCBCEncrypt(plainText, key)
 		if err != nil {
-			b.Error(err)
+			b.Fatal(err)
 		}
 		decrypt, err := xcryption.AesCBCDecrypt(encrypt, key)
 		if err != nil {
-			b.Error(err)
+			b.Fatal(err)
 		}
 		if plainText != decrypt {
-			b.Error("decrypt xerror")
+			b.Fatal("decrypt xerror")
 		}
 	}
 }
@@ -137,11 +137,61 @@ func BenchmarkHashPwd(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		hashPwd, err := xcryption.HashPassword(pwd)
 		if err != nil {
-			b.Error(err)
+			b.Fatal(err)
 		}
 		isSuccess := xcryption.CheckPassword(hashPwd, pwd)
 		if !isSuccess {
-			b.Error("hash password error")
+			b.Fatal("hash password error")
 		}
+	}
+}
+
+func BenchmarkId2Code(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		xcryption.Id2Code(int64(i%1000000), 8)
+	}
+}
+
+func BenchmarkId2CodeParallel(b *testing.B) {
+	b.RunParallel(func(pb *testing.PB) {
+		i := int64(0)
+		for pb.Next() {
+			i++
+			xcryption.Id2Code(i%1000000, 8)
+		}
+	})
+}
+
+func BenchmarkCode2Id(b *testing.B) {
+	code := xcryption.Id2Code(12345, 8)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = xcryption.Code2Id(code)
+	}
+}
+
+func BenchmarkSha256(b *testing.B) {
+	s := "hello world, this is a benchmark test string"
+	for i := 0; i < b.N; i++ {
+		xcryption.Sha256(s)
+	}
+}
+
+func BenchmarkAesCBCEncrypt(b *testing.B) {
+	plainText := "hello world, benchmark data"
+	key := "aa125678aa125678"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = xcryption.AesCBCEncrypt(plainText, key)
+	}
+}
+
+func BenchmarkAesCBCDecrypt(b *testing.B) {
+	plainText := "hello world, benchmark data"
+	key := "aa125678aa125678"
+	encrypted, _ := xcryption.AesCBCEncrypt(plainText, key)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = xcryption.AesCBCDecrypt(encrypted, key)
 	}
 }

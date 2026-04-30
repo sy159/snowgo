@@ -116,3 +116,39 @@ func TestIsUniqueStr(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkRandStr(b *testing.B) {
+	b.Run("short", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			xstr_tool.RandStr(8, xstr_tool.LowerFlag|xstr_tool.UpperFlag|xstr_tool.DigitFlag)
+		}
+	})
+
+	b.Run("parallel", func(b *testing.B) {
+		b.RunParallel(func(pb *testing.PB) {
+			for pb.Next() {
+				xstr_tool.RandStr(8, xstr_tool.LowerFlag|xstr_tool.UpperFlag|xstr_tool.DigitFlag)
+			}
+		})
+	})
+}
+
+func BenchmarkRandShuffleStr(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		xstr_tool.RandShuffleStr(8, xstr_tool.LowerFlag|xstr_tool.UpperFlag|xstr_tool.DigitFlag)
+	}
+}
+
+func BenchmarkReverseStr(b *testing.B) {
+	s := "abcdefghijklmnopqrstuvwxyz"
+	for i := 0; i < b.N; i++ {
+		xstr_tool.ReverseStr(s)
+	}
+}
+
+func BenchmarkIsUniqueStr(b *testing.B) {
+	s := "abcdefghij"
+	for i := 0; i < b.N; i++ {
+		xstr_tool.IsUniqueStr(s)
+	}
+}
