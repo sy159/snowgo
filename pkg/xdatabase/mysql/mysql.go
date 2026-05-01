@@ -65,6 +65,10 @@ func processConfig(cfg config.MysqlConfig) config.MysqlConfig {
 	if processCfg.ConnMaxIdleTime <= 0 {
 		processCfg.ConnMaxIdleTime = 10 * time.Minute
 	}
+	// 空闲时间超过最大生命周期逻辑矛盾，连接在关闭前就超过最大存活时间
+	if processCfg.ConnMaxIdleTime > processCfg.ConnMaxLifeTime {
+		processCfg.ConnMaxIdleTime = processCfg.ConnMaxLifeTime
+	}
 
 	if processCfg.SlowSqlThresholdTime <= 0 {
 		processCfg.SlowSqlThresholdTime = 2 * time.Second
@@ -72,15 +76,26 @@ func processConfig(cfg config.MysqlConfig) config.MysqlConfig {
 	return processCfg
 }
 
+// ensureTimeout 补充 DSN 中缺失的超时参数，避免零值无限等待
 func ensureTimeout(dsn string) string {
-	if strings.Contains(dsn, "timeout=") {
-		return dsn // 已设置timeout跳过
+	params := make([]string, 1)
+	if !strings.Contains(dsn, "timeout=") {
+		params = append(params, "timeout=5s")
 	}
-	// 自动追加参数
+	if !strings.Contains(dsn, "readTimeout=") {
+		params = append(params, "readTimeout=10s")
+	}
+	if !strings.Contains(dsn, "writeTimeout=") {
+		params = append(params, "writeTimeout=10s")
+	}
+	if len(params) == 0 {
+		return dsn
+	}
+	sep := "?"
 	if strings.Contains(dsn, "?") {
-		return dsn + "&timeout=5s"
+		sep = "&"
 	}
-	return dsn + "?timeout=5s"
+	return dsn + sep + strings.Join(params, "&")
 }
 
 // 连接mysql
@@ -144,13 +159,12 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 	// 未开启读写分离配置
 	if !mysqlConfig.EnableReadWriteSeparation {
 		return db, nil
-	} else {
-		if len(mysqlConfig.MainsDSN) == 0 {
-			return nil, errors.New("读写分离需要配置主库地址")
-		}
-		if len(mysqlConfig.SlavesDSN) == 0 {
-			mysqlConfig.SlavesDSN = mysqlConfig.MainsDSN
-		}
+	}
+	if len(mysqlConfig.MainsDSN) == 0 {
+		return nil, errors.New("读写分离需要配置主库地址")
+	}
+	if len(mysqlConfig.SlavesDSN) == 0 {
+		mysqlConfig.SlavesDSN = mysqlConfig.MainsDSN
 	}
 
 	// 读写分离配置
@@ -195,19 +209,23 @@ func closeMysql(db *gorm.DB) error {
 // Close 关闭所有数据库连接
 func (m *MyDB) Close() error {
 	visited := make(map[*gorm.DB]bool, 4)
-	var closeErr error
+	var errs []error
 	if _, ok := visited[m.DB]; !ok {
-		closeErr = closeMysql(m.DB)
+		if err := closeMysql(m.DB); err != nil {
+			errs = append(errs, err)
+		}
 		visited[m.DB] = true
 	}
 
 	for _, v := range m.DbMap {
 		if _, ok := visited[v]; !ok {
-			closeErr = closeMysql(v)
+			if err := closeMysql(v); err != nil {
+				errs = append(errs, err)
+			}
 			visited[v] = true
 		}
 	}
-	return closeErr
+	return errors.Join(errs...)
 }
 
 // CheckDBAlive 检查数据库连接是否存活

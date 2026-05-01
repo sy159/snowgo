@@ -1,6 +1,8 @@
 package repo
 
 import (
+	"fmt"
+
 	"gorm.io/gorm"
 	"gorm.io/plugin/dbresolver"
 	"snowgo/internal/dal/query"
@@ -48,12 +50,15 @@ func (db *Repository) DB() *gorm.DB {
 }
 
 // ChangeDB 切换其他的db连接
-func (db *Repository) ChangeDB(dbName string) *Repository {
-	repository := db.db.GetBaseRepository(dbName)
+func (db *Repository) ChangeDB(dbName string) (*Repository, error) {
+	repository, err := db.db.GetBaseRepository(dbName)
+	if err != nil {
+		return nil, fmt.Errorf("changeDB %s: %w", dbName, err)
+	}
 	return &Repository{
 		query:      query.Use(repository.DB()),
 		writeQuery: query.Use(repository.Use(dbresolver.Write).DB()),
 		readQuery:  query.Use(repository.Use(dbresolver.Read).DB()),
 		db:         repository,
-	}
+	}, nil
 }
