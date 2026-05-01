@@ -9,16 +9,21 @@ import (
 	"time"
 )
 
+const testJwtSecret = "Tphdi%Aapi5iXsX67F7MX5ZRJxZF*6wK"
+
 func TestJwt(t *testing.T) {
 	var userId int32 = 1
 	username := "test"
 
-	jwtManager, _ := jwt.NewJwtManager(&jwt.Config{
-		JwtSecret:             "Tphdi%Aapi5iXsX67F7MX5ZRJxZF*6wK",
+	jwtManager, err := jwt.NewJwtManager(&jwt.Config{
+		JwtSecret:             testJwtSecret,
 		Issuer:                "test-snow",
 		AccessExpirationTime:  10 * time.Minute,
 		RefreshExpirationTime: 30 * time.Minute,
 	})
+	if err != nil {
+		t.Fatalf("NewJwtManager error: %v", err)
+	}
 
 	t.Run("NewJwtManager validation errors", func(t *testing.T) {
 		tests := []struct {
@@ -28,9 +33,9 @@ func TestJwt(t *testing.T) {
 		}{
 			{"nil config", nil, false},
 			{"secret too short", &jwt.Config{JwtSecret: "short", Issuer: "test", AccessExpirationTime: time.Minute, RefreshExpirationTime: time.Minute}, false},
-			{"empty issuer", &jwt.Config{JwtSecret: "longsecret123456", Issuer: "", AccessExpirationTime: time.Minute, RefreshExpirationTime: time.Minute}, false},
-			{"zero access expiration", &jwt.Config{JwtSecret: "longsecret123456", Issuer: "test", AccessExpirationTime: 0, RefreshExpirationTime: time.Minute}, false},
-			{"zero refresh expiration", &jwt.Config{JwtSecret: "longsecret123456", Issuer: "test", AccessExpirationTime: time.Minute, RefreshExpirationTime: 0}, false},
+			{"empty issuer", &jwt.Config{JwtSecret: "longsecret12345678901234567890ab", Issuer: "", AccessExpirationTime: time.Minute, RefreshExpirationTime: time.Minute}, false},
+			{"zero access expiration", &jwt.Config{JwtSecret: "longsecret12345678901234567890ab", Issuer: "test", AccessExpirationTime: 0, RefreshExpirationTime: time.Minute}, false},
+			{"zero refresh expiration", &jwt.Config{JwtSecret: "longsecret12345678901234567890ab", Issuer: "test", AccessExpirationTime: time.Minute, RefreshExpirationTime: 0}, false},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
@@ -93,20 +98,56 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("expired token", func(t *testing.T) {
-		expiredManager, _ := jwt.NewJwtManager(&jwt.Config{
-			JwtSecret:             "Tphdi%Aapi5iXsX67F7MX5ZRJxZF*6wK",
+		expiredManager, err := jwt.NewJwtManager(&jwt.Config{
+			JwtSecret:             testJwtSecret,
 			Issuer:                "test-snow",
-			AccessExpirationTime:  100 * time.Millisecond,
-			RefreshExpirationTime: 100 * time.Millisecond,
+			AccessExpirationTime:  1 * time.Second,
+			RefreshExpirationTime: 1 * time.Second,
 		})
+		if err != nil {
+			t.Fatalf("NewJwtManager error: %v", err)
+		}
 		accessToken, _, err := expiredManager.GenerateAccessToken(userId, username, "123")
 		if err != nil {
 			t.Fatalf("generate expired access token error: %v", err)
 		}
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(1500 * time.Millisecond)
 		_, err = expiredManager.ParseToken(accessToken)
 		if !errors.Is(err, jwt.ErrTokenExpired) {
 			t.Fatalf("expected ErrTokenExpired, got: %v", err)
+		}
+	})
+
+	t.Run("issuer validation", func(t *testing.T) {
+		// 用 issuer-A 签发 token，用 issuer-B 解析，应该失败
+		mgrA, err := jwt.NewJwtManager(&jwt.Config{
+			JwtSecret:             testJwtSecret,
+			Issuer:                "issuer-A",
+			AccessExpirationTime:  time.Minute,
+			RefreshExpirationTime: time.Minute,
+		})
+		if err != nil {
+			t.Fatalf("NewJwtManager error: %v", err)
+		}
+		mgrB, err := jwt.NewJwtManager(&jwt.Config{
+			JwtSecret:             testJwtSecret,
+			Issuer:                "issuer-B",
+			AccessExpirationTime:  time.Minute,
+			RefreshExpirationTime: time.Minute,
+		})
+		if err != nil {
+			t.Fatalf("NewJwtManager error: %v", err)
+		}
+		accessToken, _, err := mgrA.GenerateAccessToken(userId, username, "jti")
+		if err != nil {
+			t.Fatalf("GenerateAccessToken error: %v", err)
+		}
+		_, err = mgrB.ParseToken(accessToken)
+		if err == nil {
+			t.Fatal("expected error when parsing token with wrong issuer, got nil")
+		}
+		if !errors.Is(err, jwt.ErrInvalidToken) {
+			t.Fatalf("expected ErrInvalidToken, got: %v", err)
 		}
 	})
 
@@ -149,9 +190,7 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("refresh token reuse old access token", func(t *testing.T) {
-		// 测试旧 access token 仍然可以解析，sessionId 非空
 		oldPair, _ := jwtManager.GenerateTokens(userId, username)
-		time.Sleep(1 * time.Second)
 		claims, err := jwtManager.ParseToken(oldPair.AccessToken)
 		if err != nil {
 			t.Fatalf("Parse old access token error: %v", err)
@@ -159,7 +198,6 @@ func TestJwt(t *testing.T) {
 		if claims.SessionId == "" {
 			t.Fatalf("old access token session_id is empty")
 		}
-		// 验证 refresh token 的 JTI 与 access token 的 SessionId 一致
 		refreshClaims, err := jwtManager.ParseToken(oldPair.RefreshToken)
 		if err != nil {
 			t.Fatalf("Parse old refresh token error: %v", err)
@@ -170,7 +208,6 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("claims type check", func(t *testing.T) {
-		// Test IsAccessToken and IsRefreshToken
 		tokenPair, _ := jwtManager.GenerateTokens(userId, username)
 
 		accessClaims, _ := jwtManager.ParseToken(tokenPair.AccessToken)
@@ -192,7 +229,6 @@ func TestJwt(t *testing.T) {
 
 	t.Run("refresh token with access token should fail", func(t *testing.T) {
 		tokenPair, _ := jwtManager.GenerateTokens(userId, username)
-		// Try to refresh with access token instead of refresh token
 		_, err := jwtManager.RefreshTokens(tokenPair.AccessToken)
 		if err == nil {
 			t.Fatal("expected error when refreshing access token")
@@ -218,12 +254,16 @@ func TestJwt(t *testing.T) {
 var benchMgr *jwt.Manager
 
 func init() {
-	benchMgr, _ = jwt.NewJwtManager(&jwt.Config{
-		JwtSecret:             "benchmark-secret-key-32bytes!!",
+	var err error
+	benchMgr, err = jwt.NewJwtManager(&jwt.Config{
+		JwtSecret:             "benchmark-secret-key-32bytes!!!!",
 		Issuer:                "bench",
 		AccessExpirationTime:  10 * time.Minute,
 		RefreshExpirationTime: 30 * time.Minute,
 	})
+	if err != nil {
+		panic(err)
+	}
 }
 
 func BenchmarkGenerateAccessToken(b *testing.B) {
@@ -237,7 +277,7 @@ func BenchmarkGenerateAccessToken(b *testing.B) {
 }
 
 func BenchmarkGenerateTokens(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = benchMgr.GenerateTokens(1, "benchuser")
 	}
 }
@@ -245,7 +285,7 @@ func BenchmarkGenerateTokens(b *testing.B) {
 func BenchmarkParseToken(b *testing.B) {
 	token, _, _ := benchMgr.GenerateAccessToken(1, "benchuser", "jti")
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = benchMgr.ParseToken(token)
 	}
 }

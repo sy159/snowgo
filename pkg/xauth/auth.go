@@ -2,7 +2,6 @@ package xauth
 
 import (
 	"context"
-	"fmt"
 	e "snowgo/pkg/xerror"
 )
 
@@ -25,9 +24,7 @@ type Context struct {
 }
 
 type UserContext struct {
-	TraceId   string
-	IP        string
-	UserAgent string
+	Context
 	UserId    int32
 	Username  string
 	SessionId string
@@ -35,11 +32,11 @@ type UserContext struct {
 
 func GetContext(ctx context.Context) *Context {
 	traceId, _ := ctx.Value(XTraceId).(string)
-	iP, _ := ctx.Value(XIp).(string)
+	ip, _ := ctx.Value(XIp).(string)
 	userAgent, _ := ctx.Value(XUserAgent).(string)
 	return &Context{
 		TraceId:   traceId,
-		IP:        iP,
+		IP:        ip,
 		UserAgent: userAgent,
 	}
 }
@@ -48,17 +45,19 @@ func GetContext(ctx context.Context) *Context {
 func GetUserContext(ctx context.Context) (*UserContext, error) {
 	userId, ok := ctx.Value(XUserId).(int32)
 	if !ok || userId <= 0 {
-		return nil, fmt.Errorf("%w", e.HttpForbidden)
+		return nil, e.HttpForbidden
 	}
 	traceId, _ := ctx.Value(XTraceId).(string)
-	iP, _ := ctx.Value(XIp).(string)
+	ip, _ := ctx.Value(XIp).(string)
 	userAgent, _ := ctx.Value(XUserAgent).(string)
 	username, _ := ctx.Value(XUserName).(string)
 	sessionId, _ := ctx.Value(XSessionId).(string)
 	return &UserContext{
-		TraceId:   traceId,
-		IP:        iP,
-		UserAgent: userAgent,
+		Context: Context{
+			TraceId:   traceId,
+			IP:        ip,
+			UserAgent: userAgent,
+		},
 		UserId:    userId,
 		Username:  username,
 		SessionId: sessionId,

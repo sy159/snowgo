@@ -43,8 +43,8 @@ func NewJwtManager(conf *Config) (*Manager, error) {
 	if conf == nil {
 		return nil, errors.New("jwt config is nil")
 	}
-	if len(conf.JwtSecret) < 16 {
-		return nil, errors.New("jwt secret too short (recommend >= 16)")
+	if len(conf.JwtSecret) < 32 {
+		return nil, errors.New("jwt secret must be at least 32 characters for HS256")
 	}
 	if conf.Issuer == "" {
 		return nil, errors.New("jwt issuer required")
@@ -140,7 +140,9 @@ func (m *Manager) ParseToken(tokenStr string) (*Claims, error) {
 	var claims Claims
 	token, err := jwt.ParseWithClaims(tokenStr, &claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(m.jwtConf.JwtSecret), nil
-	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithIssuer(m.jwtConf.Issuer),
+	)
 
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
@@ -195,7 +197,7 @@ func (cm *Claims) IsRefreshToken() bool {
 	return cm.GrantType == refreshType
 }
 
-// ValidAccessToken 校验 access token（类型 + 时间 + issuer）
+// ValidAccessToken 校验 access token 的类型
 func (cm *Claims) ValidAccessToken() error {
 	// 检查令牌类型
 	if cm.GrantType != accessType {
