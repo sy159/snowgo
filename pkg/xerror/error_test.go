@@ -31,34 +31,15 @@ func TestCodeToString(t *testing.T) {
 	}
 }
 
-func TestSetErrCode(t *testing.T) {
-	// 测试 SetErrCode 方法
-	code := xerror.NewCode(xerror.CategoryHttp, 90003, "Initial Message")
-	code.SetErrCode(90004)
-
-	if code.GetErrCode() != 90004 {
-		t.Errorf("Expected error code 90004, but got %d", code.GetErrCode())
-	}
-}
-
-func TestSetErrMsg(t *testing.T) {
-	// 测试 SetErrMsg 方法
-	code := xerror.NewCode(xerror.CategoryHttp, 90005, "Initial Message")
-	code.SetErrMsg("Updated Message")
-
-	if code.GetErrMsg() != "Updated Message" {
-		t.Errorf("Expected error message 'Updated Message', but got '%s'", code.GetErrMsg())
-	}
-}
-
-func TestSetCategory(t *testing.T) {
-	// 测试 SetCategory 方法
-	code := xerror.NewCode(xerror.CategoryHttp, 90006, "Initial Message")
-	code.SetCategory("Updated Category")
-
-	if code.GetCategory() != "Updated Category" {
-		t.Errorf("Expected Category 'Updated Category', but got '%s'", code.GetCategory())
-	}
+func TestDuplicateCodePanics(t *testing.T) {
+	// 重复 errCode 注册应 panic 而非静默覆盖
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic for duplicate error code")
+		}
+	}()
+	_ = xerror.NewCode(xerror.CategoryHttp, 90003, "First")
+	_ = xerror.NewCode(xerror.CategoryHttp, 90003, "Duplicate")
 }
 
 func TestErrorCodes(t *testing.T) {

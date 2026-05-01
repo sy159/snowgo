@@ -49,7 +49,7 @@ func AesGCMEncrypt(plainText, key string) (string, error) {
 		return "", fmt.Errorf("创建 GCM 模式失败: %w", err)
 	}
 
-	// WHY: GCM 推荐使用 12 字节 nonce，由 crypto/rand 生成保证不可预测
+	// GCM 推荐使用 12 字节 nonce，由 crypto/rand 生成保证不可预测
 	nonce := make([]byte, aesGCM.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {
 		return "", fmt.Errorf("生成 nonce 失败: %w", err)

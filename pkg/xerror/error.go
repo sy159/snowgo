@@ -2,6 +2,7 @@ package xerror
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 )
 
@@ -20,7 +21,7 @@ var (
 	OK                      = NewCode(CategoryHttp, 0, "success")                 // 自定义正常
 	HttpOK                  = NewCode(CategoryHttp, 200, "ok")                    // http状态正常
 	HttpNoContent           = NewCode(CategoryHttp, 204, "No Content")            // 无内容
-	HttpMovedPermanently    = NewCode(CategoryHttp, 301, "Moved Permanently")     // 用久重定向
+	HttpMovedPermanently    = NewCode(CategoryHttp, 301, "Moved Permanently")     // 永久重定向
 	HttpFound               = NewCode(CategoryHttp, 302, "Found")                 // 临时重定向
 	HttpBadRequest          = NewCode(CategoryHttp, 400, "Bad Request")           // 请求数据有问题
 	HttpUnauthorized        = NewCode(CategoryHttp, 401, "Unauthorized")          // 用户未认证或认证失败
@@ -112,6 +113,7 @@ var (
 	DictItemDeleteError    = NewCode(CategorySystem, 10322, "字典枚举删除失败")
 )
 
+// Code 错误码接口，错误码一旦创建即为不可变常量
 type Code interface {
 	i() // 避免被其他包实现
 	error
@@ -119,9 +121,6 @@ type Code interface {
 	GetErrMsg() string
 	GetCategory() string
 	ToString() string
-	SetErrCode(int)
-	SetErrMsg(string)
-	SetCategory(string)
 }
 
 type code struct {
@@ -140,6 +139,10 @@ func NewCode(category string, errCode int, errMsg string) Code {
 	registryMu.Lock()
 	defer registryMu.Unlock()
 
+	if _, exists := registry[errCode]; exists {
+		panic(fmt.Sprintf("duplicate error code registered: %d", errCode))
+	}
+
 	codeInfo := &code{
 		ErrCode:  errCode,
 		ErrMsg:   errMsg,
@@ -149,6 +152,7 @@ func NewCode(category string, errCode int, errMsg string) Code {
 	return codeInfo
 }
 
+// GetCodes 返回所有注册的错误码
 func GetCodes() []Code {
 	registryMu.RLock()
 	defer registryMu.RUnlock()
@@ -182,23 +186,11 @@ func (c *code) GetCategory() string {
 	return c.Category
 }
 
-// SetErrCode 设置错误code
-func (c *code) SetErrCode(errCode int) {
-	c.ErrCode = errCode
-}
-
-// SetErrMsg 设置错误信息
-func (c *code) SetErrMsg(errMsg string) {
-	c.ErrMsg = errMsg
-}
-
-// SetCategory 设置错误类别
-func (c *code) SetCategory(category string) {
-	c.Category = category
-}
-
 // ToString 返回 JSON 格式的错误详情
 func (c *code) ToString() string {
-	raw, _ := json.Marshal(&c)
+	raw, err := json.Marshal(c)
+	if err != nil {
+		return fmt.Sprintf(`{"code":%d,"msg":%q,"category":%q}`, c.ErrCode, c.ErrMsg, c.Category)
+	}
 	return string(raw)
 }
