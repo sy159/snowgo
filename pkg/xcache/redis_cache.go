@@ -24,16 +24,15 @@ func (r *RedisCache) Eval(ctx context.Context, script string, keys []string, arg
 	return res, nil
 }
 
-// Get 如果没有值会直接返回空
-func (r *RedisCache) Get(ctx context.Context, key string) (string, error) {
+func (r *RedisCache) Get(ctx context.Context, key string) (string, bool, error) {
 	result, err := r.client.Get(ctx, key).Result()
 	if errors.Is(err, redis.Nil) {
-		return "", nil
+		return "", false, nil
 	}
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
-	return result, nil
+	return result, true, nil
 }
 
 func (r *RedisCache) Set(ctx context.Context, key string, value string, expiration time.Duration) error {
@@ -70,15 +69,15 @@ func (r *RedisCache) HSet(ctx context.Context, key string, field string, value s
 	return r.client.HSet(ctx, key, field, value).Err()
 }
 
-func (r *RedisCache) HGet(ctx context.Context, key string, field string) (string, error) {
+func (r *RedisCache) HGet(ctx context.Context, key string, field string) (string, bool, error) {
 	result, err := r.client.HGet(ctx, key, field).Result()
 	if errors.Is(err, redis.Nil) {
-		return "", nil
+		return "", false, nil
 	}
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
-	return result, nil
+	return result, true, nil
 }
 
 func (r *RedisCache) HGetAll(ctx context.Context, key string) (map[string]string, error) {
@@ -123,7 +122,11 @@ func (r *RedisCache) ZAdd(ctx context.Context, key string, score float64, member
 
 // ZRem 删除有序集合的成员
 func (r *RedisCache) ZRem(ctx context.Context, key string, members ...string) error {
-	return r.client.ZRem(ctx, key, members).Err()
+	args := make([]interface{}, len(members))
+	for i, m := range members {
+		args[i] = m
+	}
+	return r.client.ZRem(ctx, key, args...).Err()
 }
 
 // ZRange 根据分数从小到大排序，根据开始跟结束为止进行数据返回0, -1

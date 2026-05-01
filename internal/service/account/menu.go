@@ -325,7 +325,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 // GetMenuTree 获取菜单树
 func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 	// 尝试缓存
-	if data, err := s.cache.Get(ctx, constant.CacheMenuTree); err == nil && data != "" {
+	if data, ok, _ := s.cache.Get(ctx, constant.CacheMenuTree); ok {
 		var tree []*MenuInfo
 		if err := json.Unmarshal([]byte(data), &tree); err == nil {
 			xlogger.InfofCtx(ctx, "缓存获取菜单树")

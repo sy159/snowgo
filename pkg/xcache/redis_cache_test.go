@@ -31,9 +31,12 @@ func TestRedisCacheGetNonExistentKey(t *testing.T) {
 	ctx := context.Background()
 
 	// Get a key that doesn't exist
-	got, err := cache.Get(ctx, "non-existent-key-12345")
+	got, ok, err := cache.Get(ctx, "non-existent-key-12345")
 	if err != nil {
 		t.Fatalf("Get non-existent key error: %v", err)
+	}
+	if ok {
+		t.Fatal("expected ok=false for non-existent key")
 	}
 	if got != "" {
 		t.Fatalf("expected empty string for non-existent key, got %q", got)
@@ -91,9 +94,12 @@ func TestRedisCacheHGetNonExistentField(t *testing.T) {
 	ctx := context.Background()
 
 	hashKey := "test-hget-nonexist"
-	got, err := cache.HGet(ctx, hashKey, "non-existent-field")
+	got, ok, err := cache.HGet(ctx, hashKey, "non-existent-field")
 	if err != nil {
 		t.Fatalf("HGet non-existent field error: %v", err)
+	}
+	if ok {
+		t.Fatal("expected ok=false for non-existent field")
 	}
 	if got != "" {
 		t.Fatalf("expected empty string for non-existent field, got %q", got)
@@ -242,9 +248,9 @@ func TestRedisCache(t *testing.T) {
 		_, _ = redisCache.Delete(ctx, key)
 
 		script := `
-local cnt = redis.call("INCR", KEYS[1])
-return cnt
-`
+	local cnt = redis.call("INCR", KEYS[1])
+	return cnt
+	`
 		res, err := redisCache.Eval(ctx, script, []string{key})
 		if err != nil {
 			t.Fatalf("Eval failed: %v", err)
@@ -265,9 +271,12 @@ return cnt
 		if err != nil {
 			t.Fatalf("CacheSet failed: %v", err)
 		}
-		got, err := redisCache.Get(ctx, key)
+		got, ok, err := redisCache.Get(ctx, key)
 		if err != nil {
 			t.Fatalf("CacheGet failed: %v", err)
+		}
+		if !ok {
+			t.Fatal("expected ok=true for existing key")
 		}
 		if got != value {
 			t.Fatalf("CacheGet returned wrong value: got %v want %v", got, value)
@@ -286,9 +295,12 @@ return cnt
 			t.Fatalf("CacheDelete returned wrong value: got %v want %v", num, 1)
 		}
 
-		got, err := redisCache.Get(ctx, key)
+		got, ok, err := redisCache.Get(ctx, key)
 		if err != nil {
 			t.Fatalf("CacheGet failed: %v", err)
+		}
+		if ok {
+			t.Fatal("expected ok=false after delete")
 		}
 		if got != "" {
 			t.Fatalf("CacheDelete failed, key still exists")
@@ -323,9 +335,12 @@ return cnt
 			t.Fatalf("HSet failed: %v", err)
 		}
 
-		got, err := redisCache.HGet(ctx, hashKey, field)
+		got, ok, err := redisCache.HGet(ctx, hashKey, field)
 		if err != nil {
 			t.Fatalf("HGet failed: %v", err)
+		}
+		if !ok {
+			t.Fatal("expected ok=true for existing field")
 		}
 		if got != value {
 			t.Fatalf("HGet returned wrong value: got %v want %v", got, value)

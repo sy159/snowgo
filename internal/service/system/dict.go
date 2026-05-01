@@ -385,7 +385,7 @@ func (d *DictService) GetItemListByCode(ctx context.Context, code string) ([]*It
 
 	// 尝试从缓存读取
 	cacheKey := fmt.Sprintf("%s%s", constant.SystemDictPrefix, code)
-	if data, err := d.cache.Get(ctx, cacheKey); err == nil && data != "" {
+	if data, ok, _ := d.cache.Get(ctx, cacheKey); ok {
 		var m []*ItemInfo
 		if err := json.Unmarshal([]byte(data), &m); err == nil {
 			return m, nil

@@ -466,7 +466,7 @@ func (s *RoleService) GetRolePermsListByRuleID(ctx context.Context, roleId int32
 func (s *RoleService) GetRoleMenuListByRuleID(ctx context.Context, roleId int32) ([]*MenuData, error) {
 	// 尝试从缓存读取
 	cacheKey := fmt.Sprintf("%s%d", constant.CacheRoleMenuPrefix, roleId)
-	if data, err := s.cache.Get(ctx, cacheKey); err == nil && data != "" {
+	if data, ok, _ := s.cache.Get(ctx, cacheKey); ok {
 		var m []*MenuData
 		if err := json.Unmarshal([]byte(data), &m); err == nil {
 			return m, nil

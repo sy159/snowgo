@@ -536,7 +536,7 @@ func (u *UserService) GetRoleIdsByUserId(ctx context.Context, userId int32) ([]i
 
 	// 读缓存 user->roleId
 	cacheKey := fmt.Sprintf("%s%d", constant.CacheUserRolePrefix, userId)
-	if data, err := u.cache.Get(ctx, cacheKey); err == nil && data != "" {
+	if data, ok, _ := u.cache.Get(ctx, cacheKey); ok {
 		if strErr := json.Unmarshal([]byte(data), &roleIds); strErr == nil {
 			return roleIds, nil
 		}
