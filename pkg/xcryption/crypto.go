@@ -12,7 +12,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Sha256 Sha256加密
+// Sha256 返回输入的 SHA-256 十六进制字符串。
+// 注意：此函数不使用 salt，不适用于密码哈希或安全敏感场景。
+// 密码请使用 HashPassword（bcrypt）或 AesGCMEncrypt（对称加密）。
 func Sha256(s string) string {
 	m := sha256.New()
 	m.Write([]byte(s))

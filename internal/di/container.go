@@ -90,7 +90,7 @@ func BuildRedisCache(rdb *redis.Client) (xcache.Cache, error) {
 	if rdb == nil {
 		return nil, errors.New("please initialize redis first")
 	}
-	return xcache.NewRedisCache(rdb), nil
+	return xcache.NewRedisCache(rdb)
 }
 
 // BuildLock 构建锁
@@ -270,7 +270,7 @@ func GetContainer(c *gin.Context) *Container {
 	return container
 }
 
-// GetContainerSafe 未获取到不会报错，用于work使用
+// GetContainerSafe 安全获取 Container，未获取到不会 panic，返回 (nil, false)，用于work使用
 func GetContainerSafe(c *gin.Context) (*Container, bool) {
 	val, exists := c.Get(constant.CONTAINER)
 	if !exists {

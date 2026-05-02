@@ -187,6 +187,15 @@ func mergeHeader(defaults, custom map[string]string) map[string]string {
 	return merged
 }
 
+func isIdempotentMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return true
+	default:
+		return false
+	}
+}
+
 func sleepBackoff(ctx context.Context, i int, base time.Duration) {
 	backoff := base * (1 << i)
 	if backoff <= 0 {
@@ -270,6 +279,7 @@ func Request(method, rawURL string, opts ...Option) (*Response, error) {
 		resp, err := client.Do(httpReq)
 		if err != nil {
 			lastErr = err
+			// 网络层错误（连接/超时/DNS），安全重试
 			if i < reqOpts.maxRetries {
 				sleepBackoff(reqOpts.ctx, i, 100*time.Millisecond)
 				continue
@@ -279,8 +289,8 @@ func Request(method, rawURL string, opts ...Option) (*Response, error) {
 		response, err := handleResponse(resp)
 		if err != nil {
 			lastErr = err
-			// 如果还有重试机会，继续重试；否则返回错误
-			if i < reqOpts.maxRetries {
+			// 仅幂等方法可安全重试（非幂等方法重试可能导致重复提交）
+			if i < reqOpts.maxRetries && isIdempotentMethod(method) {
 				sleepBackoff(reqOpts.ctx, i, 100*time.Millisecond)
 				continue
 			}

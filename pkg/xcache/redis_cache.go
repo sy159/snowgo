@@ -11,8 +11,11 @@ type RedisCache struct {
 	client *redis.Client
 }
 
-func NewRedisCache(client *redis.Client) Cache {
-	return &RedisCache{client: client}
+func NewRedisCache(client *redis.Client) (Cache, error) {
+	if client == nil {
+		return nil, errors.New("redis client cannot be nil")
+	}
+	return &RedisCache{client: client}, nil
 }
 
 // Eval 在 Redis 上执行 lua 脚本并返回结果

@@ -172,7 +172,7 @@ func setupTestRedis(t *testing.T) *redis.Client {
 
 func TestFixedWindowLimiter_Add(t *testing.T) {
 	client := setupTestRedis(t)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	key := "test:fw:add"
@@ -256,7 +256,7 @@ func TestFixedWindowLimiter_Defaults(t *testing.T) {
 
 	t.Run("default windowSecond", func(t *testing.T) {
 		client := setupTestRedis(t)
-		cache := xcache.NewRedisCache(client)
+		cache, _ := xcache.NewRedisCache(client)
 		limiter, err := NewFixedWindowLimiter(cache, "test:default-window", 0, 5)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -268,7 +268,7 @@ func TestFixedWindowLimiter_Defaults(t *testing.T) {
 
 	t.Run("default maxFails", func(t *testing.T) {
 		client := setupTestRedis(t)
-		cache := xcache.NewRedisCache(client)
+		cache, _ := xcache.NewRedisCache(client)
 		limiter, err := NewFixedWindowLimiter(cache, "test:default-fails", 10, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -280,7 +280,7 @@ func TestFixedWindowLimiter_Defaults(t *testing.T) {
 
 	t.Run("negative values use defaults", func(t *testing.T) {
 		client := setupTestRedis(t)
-		cache := xcache.NewRedisCache(client)
+		cache, _ := xcache.NewRedisCache(client)
 		limiter, err := NewFixedWindowLimiter(cache, "test:negative", -5, -3)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)

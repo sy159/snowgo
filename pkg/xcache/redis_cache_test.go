@@ -27,7 +27,7 @@ func teardownTestRedis(client *redis.Client) {
 func TestRedisCacheGetNonExistentKey(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	// Get a key that doesn't exist
@@ -46,7 +46,7 @@ func TestRedisCacheGetNonExistentKey(t *testing.T) {
 func TestRedisCacheDeleteNonExistentKey(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	num, err := cache.Delete(ctx, "non-existent-key-12345")
@@ -61,7 +61,7 @@ func TestRedisCacheDeleteNonExistentKey(t *testing.T) {
 func TestRedisCacheIncrByDecrByEdgeCases(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	key := "test-incr-decr-edge"
@@ -77,7 +77,7 @@ func TestRedisCacheIncrByDecrByEdgeCases(t *testing.T) {
 func TestRedisCacheEvalError(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	// Invalid Lua script should return an error
@@ -90,7 +90,7 @@ func TestRedisCacheEvalError(t *testing.T) {
 func TestRedisCacheHGetNonExistentField(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	hashKey := "test-hget-nonexist"
@@ -109,7 +109,7 @@ func TestRedisCacheHGetNonExistentField(t *testing.T) {
 func TestRedisCacheHDelNonExistentField(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	hashKey := "test-hdel-nonexist"
@@ -125,7 +125,7 @@ func TestRedisCacheHDelNonExistentField(t *testing.T) {
 func TestRedisCacheZRangeError(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	zKey := "test-zrange-error"
@@ -141,7 +141,7 @@ func TestRedisCacheZRangeError(t *testing.T) {
 func TestRedisCacheZCardError(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	zKey := "test-zcard-error"
@@ -156,7 +156,7 @@ func TestRedisCacheZCardError(t *testing.T) {
 func TestRedisCacheExistsError(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	exists, err := cache.Exists(ctx, "some-key")
@@ -171,7 +171,7 @@ func TestRedisCacheExistsError(t *testing.T) {
 func TestRedisCacheTTLError(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	// TTL on non-existent key
@@ -187,7 +187,7 @@ func TestRedisCacheTTLError(t *testing.T) {
 func TestRedisCacheHGetAllError(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	hashKey := "test-hgetall-error"
@@ -202,7 +202,7 @@ func TestRedisCacheHGetAllError(t *testing.T) {
 func TestRedisCacheHLenError(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	hashKey := "test-hlen-error"
@@ -217,7 +217,7 @@ func TestRedisCacheHLenError(t *testing.T) {
 func TestRedisCacheHIncrByError(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
-	cache := xcache.NewRedisCache(client)
+	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 
 	hIncrKey := "test-hincr-error"
@@ -233,7 +233,7 @@ func TestRedisCache(t *testing.T) {
 	client := setupTestRedis()
 	defer teardownTestRedis(client)
 
-	redisCache := xcache.NewRedisCache(client)
+	redisCache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
 	key := "test-key"
 	value := "test-value"

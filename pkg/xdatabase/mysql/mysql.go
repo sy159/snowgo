@@ -10,11 +10,11 @@ import (
 	"gorm.io/gorm/schema"
 	"gorm.io/plugin/dbresolver"
 	"log"
+	"net/url"
 	"os"
 	"runtime"
 	"snowgo/config"
 	"snowgo/pkg/xcolor"
-	"strings"
 	"time"
 )
 
@@ -78,24 +78,25 @@ func processConfig(cfg config.MysqlConfig) config.MysqlConfig {
 
 // ensureTimeout 补充 DSN 中缺失的超时参数，避免零值无限等待
 func ensureTimeout(dsn string) string {
-	params := make([]string, 0, 3)
-	if !strings.Contains(dsn, "timeout=") {
-		params = append(params, "timeout=5s")
-	}
-	if !strings.Contains(dsn, "readTimeout=") {
-		params = append(params, "readTimeout=10s")
-	}
-	if !strings.Contains(dsn, "writeTimeout=") {
-		params = append(params, "writeTimeout=10s")
-	}
-	if len(params) == 0 {
+	u, err := url.Parse(dsn)
+	if err != nil {
 		return dsn
 	}
-	sep := "?"
-	if strings.Contains(dsn, "?") {
-		sep = "&"
+
+	q := u.Query()
+
+	if q.Get("timeout") == "" {
+		q.Set("timeout", "5s")
 	}
-	return dsn + sep + strings.Join(params, "&")
+	if q.Get("readTimeout") == "" {
+		q.Set("readTimeout", "10s")
+	}
+	if q.Get("writeTimeout") == "" {
+		q.Set("writeTimeout", "10s")
+	}
+
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 // 连接mysql

@@ -279,11 +279,8 @@ func getTimeWriter(filename string, maxAgeDay uint32) zapcore.WriteSyncer {
 	)
 
 	if err != nil {
-		// 降级到 stdout，避免 panic 导致服务无法启动
-		zap.L().Error("create rotate log writer failed, fallback to stdout",
-			zap.String("filename", filename),
-			zap.Error(err),
-		)
+		// Init 期间全局 logger 尚未初始化，降级到 stderr
+		_, _ = fmt.Fprintf(os.Stderr, "[logger] create rotate log writer failed for %s, fallback to stdout: %v\n", filename, err)
 		return zapcore.AddSync(os.Stdout)
 	}
 	return zapcore.AddSync(hook)
