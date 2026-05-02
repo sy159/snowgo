@@ -10,6 +10,7 @@ import (
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
 	"snowgo/internal/service/system"
+	common "snowgo/pkg"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xlogger"
@@ -231,7 +232,11 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 	xlogger.InfofCtx(ctx, "菜单更新成功: old=%+v new=%+v", oldMenu, mn)
 
 	// 如果修改了接口权限，需要更新角色-接口权限数据缓存
-	if *oldMenu.Perms != p.Perms {
+	oldPerms := ""
+	if oldMenu.Perms != nil {
+		oldPerms = *oldMenu.Perms
+	}
+	if oldPerms != p.Perms {
 		roleIds, err := s.menuDao.GetRoleIdsByIds(ctx, p.ID)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "获取角色ids异常: %v", err)
@@ -347,12 +352,12 @@ func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 			ParentID:  m.ParentID,
 			MenuType:  m.MenuType,
 			Name:      m.Name,
-			Path:      *m.Path,
-			Icon:      *m.Icon,
-			Perms:     *m.Perms,
+			Path:      common.Deref(m.Path),
+			Icon:      common.Deref(m.Icon),
+			Perms:     common.Deref(m.Perms),
 			SortOrder: m.SortOrder,
-			CreatedAt: *m.CreatedAt,
-			UpdatedAt: *m.UpdatedAt,
+			CreatedAt: common.Deref(m.CreatedAt),
+			UpdatedAt: common.Deref(m.UpdatedAt),
 			Children:  []*MenuInfo{},
 		}
 	}

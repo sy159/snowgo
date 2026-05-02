@@ -200,6 +200,8 @@ func GetUserList(c *gin.Context) {
 		return
 	} else if userListReq.Limit == 0 {
 		userListReq.Limit = constant.DefaultLimit
+	} else if userListReq.Limit > constant.MaxLimit {
+		userListReq.Limit = constant.MaxLimit
 	}
 	ctx := c.Request.Context()
 

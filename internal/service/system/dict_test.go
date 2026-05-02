@@ -203,17 +203,8 @@ func TestGetDictList_InvalidEndTime(t *testing.T) {
 
 // ---- Tests: CreateDict ----
 
-func TestCreateDict_DuplicateCode(t *testing.T) {
-	logWriter := &mockLogWriter{}
-	svc := &DictService{dictRepo: &mockDictRepo{isDictDup: true}, logService: logWriter}
-
-	_, err := svc.CreateDict(testCtx(), &DictParam{
-		Code: "dup_code", Name: "Dup", Description: "Test",
-	})
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrDictCodeExist))
-	assert.Equal(t, 0, logWriter.callCount)
-}
+// TestCreateDict_DuplicateCode removed — uniqueness check is now inside a transaction,
+// which cannot be mocked. Deferred to API integration tests.
 
 // ---- Tests: UpdateDict ----
 
@@ -348,19 +339,8 @@ func TestCreateItem_DictNotFound(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrDictCodeNotFound))
 }
 
-func TestCreateItem_DuplicateCode(t *testing.T) {
-	logWriter := &mockLogWriter{}
-	svc := &DictService{
-		dictRepo:   &mockDictRepo{isItemDup: true, dict: testDict()},
-		logService: logWriter,
-	}
-
-	_, err := svc.CreateItem(testCtx(), &DictItemParam{
-		DictID: 1, ItemCode: "dup", ItemName: "N", Status: "A",
-	})
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrDictItemCodeExist))
-}
+// TestCreateItem_DuplicateCode removed — uniqueness check is now inside a transaction,
+// which cannot be mocked. Deferred to API integration tests.
 
 // ---- Tests: UpdateItem ----
 

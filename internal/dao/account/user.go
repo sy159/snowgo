@@ -322,3 +322,15 @@ func (u *UserDao) ResetPwdById(ctx context.Context, userId int32, password strin
 	}
 	return nil
 }
+
+// TransactionResetPwdById 事务内重置密码
+func (u *UserDao) TransactionResetPwdById(ctx context.Context, tx *query.Query, userId int32, password string) error {
+	if userId <= 0 {
+		return errors.New("用户id不存在")
+	}
+	_, err := tx.WithContext(ctx).User.Where(tx.User.ID.Eq(userId)).UpdateSimple(tx.User.Password.Value(password))
+	if err != nil {
+		return err
+	}
+	return nil
+}

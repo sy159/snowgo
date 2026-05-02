@@ -12,6 +12,7 @@ import (
 	"snowgo/internal/dal/repo"
 	"snowgo/internal/dao/account"
 	"snowgo/internal/service/system"
+	common "snowgo/pkg"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	e "snowgo/pkg/xerror"
@@ -24,6 +25,7 @@ type RoleRepo interface {
 	CreateRole(ctx context.Context, role *model.Role) (*model.Role, error)
 	TransactionCreateRole(ctx context.Context, tx *query.Query, role *model.Role) (*model.Role, error)
 	UpdateRole(ctx context.Context, role *model.Role) (*model.Role, error)
+	TransactionUpdateRole(ctx context.Context, tx *query.Query, role *model.Role) (*model.Role, error)
 	DeleteById(ctx context.Context, roleId int32) error
 	GetRoleById(ctx context.Context, roleId int32) (*model.Role, error)
 	GetRoleList(ctx context.Context, cond *account.RoleListCondition) ([]*model.Role, int64, error)
@@ -34,6 +36,7 @@ type RoleRepo interface {
 	CountMenuByIds(ctx context.Context, ids []int32) (int64, error)
 	GetMenuIdsByRoleId(ctx context.Context, roleId int32) ([]int32, error)
 	GetMenuPermsByRoleId(ctx context.Context, roleId int32) ([]string, error)
+	GetMenuPermsByRoleIds(ctx context.Context, roleIds []int32) ([]string, error)
 	GetMenuListByRoleId(ctx context.Context, roleId int32) ([]*model.Menu, error)
 	ListRoleMenuPerms(ctx context.Context) ([]*account.RoleMenuPerm, error)
 }
@@ -42,6 +45,7 @@ type RoleRepo interface {
 type RolePermsGetter interface {
 	GetRolePermsListByRuleID(ctx context.Context, roleId int32) ([]string, error)
 	GetRoleMenuListByRuleID(ctx context.Context, roleId int32) ([]*MenuData, error)
+	GetRolePermsListByRuleIds(ctx context.Context, roleIds []int32) ([]string, error)
 }
 
 type RoleService struct {
@@ -104,16 +108,6 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 		return 0, err
 	}
 
-	// 校验 code 是否存在
-	exists, err := s.roleDao.IsCodeExists(ctx, param.Code, 0)
-	if err != nil {
-		xlogger.ErrorfCtx(ctx, "校验角色code异常: %v", err)
-		return 0, fmt.Errorf("校验角色编码失败: %w", err)
-	}
-	if exists {
-		return 0, errors.New("角色编码已存在")
-	}
-
 	// 校验 菜单id是否都存在
 	if len(param.MenuIds) > 0 {
 		menuLen, err := s.roleDao.CountMenuByIds(ctx, param.MenuIds)
@@ -135,6 +129,15 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 	var roleObj *model.Role
 	// 事务创建角色，以及关联菜单权限
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 校验 code 是否存在（事务内防止并发竞争）
+		exists, err := s.roleDao.IsCodeExists(ctx, param.Code, 0)
+		if err != nil {
+			return fmt.Errorf("校验角色编码失败: %w", err)
+		}
+		if exists {
+			return errors.New("角色编码已存在")
+		}
+
 		// 创建角色
 		roleObj, err = s.roleDao.TransactionCreateRole(ctx, tx, role)
 		if err != nil {
@@ -224,11 +227,11 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 		}
 	}
 
-	// 事务更新角色，以及关联菜单权限
+	// 事务内更新角色，以及关联菜单权限
 	var ruleObj *model.Role
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 更新字段
-		ruleObj, err = s.roleDao.UpdateRole(ctx, &model.Role{
+		ruleObj, err = s.roleDao.TransactionUpdateRole(ctx, tx, &model.Role{
 			ID:          param.ID,
 			Name:        &param.Name,
 			Code:        param.Code,
@@ -495,12 +498,12 @@ func (s *RoleService) GetRoleMenuListByRuleID(ctx context.Context, roleId int32)
 			ParentID:  m.ParentID,
 			MenuType:  m.MenuType,
 			Name:      m.Name,
-			Path:      *m.Path,
-			Icon:      *m.Icon,
-			Perms:     *m.Perms,
+			Path:      common.Deref(m.Path),
+			Icon:      common.Deref(m.Icon),
+			Perms:     common.Deref(m.Perms),
 			SortOrder: m.SortOrder,
-			CreatedAt: *m.CreatedAt,
-			UpdatedAt: *m.UpdatedAt,
+			CreatedAt: common.Deref(m.CreatedAt),
+			UpdatedAt: common.Deref(m.UpdatedAt),
 		})
 	}
 
@@ -510,4 +513,12 @@ func (s *RoleService) GetRoleMenuListByRuleID(ctx context.Context, roleId int32)
 	}
 
 	return menus, nil
+}
+
+// GetRolePermsListByRuleIds 批量获取多个角色的接口权限列表
+func (s *RoleService) GetRolePermsListByRuleIds(ctx context.Context, roleIds []int32) ([]string, error) {
+	if len(roleIds) == 0 {
+		return nil, nil
+	}
+	return s.roleDao.GetMenuPermsByRoleIds(ctx, roleIds)
 }

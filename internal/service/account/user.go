@@ -12,6 +12,7 @@ import (
 	"snowgo/internal/dal/repo"
 	"snowgo/internal/dao/account"
 	"snowgo/internal/service/system"
+	common "snowgo/pkg"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xcryption"
@@ -40,6 +41,7 @@ type UserRepo interface {
 	GetUserList(ctx context.Context, condition *account.UserListCondition) ([]*model.User, int64, error)
 	DeleteById(ctx context.Context, userId int32) error
 	ResetPwdById(ctx context.Context, userId int32, password string) error
+	TransactionResetPwdById(ctx context.Context, tx *query.Query, userId int32, password string) error
 }
 
 type UserService struct {
@@ -135,16 +137,6 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		return 0, err
 	}
 
-	// 检查用户名，或者电话是否存在
-	isDuplicate, err := u.userDao.IsNameTelDuplicate(ctx, userParam.Username, userParam.Tel, 0)
-	if err != nil {
-		xlogger.ErrorfCtx(ctx, "查询用户名或电话是否存在异常: %v", err)
-		return 0, fmt.Errorf("查询用户名或电话是否存在异常: %w", err)
-	}
-	if isDuplicate {
-		return 0, ErrUserNameTelExist
-	}
-
 	// 检查设置的角色id是否存在
 	if len(userParam.RoleIds) > 0 {
 		//isExist, err := u.userDao.IsExistByRoleId(ctx, userParam.RoleIds)
@@ -167,6 +159,15 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 	activeStatus := constant.UserStatusActive
 	var userObj *model.User
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 检查用户名或电话是否重复（事务内防止并发竞争）
+		isDuplicate, err := u.userDao.IsNameTelDuplicate(ctx, userParam.Username, userParam.Tel, 0)
+		if err != nil {
+			return fmt.Errorf("查询用户名或电话是否存在异常: %w", err)
+		}
+		if isDuplicate {
+			return ErrUserNameTelExist
+		}
+
 		// 创建用户
 		userObj, err = u.userDao.TransactionCreateUser(ctx, tx, &model.User{
 			Username:  userParam.Username,
@@ -359,18 +360,18 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 		roles = append(roles, &UserRole{
 			ID:   role.ID,
 			Code: role.Code,
-			Name: *role.Name,
+			Name: common.Deref(role.Name),
 		})
 	}
 	return &UserInfo{
 		ID:        user.ID,
 		Username:  user.Username,
 		Tel:       user.Tel,
-		Nickname:  *user.Nickname,
-		Status:    *user.Status,
+		Nickname:  common.Deref(user.Nickname),
+		Status:    common.Deref(user.Status),
 		RoleList:  roles,
-		CreatedAt: *user.CreatedAt,
-		UpdatedAt: *user.UpdatedAt,
+		CreatedAt: common.Deref(user.CreatedAt),
+		UpdatedAt: common.Deref(user.UpdatedAt),
 	}, nil
 }
 
@@ -475,7 +476,8 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 	if err != nil {
 		return err
 	}
-	_, err = u.userDao.GetUserById(ctx, userId)
+	// 获取用户信息
+	user, err := u.userDao.GetUserById(ctx, userId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrUserNotFound
@@ -490,12 +492,39 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 		xlogger.ErrorfCtx(ctx, "密码加密异常: %v", err)
 		return fmt.Errorf("密码加密异常: %w", err)
 	}
-	err = u.userDao.ResetPwdById(ctx, userId, pwd)
+
+	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 重置密码
+		err = u.userDao.TransactionResetPwdById(ctx, tx, userId, pwd)
+		if err != nil {
+			return fmt.Errorf("重置密码失败: %w", err)
+		}
+
+		// 创建操作日志
+		err = u.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
+			OperatorID:   userContext.UserId,
+			OperatorName: userContext.Username,
+			OperatorType: constant.OperatorUser,
+			Resource:     constant.ResourceUser,
+			ResourceID:   userId,
+			TraceID:      userContext.TraceId,
+			Action:       constant.ActionUpdate,
+			BeforeData:   nil,
+			AfterData:    nil,
+			Description: fmt.Sprintf("用户(%d-%s)重置了用户(%d-%s)的密码",
+				userContext.UserId, userContext.Username, userId, user.Username),
+			IP: userContext.IP,
+		})
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %v", err)
+			return fmt.Errorf("操作日志创建失败: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		xlogger.ErrorfCtx(ctx, "修改用户(%d)密码异常: %v", userId, err)
-		return fmt.Errorf("重置密码失败: %w", err)
+		return err
 	}
-	xlogger.InfofCtx(ctx, "登录用户(%d-%s)重置用户(%d)密码成功", userContext.UserId, userContext.Username, userId)
+	xlogger.InfofCtx(ctx, "用户(%d-%s)重置用户(%d)密码成功", userContext.UserId, userContext.Username, userId)
 	return nil
 }
 
@@ -511,19 +540,23 @@ func (u *UserService) Authenticate(ctx context.Context, username, password strin
 		return nil, fmt.Errorf("用户信息查询失败: %w", err)
 	}
 
-	// 密码加密
+	// 密码校验
 	isOk := xcryption.CheckPassword(user.Password, password)
 	if !isOk {
+		return nil, ErrAuth
+	}
+	// 检查用户状态，禁用用户禁止登录
+	if user.Status != nil && *user.Status == constant.UserStatusDisabled {
 		return nil, ErrAuth
 	}
 	return &UserInfo{
 		ID:        user.ID,
 		Username:  user.Username,
 		Tel:       user.Tel,
-		Nickname:  *user.Nickname,
-		Status:    *user.Status,
-		CreatedAt: *user.CreatedAt,
-		UpdatedAt: *user.UpdatedAt,
+		Nickname:  common.Deref(user.Nickname),
+		Status:    common.Deref(user.Status),
+		CreatedAt: common.Deref(user.CreatedAt),
+		UpdatedAt: common.Deref(user.UpdatedAt),
 	}, nil
 }
 
@@ -578,15 +611,22 @@ func (u *UserService) GetPermsListById(ctx context.Context, userId int32) ([]str
 		return []string{}, nil
 	}
 
-	// 根据roleId拿到接口的perms列表
-	permsList := make([]string, 0, 10)
+	// 逐个角色读取缓存的 perms，去重合并
+	permSet := make(map[string]struct{})
 	for _, roleId := range roleIds {
 		perms, err := u.roleService.GetRolePermsListByRuleID(ctx, roleId)
 		if err != nil {
-			xlogger.ErrorfCtx(ctx, "GetPermsListById 获取角色权限失败 rid=%v: %v", roleIds, err)
+			xlogger.ErrorfCtx(ctx, "GetPermsListById 获取角色权限失败 roleId=%d: %v", roleId, err)
 			return nil, err
 		}
-		permsList = append(permsList, perms...)
+		for _, p := range perms {
+			permSet[p] = struct{}{}
+		}
+	}
+
+	permsList := make([]string, 0, len(permSet))
+	for p := range permSet {
+		permsList = append(permsList, p)
 	}
 	return permsList, nil
 }

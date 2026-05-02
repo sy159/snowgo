@@ -186,7 +186,7 @@ func TestFixedWindowLimiter_Add(t *testing.T) {
 	_ = limiter.Reset(ctx)
 
 	t.Run("under limit", func(t *testing.T) {
-		for i := int64(1); i <= maxFails-1; i++ {
+		for i := int64(1); i <= maxFails; i++ {
 			allowed, count, ttl, err := limiter.Add(ctx)
 			if err != nil {
 				t.Fatalf("Add failed: %v", err)
@@ -209,10 +209,10 @@ func TestFixedWindowLimiter_Add(t *testing.T) {
 			t.Fatalf("Add failed: %v", err)
 		}
 		if allowed {
-			t.Fatal("Add should be blocked at maxFails")
+			t.Fatal("Add should be blocked at maxFails+1")
 		}
-		if count != maxFails {
-			t.Fatalf("count mismatch at limit: got %d want %d", count, maxFails)
+		if count != maxFails+1 {
+			t.Fatalf("count mismatch at limit: got %d want %d", count, maxFails+1)
 		}
 	})
 

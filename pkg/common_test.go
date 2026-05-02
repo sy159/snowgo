@@ -354,3 +354,68 @@ func TestWeakRandInt63n_ConcurrentStress(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// ========================
+// Deref
+// ========================
+
+func TestDeref(t *testing.T) {
+	t.Run("string nil", func(t *testing.T) {
+		if got := Deref((*string)(nil)); got != "" {
+			t.Errorf("Deref(*string) nil = %q, want empty", got)
+		}
+	})
+
+	t.Run("string value", func(t *testing.T) {
+		s := "test"
+		if got := Deref(&s); got != "test" {
+			t.Errorf("Deref(&string) = %q, want test", got)
+		}
+	})
+
+	t.Run("int nil", func(t *testing.T) {
+		if got := Deref((*int)(nil)); got != 0 {
+			t.Errorf("Deref(*int) nil = %d, want 0", got)
+		}
+	})
+
+	t.Run("int value", func(t *testing.T) {
+		n := 42
+		if got := Deref(&n); got != 42 {
+			t.Errorf("Deref(&int) = %d, want 42", got)
+		}
+	})
+
+	t.Run("int32 nil", func(t *testing.T) {
+		if got := Deref((*int32)(nil)); got != 0 {
+			t.Errorf("Deref(*int32) nil = %d, want 0", got)
+		}
+	})
+
+	t.Run("bool nil", func(t *testing.T) {
+		if got := Deref((*bool)(nil)); got != false {
+			t.Errorf("Deref(*bool) nil = %v, want false", got)
+		}
+	})
+
+	t.Run("bool value", func(t *testing.T) {
+		b := true
+		if got := Deref(&b); !got {
+			t.Errorf("Deref(&bool) = %v, want true", got)
+		}
+	})
+}
+
+func BenchmarkDeref_String(b *testing.B) {
+	s := "hello world"
+	for i := 0; i < b.N; i++ {
+		_ = Deref(&s)
+	}
+}
+
+func BenchmarkDeref_Int(b *testing.B) {
+	n := 42
+	for i := 0; i < b.N; i++ {
+		_ = Deref(&n)
+	}
+}

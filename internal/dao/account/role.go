@@ -95,6 +95,18 @@ func (r *RoleDao) UpdateRole(ctx context.Context, role *model.Role) (*model.Role
 	return role, nil
 }
 
+// TransactionUpdateRole 事务内更新角色
+func (r *RoleDao) TransactionUpdateRole(ctx context.Context, tx *query.Query, role *model.Role) (*model.Role, error) {
+	if role.ID <= 0 {
+		return nil, errors.New("角色id不存在")
+	}
+	err := tx.WithContext(ctx).Role.Where(tx.Role.ID.Eq(role.ID)).Save(role)
+	if err != nil {
+		return nil, err
+	}
+	return role, nil
+}
+
 // DeleteById 删除角色
 func (r *RoleDao) DeleteById(ctx context.Context, roleId int32) error {
 	if roleId <= 0 {
@@ -256,6 +268,25 @@ func (r *RoleDao) GetMenuListByRoleId(ctx context.Context, roleId int32) ([]*mod
 		return nil, err
 	}
 	return menuList, nil
+}
+
+// GetMenuPermsByRoleIds 批量获取多个角色的菜单 perms 列表
+func (r *RoleDao) GetMenuPermsByRoleIds(ctx context.Context, roleIds []int32) ([]string, error) {
+	if len(roleIds) == 0 {
+		return nil, nil
+	}
+	m := r.repo.Query().RoleMenu
+	menu := r.repo.Query().Menu
+	permsList := make([]string, 0, len(roleIds)*5)
+	err := m.WithContext(ctx).
+		Join(menu, m.MenuID.EqCol(menu.ID)).
+		Where(m.RoleID.In(roleIds...), menu.Perms.IsNotNull(), menu.Perms.Neq("")).
+		Select(menu.Perms).
+		Pluck(menu.Perms, &permsList)
+	if err != nil {
+		return nil, err
+	}
+	return permsList, nil
 }
 
 // ListRoleMenuPerms 查询每个角色绑定的接口perms权限名

@@ -50,6 +50,8 @@ func GetOperationLogList(c *gin.Context) {
 		return
 	} else if logListReq.Limit == 0 {
 		logListReq.Limit = constant.DefaultLimit
+	} else if logListReq.Limit > constant.MaxLimit {
+		logListReq.Limit = constant.MaxLimit
 	}
 
 	container := di.GetSystemContainer(c)

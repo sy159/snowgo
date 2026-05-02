@@ -49,9 +49,9 @@ if cnt == 1 or t < 0 then
     t = window
 end
 
--- 超限判断：cnt >= maxFails 返回 blocked
+-- 超限判断：cnt > maxFails 返回 blocked
 local allowed = 1
-if cnt >= maxFails then
+if cnt > maxFails then
     allowed = 0
 end
 

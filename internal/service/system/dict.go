@@ -162,19 +162,18 @@ func (d *DictService) CreateDict(ctx context.Context, param *DictParam) (int32, 
 		return 0, err
 	}
 
-	// 检查code是否存在
-	isDuplicate, err := d.dictRepo.IsCodeDuplicate(ctx, param.Code, 0)
-	if err != nil {
-		xlogger.ErrorfCtx(ctx, "查询code是否存在异常: %v", err)
-		return 0, fmt.Errorf("查询字典编码是否存在异常: %w", err)
-	}
-	if isDuplicate {
-		return 0, ErrDictCodeExist
-	}
-
 	// 创建字典
 	var dict *model.SystemDict
 	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 检查code是否存在（事务内防止并发竞争）
+		isDuplicate, err := d.dictRepo.IsCodeDuplicate(ctx, param.Code, 0)
+		if err != nil {
+			return fmt.Errorf("查询字典编码是否存在异常: %w", err)
+		}
+		if isDuplicate {
+			return ErrDictCodeExist
+		}
+
 		// 创建字典
 		dict, err = d.dictRepo.TransactionCreateDict(ctx, tx, &model.SystemDict{
 			Code:        param.Code,
@@ -441,19 +440,18 @@ func (d *DictService) CreateItem(ctx context.Context, param *DictItemParam) (int
 		return 0, fmt.Errorf("字典信息查询失败: %w", err)
 	}
 
-	// 检查code是否存在
-	isDuplicate, err := d.dictRepo.IsCodeItemDuplicate(ctx, dict.ID, param.ItemCode, 0)
-	if err != nil {
-		xlogger.ErrorfCtx(ctx, "查询item code是否存在异常: %v", err)
-		return 0, fmt.Errorf("查询字典item编码是否存在异常: %w", err)
-	}
-	if isDuplicate {
-		return 0, ErrDictItemCodeExist
-	}
-
 	// 创建字典item
 	var item *model.SystemDictItem
 	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 检查item code是否存在（事务内防止并发竞争）
+		isDuplicate, err := d.dictRepo.IsCodeItemDuplicate(ctx, dict.ID, param.ItemCode, 0)
+		if err != nil {
+			return fmt.Errorf("查询字典item编码是否存在异常: %w", err)
+		}
+		if isDuplicate {
+			return ErrDictItemCodeExist
+		}
+
 		// 创建字典item
 		item, err = d.dictRepo.TransactionCreateDictItem(ctx, tx, &model.SystemDictItem{
 			DictID:      dict.ID,

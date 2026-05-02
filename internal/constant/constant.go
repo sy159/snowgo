@@ -2,7 +2,8 @@ package constant
 
 // 常用
 const (
-	DefaultLimit = 10 // 分页默认10条数据
+	DefaultLimit = 10  // 分页默认10条数据
+	MaxLimit     = 200 // 分页最大条数，防止请求过大导致性能问题
 
 	TimeFmtWithMS = "2006-01-02 15:04:05.000"
 	TimeFmtWithS  = "2006-01-02 15:04:05"
