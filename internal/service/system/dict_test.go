@@ -9,7 +9,6 @@ import (
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	daoSystem "snowgo/internal/dao/system"
-	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"testing"
 	"time"
@@ -131,16 +130,6 @@ func (m *mockDictCache) Delete(_ context.Context, keys ...string) (int64, error)
 
 // ---- Helpers ----
 
-func ctxWithUserSys() context.Context {
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, xauth.XUserId, int32(1))
-	ctx = context.WithValue(ctx, xauth.XUserName, "admin")
-	ctx = context.WithValue(ctx, xauth.XTraceId, "test-trace-id")
-	ctx = context.WithValue(ctx, xauth.XIp, "127.0.0.1")
-	ctx = context.WithValue(ctx, xauth.XUserAgent, "test-agent")
-	return ctx
-}
-
 func testDict() *model.SystemDict {
 	desc := "Test dict"
 	return &model.SystemDict{
@@ -153,7 +142,6 @@ func testDict() *model.SystemDict {
 	}
 }
 
-func ptrStrSys(s string) *string        { return &s }
 func ptrTimeSys(t time.Time) *time.Time { return &t }
 
 // ---- Tests: GetDictList ----

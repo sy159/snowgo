@@ -9,7 +9,6 @@ import (
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	daoAccount "snowgo/internal/dao/account"
-	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xcryption"
 	"testing"
@@ -127,17 +126,6 @@ func (m *mockCache) Delete(_ context.Context, keys ...string) (int64, error) {
 }
 
 // ---- Helpers ----
-
-func ctxWithUser() context.Context {
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, xauth.XUserId, int32(1))
-	ctx = context.WithValue(ctx, xauth.XUserName, "admin")
-	ctx = context.WithValue(ctx, xauth.XTraceId, "test-trace-id")
-	ctx = context.WithValue(ctx, xauth.XIp, "127.0.0.1")
-	ctx = context.WithValue(ctx, xauth.XUserAgent, "test-agent")
-	ctx = context.WithValue(ctx, xauth.XSessionId, "test-session")
-	return ctx
-}
 
 func testUser() *model.User {
 	nickname := "Test User"
