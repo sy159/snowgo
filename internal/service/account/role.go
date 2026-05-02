@@ -396,12 +396,12 @@ func (s *RoleService) GetRoleById(ctx context.Context, id int32) (*RoleInfo, err
 	}
 	return &RoleInfo{
 		ID:          r.ID,
-		Name:        *r.Name,
+		Name:        common.DerefOrZero(r.Name),
 		Code:        r.Code,
-		Description: *r.Description,
+		Description: common.DerefOrZero(r.Description),
 		MenuIds:     menuIds,
-		CreatedAt:   *r.CreatedAt,
-		UpdatedAt:   *r.UpdatedAt,
+		CreatedAt:   common.DerefOrZero(r.CreatedAt),
+		UpdatedAt:   common.DerefOrZero(r.UpdatedAt),
 	}, nil
 }
 
@@ -423,11 +423,11 @@ func (s *RoleService) ListRoles(ctx context.Context, cond *RoleListCondition) (*
 	for _, r := range list {
 		infos = append(infos, &RoleInfo{
 			ID:          r.ID,
-			Name:        *r.Name,
+			Name:        common.DerefOrZero(r.Name),
 			Code:        r.Code,
-			Description: *r.Description,
-			CreatedAt:   *r.CreatedAt,
-			UpdatedAt:   *r.UpdatedAt,
+			Description: common.DerefOrZero(r.Description),
+			CreatedAt:   common.DerefOrZero(r.CreatedAt),
+			UpdatedAt:   common.DerefOrZero(r.UpdatedAt),
 		})
 	}
 	return &RoleList{List: infos, Total: total}, nil
@@ -498,12 +498,12 @@ func (s *RoleService) GetRoleMenuListByRuleID(ctx context.Context, roleId int32)
 			ParentID:  m.ParentID,
 			MenuType:  m.MenuType,
 			Name:      m.Name,
-			Path:      common.Deref(m.Path),
-			Icon:      common.Deref(m.Icon),
-			Perms:     common.Deref(m.Perms),
+			Path:      common.DerefOrZero(m.Path),
+			Icon:      common.DerefOrZero(m.Icon),
+			Perms:     common.DerefOrZero(m.Perms),
 			SortOrder: m.SortOrder,
-			CreatedAt: common.Deref(m.CreatedAt),
-			UpdatedAt: common.Deref(m.UpdatedAt),
+			CreatedAt: common.DerefOrZero(m.CreatedAt),
+			UpdatedAt: common.DerefOrZero(m.UpdatedAt),
 		})
 	}
 

@@ -352,12 +352,12 @@ func (s *MenuService) GetMenuTree(ctx context.Context) ([]*MenuInfo, error) {
 			ParentID:  m.ParentID,
 			MenuType:  m.MenuType,
 			Name:      m.Name,
-			Path:      common.Deref(m.Path),
-			Icon:      common.Deref(m.Icon),
-			Perms:     common.Deref(m.Perms),
+			Path:      common.DerefOrZero(m.Path),
+			Icon:      common.DerefOrZero(m.Icon),
+			Perms:     common.DerefOrZero(m.Perms),
 			SortOrder: m.SortOrder,
-			CreatedAt: common.Deref(m.CreatedAt),
-			UpdatedAt: common.Deref(m.UpdatedAt),
+			CreatedAt: common.DerefOrZero(m.CreatedAt),
+			UpdatedAt: common.DerefOrZero(m.UpdatedAt),
 			Children:  []*MenuInfo{},
 		}
 	}

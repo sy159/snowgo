@@ -140,8 +140,8 @@ func StructToMap(in any, tagName string) (map[string]any, error) {
 	return out, nil
 }
 
-// Deref 安全解引用任意指针类型，nil 时返回零值
-func Deref[T any](v *T) T {
+// DerefOrZero 安全解引用任意指针类型，nil 时返回零值
+func DerefOrZero[T any](v *T) T {
 	if v == nil {
 		var zero T
 		return zero

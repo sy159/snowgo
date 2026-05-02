@@ -360,18 +360,18 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 		roles = append(roles, &UserRole{
 			ID:   role.ID,
 			Code: role.Code,
-			Name: common.Deref(role.Name),
+			Name: common.DerefOrZero(role.Name),
 		})
 	}
 	return &UserInfo{
 		ID:        user.ID,
 		Username:  user.Username,
 		Tel:       user.Tel,
-		Nickname:  common.Deref(user.Nickname),
-		Status:    common.Deref(user.Status),
+		Nickname:  common.DerefOrZero(user.Nickname),
+		Status:    common.DerefOrZero(user.Status),
 		RoleList:  roles,
-		CreatedAt: common.Deref(user.CreatedAt),
-		UpdatedAt: common.Deref(user.UpdatedAt),
+		CreatedAt: common.DerefOrZero(user.CreatedAt),
+		UpdatedAt: common.DerefOrZero(user.UpdatedAt),
 	}, nil
 }
 
@@ -396,10 +396,10 @@ func (u *UserService) GetUserList(ctx context.Context, condition *UserListCondit
 			ID:        user.ID,
 			Username:  user.Username,
 			Tel:       user.Tel,
-			Nickname:  *user.Nickname,
-			Status:    *user.Status,
-			CreatedAt: *user.CreatedAt,
-			UpdatedAt: *user.UpdatedAt,
+			Nickname:  common.DerefOrZero(user.Nickname),
+			Status:    common.DerefOrZero(user.Status),
+			CreatedAt: common.DerefOrZero(user.CreatedAt),
+			UpdatedAt: common.DerefOrZero(user.UpdatedAt),
 		})
 	}
 	return &UserList{List: userInfoList, Total: total}, nil
@@ -553,10 +553,10 @@ func (u *UserService) Authenticate(ctx context.Context, username, password strin
 		ID:        user.ID,
 		Username:  user.Username,
 		Tel:       user.Tel,
-		Nickname:  common.Deref(user.Nickname),
-		Status:    common.Deref(user.Status),
-		CreatedAt: common.Deref(user.CreatedAt),
-		UpdatedAt: common.Deref(user.UpdatedAt),
+		Nickname:  common.DerefOrZero(user.Nickname),
+		Status:    common.DerefOrZero(user.Status),
+		CreatedAt: common.DerefOrZero(user.CreatedAt),
+		UpdatedAt: common.DerefOrZero(user.UpdatedAt),
 	}, nil
 }
 
