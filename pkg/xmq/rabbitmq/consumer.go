@@ -121,6 +121,15 @@ func sleepWithContext(ctx context.Context, d time.Duration) {
 	}
 }
 
+// truncateBody 截断消息体日志，防止 PII 泄露
+func truncateBody(body []byte) string {
+	s := string(body)
+	if len(s) > 128 {
+		return s[:128] + "..."
+	}
+	return s
+}
+
 // workerLoop
 func (c *Consumer) workerLoop(ctx context.Context, unit *consumerUnit, workerID int) {
 	c.logger.Info(ctx,
@@ -309,7 +318,7 @@ func (c *Consumer) handleDeliveryInProcess(parentCtx context.Context, _ *amqp.Ch
 				zap.String("event", xmq.EventConsumerConsume),
 				zap.String("queue", unit.queue),
 				zap.String("message_id", d.MessageId),
-				zap.String("message_body", string(d.Body)),
+				zap.String("message_body", truncateBody(d.Body)),
 				zap.Duration("duration", duration),
 				zap.String("status", "fail"),
 				zap.Int("attempt", attempt+1),

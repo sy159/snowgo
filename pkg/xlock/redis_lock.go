@@ -118,27 +118,38 @@ func (r *RedisLock) ReTryLock(ctx context.Context, key string, expireSecond int6
 	expiryOption := redsync.WithExpiry(time.Duration(expireSecond) * time.Second)
 	mutex := r.rl.NewMutex(key, expiryOption)
 	attempt := 0
+	timer := time.NewTimer(0)
+	<-timer.C // drain initial
 	for {
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return ctx.Err()
 		default:
 		}
 
 		if err = mutex.LockContext(ctx); err != nil {
 			r.logger.Errorf("[redis lock] redis retry lock failed key=%s attempt=%d err=%v", key, attempt, err)
-			// WHY: 使用 select+timer 替代 time.Sleep，使 sleep 可响应 context 取消
 			jitter := time.Millisecond*50 + time.Duration(common.WeakRandInt63n(20))*time.Millisecond
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			timer.Reset(jitter)
 			select {
 			case <-ctx.Done():
+				timer.Stop()
 				return ctx.Err()
-			case <-time.After(jitter):
+			case <-timer.C:
 			}
 			attempt++
 			continue
 		}
 		break
 	}
+	timer.Stop()
 	r.logger.Infof("[redis lock] lock acquired key=%s expire=%ds", key, expireSecond)
 	defer r.unlockWithTimeout(mutex, key)
 

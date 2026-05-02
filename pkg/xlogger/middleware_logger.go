@@ -67,9 +67,7 @@ func NewLogger(basePath, name string, opts ...LogOptions) *MiddlewareLogger {
 		infoWriter = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), infoWriter)
 	}
 
-	core := zapcore.NewTee(
-		zapcore.NewCore(encoder, infoWriter, infoLevel),
-	)
+	core := zapcore.NewCore(encoder, infoWriter, infoLevel)
 
 	zapLogger := zap.New(
 		core,

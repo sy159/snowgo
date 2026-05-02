@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	common "snowgo/pkg"
@@ -149,11 +150,7 @@ func copyClient(client *http.Client) *http.Client {
 
 // cloneHeader 复制header，防止header被修改
 func cloneHeader(header map[string]string) map[string]string {
-	cpHeader := make(map[string]string, len(header))
-	for k, v := range header {
-		cpHeader[k] = v
-	}
-	return cpHeader
+	return maps.Clone(header)
 }
 
 // handleResponse 读取并封装响应
@@ -185,12 +182,8 @@ func handleResponse(resp *http.Response) (*Response, error) {
 // 始终创建新 map，避免修改传入的 defaults map
 func mergeHeader(defaults, custom map[string]string) map[string]string {
 	merged := make(map[string]string, len(defaults)+len(custom))
-	for k, v := range defaults {
-		merged[k] = v
-	}
-	for k, v := range custom {
-		merged[k] = v
-	}
+	maps.Copy(merged, defaults)
+	maps.Copy(merged, custom)
 	return merged
 }
 
@@ -204,7 +197,8 @@ func sleepBackoff(ctx context.Context, i int, base time.Duration) {
 		backoff = maxBackoff
 	}
 
-	jitter := time.Duration(common.WeakRandInt63n(int64(backoff)))
+	// equal jitter: at least half backoff, plus random up to half
+	jitter := backoff/2 + time.Duration(common.WeakRandInt63n(int64(backoff/2+1)))
 
 	timer := time.NewTimer(jitter)
 	defer timer.Stop()
