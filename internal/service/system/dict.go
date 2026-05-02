@@ -40,10 +40,10 @@ type DictService struct {
 	db         *repo.Repository
 	cache      xcache.Cache
 	dictRepo   DictRepo
-	logService *OperationLogService
+	logService OperationLogWriter
 }
 
-func NewDictService(db *repo.Repository, cache xcache.Cache, dictRepo DictRepo, logService *OperationLogService) *DictService {
+func NewDictService(db *repo.Repository, cache xcache.Cache, dictRepo DictRepo, logService OperationLogWriter) *DictService {
 	return &DictService{
 		db:         db,
 		cache:      cache,

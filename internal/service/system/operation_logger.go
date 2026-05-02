@@ -14,11 +14,18 @@ import (
 	"time"
 )
 
+// OperationLogWriter 定义跨模块写操作日志的接口，用于解耦依赖
+type OperationLogWriter interface {
+	CreateOperationLog(ctx context.Context, tx *query.Query, input *OperationLogInput) error
+}
+
 // OperationLogRepo 定义opt log相关db操作接口
 type OperationLogRepo interface {
 	TransactionCreate(ctx context.Context, tx *query.Query, operationLog *model.OperationLog) (*model.OperationLog, error)
 	GetOperationLogList(ctx context.Context, condition *daoSystem.OperationLogCondition) ([]*model.OperationLog, int64, error)
 }
+
+var _ OperationLogWriter = (*OperationLogService)(nil)
 
 type OperationLogInput struct {
 	OperatorID   int32

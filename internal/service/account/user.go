@@ -46,12 +46,12 @@ type UserService struct {
 	db          *repo.Repository
 	userDao     UserRepo
 	cache       xcache.Cache
-	roleService *RoleService
-	logService  *system.OperationLogService
+	roleService RolePermsGetter
+	logService  system.OperationLogWriter
 }
 
-func NewUserService(db *repo.Repository, userDao UserRepo, cache xcache.Cache, roleService *RoleService,
-	logService *system.OperationLogService) *UserService {
+func NewUserService(db *repo.Repository, userDao UserRepo, cache xcache.Cache, roleService RolePermsGetter,
+	logService system.OperationLogWriter) *UserService {
 	return &UserService{
 		db:          db,
 		cache:       cache,

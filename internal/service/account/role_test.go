@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
+	"snowgo/internal/dal/query"
 	daoAccount "snowgo/internal/dao/account"
 	"testing"
 	"time"
@@ -61,6 +62,35 @@ func (m *mockRoleDao) CountMenuByIds(_ context.Context, _ []int32) (int64, error
 
 func (m *mockRoleDao) IsUsedUserByIds(_ context.Context, _ int32) (bool, error) {
 	return m.isUsed, m.err
+}
+
+func (m *mockRoleDao) TransactionCreateRole(_ context.Context, _ *query.Query, role *model.Role) (*model.Role, error) {
+	role.ID = 1
+	return role, nil
+}
+
+func (m *mockRoleDao) UpdateRole(_ context.Context, role *model.Role) (*model.Role, error) {
+	return role, nil
+}
+
+func (m *mockRoleDao) TransactionCreateRoleMenu(_ context.Context, _ *query.Query, _ []*model.RoleMenu) error {
+	return nil
+}
+
+func (m *mockRoleDao) TransactionDeleteRoleMenu(_ context.Context, _ *query.Query, _ int32) error {
+	return nil
+}
+
+func (m *mockRoleDao) TransactionDeleteById(_ context.Context, _ *query.Query, _ int32) error {
+	return nil
+}
+
+func (m *mockRoleDao) GetMenuPermsByRoleId(_ context.Context, _ int32) ([]string, error) {
+	return []string{"perm1"}, nil
+}
+
+func (m *mockRoleDao) ListRoleMenuPerms(_ context.Context) ([]*daoAccount.RoleMenuPerm, error) {
+	return nil, nil
 }
 
 // ---- Tests: GetRoleById ----
@@ -135,6 +165,97 @@ func TestListRoles_Empty(t *testing.T) {
 	assert.Empty(t, result.List)
 }
 
+// ---- Tests: CreateRole ----
+
+func TestCreateRole_DuplicateCode(t *testing.T) {
+	logWriter := &mockLogWriter{}
+	svc := &RoleService{
+		roleDao:    &mockRoleDao{codeExists: true},
+		logService: logWriter,
+	}
+
+	_, err := svc.CreateRole(testCtx(), &RoleParam{
+		Code: "dup_code", Name: "Dup", Description: "Test",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "角色编码已存在")
+	assert.Equal(t, 0, logWriter.callCount)
+}
+
+func TestCreateRole_InvalidMenu(t *testing.T) {
+	logWriter := &mockLogWriter{}
+	svc := &RoleService{
+		roleDao:    &mockRoleDao{countMenus: 0},
+		logService: logWriter,
+	}
+
+	_, err := svc.CreateRole(testCtx(), &RoleParam{
+		Code: "new_role", Name: "New", Description: "Test", MenuIds: []int32{999},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "设置的菜单不存在")
+}
+
+// ---- Tests: UpdateRole ----
+
+func TestUpdateRole_InvalidID(t *testing.T) {
+	logWriter := &mockLogWriter{}
+	svc := &RoleService{logService: logWriter}
+
+	err := svc.UpdateRole(testCtx(), &RoleParam{
+		ID: -1, Code: "x", Name: "N", Description: "D",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "角色ID无效")
+}
+
+func TestUpdateRole_DuplicateCode(t *testing.T) {
+	logWriter := &mockLogWriter{}
+	name := "Test"
+	svc := &RoleService{
+		roleDao:    &mockRoleDao{codeExists: true, role: &model.Role{ID: 1, Code: "x", Name: &name}},
+		logService: logWriter,
+	}
+
+	err := svc.UpdateRole(testCtx(), &RoleParam{
+		ID: 1, Code: "dup", Name: "New", Description: "D",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "角色编码已存在")
+}
+
+func TestUpdateRole_NotFound(t *testing.T) {
+	logWriter := &mockLogWriter{}
+	svc := &RoleService{
+		roleDao:    &mockRoleDao{role: nil},
+		logService: logWriter,
+	}
+
+	err := svc.UpdateRole(testCtx(), &RoleParam{
+		ID: 1, Code: "x", Name: "N", Description: "D",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "角色不存在")
+}
+
+// ---- Tests: DeleteRole ----
+
+func TestDeleteRole_InvalidID(t *testing.T) {
+	svc := &RoleService{}
+	err := svc.DeleteRole(testCtx(), -1)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "角色ID无效")
+}
+
+func TestDeleteRole_UsedByUser(t *testing.T) {
+	svc := &RoleService{
+		roleDao: &mockRoleDao{isUsed: true},
+	}
+	err := svc.DeleteRole(testCtx(), 1)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "该角色已被使用")
+}
+
 // ---- Tests: GetRoleMenuListByRuleID ----
 
 func TestGetRoleMenuListByRuleID_CacheHit(t *testing.T) {
@@ -179,7 +300,6 @@ func TestGetRoleMenuListByRuleID_CacheMiss(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, got, 1)
 	assert.Equal(t, "Dashboard", got[0].Name)
-	// Verify cache was written
 	_, ok := cacheData[fmt.Sprintf("%s%d", constant.CacheRoleMenuPrefix, int32(1))]
 	assert.True(t, ok)
 }

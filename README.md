@@ -140,7 +140,6 @@ snowgo
 │   ├── xresponse/            # 统一响应格式
 │   ├── xstr_tool/            # 字符串工具
 │   └── xtrace/               # OpenTelemetry 链路追踪
-├── test/                     # 测试用例
 ├── logs/                     # 运行日志（.gitignore）
 ├── CLAUDE.md                 # AI 辅助开发指南
 ├── CLAUDE_CODING.md          # 编码规范

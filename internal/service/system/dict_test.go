@@ -9,12 +9,14 @@ import (
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	daoSystem "snowgo/internal/dao/system"
+	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 // ---- Mock implementations ----
@@ -31,7 +33,7 @@ type mockDictRepo struct {
 
 func (m *mockDictRepo) GetDictById(_ context.Context, _ int32) (*model.SystemDict, error) {
 	if m.dict == nil {
-		return nil, errors.New("not found")
+		return nil, gorm.ErrRecordNotFound
 	}
 	return m.dict, m.err
 }
@@ -75,7 +77,7 @@ func (m *mockDictRepo) TransactionCreateDictItem(_ context.Context, _ *query.Que
 
 func (m *mockDictRepo) GetDictItemById(_ context.Context, _ int32) (*model.SystemDictItem, error) {
 	if m.dictItem == nil {
-		return nil, errors.New("not found")
+		return nil, gorm.ErrRecordNotFound
 	}
 	return m.dictItem, m.err
 }
@@ -130,6 +132,17 @@ func (m *mockDictCache) Delete(_ context.Context, keys ...string) (int64, error)
 
 // ---- Helpers ----
 
+func testCtx() context.Context {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, xauth.XUserId, int32(1))
+	ctx = context.WithValue(ctx, xauth.XUserName, "admin")
+	ctx = context.WithValue(ctx, xauth.XTraceId, "test-trace-id")
+	ctx = context.WithValue(ctx, xauth.XIp, "127.0.0.1")
+	ctx = context.WithValue(ctx, xauth.XUserAgent, "test-agent")
+	ctx = context.WithValue(ctx, xauth.XSessionId, "test-session")
+	return ctx
+}
+
 func testDict() *model.SystemDict {
 	desc := "Test dict"
 	return &model.SystemDict{
@@ -143,6 +156,17 @@ func testDict() *model.SystemDict {
 }
 
 func ptrTimeSys(t time.Time) *time.Time { return &t }
+
+// mockLogWriter 满足 OperationLogWriter 接口
+type mockLogWriter struct {
+	callCount int
+	err       error
+}
+
+func (m *mockLogWriter) CreateOperationLog(_ context.Context, _ *query.Query, _ *OperationLogInput) error {
+	m.callCount++
+	return m.err
+}
 
 // ---- Tests: GetDictList ----
 
@@ -175,6 +199,70 @@ func TestGetDictList_InvalidEndTime(t *testing.T) {
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "end_time格式错误")
+}
+
+// ---- Tests: CreateDict ----
+
+func TestCreateDict_DuplicateCode(t *testing.T) {
+	logWriter := &mockLogWriter{}
+	svc := &DictService{dictRepo: &mockDictRepo{isDictDup: true}, logService: logWriter}
+
+	_, err := svc.CreateDict(testCtx(), &DictParam{
+		Code: "dup_code", Name: "Dup", Description: "Test",
+	})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrDictCodeExist))
+	assert.Equal(t, 0, logWriter.callCount)
+}
+
+// ---- Tests: UpdateDict ----
+
+func TestUpdateDict_InvalidID(t *testing.T) {
+	svc := &DictService{}
+
+	_, err := svc.UpdateDict(testCtx(), &DictParam{
+		ID: -1, Code: "x", Name: "N", Description: "D",
+	})
+	assert.True(t, errors.Is(err, ErrDictCodeNotFound))
+}
+
+func TestUpdateDict_NotFound(t *testing.T) {
+	svc := &DictService{dictRepo: &mockDictRepo{dict: nil}}
+
+	_, err := svc.UpdateDict(testCtx(), &DictParam{
+		ID: 1, Code: "x", Name: "N", Description: "D",
+	})
+	assert.True(t, errors.Is(err, ErrDictCodeNotFound))
+}
+
+func TestUpdateDict_DuplicateCode(t *testing.T) {
+	name := "Test"
+	svc := &DictService{
+		dictRepo: &mockDictRepo{
+			isDictDup: true,
+			dict:      &model.SystemDict{ID: 1, Code: "x", Name: name, CreatedAt: ptrTimeSys(time.Now())},
+		},
+	}
+
+	_, err := svc.UpdateDict(testCtx(), &DictParam{
+		ID: 1, Code: "dup", Name: "New", Description: "D",
+	})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrDictCodeExist))
+}
+
+// ---- Tests: DeleteById ----
+
+func TestDeleteDict_InvalidID(t *testing.T) {
+	svc := &DictService{}
+	err := svc.DeleteById(testCtx(), -1)
+	assert.True(t, errors.Is(err, ErrDictCodeNotFound))
+}
+
+func TestDeleteDict_NotFound(t *testing.T) {
+	svc := &DictService{dictRepo: &mockDictRepo{dict: nil}}
+	err := svc.DeleteById(testCtx(), 1)
+	assert.True(t, errors.Is(err, ErrDictCodeNotFound))
 }
 
 // ---- Tests: GetItemListByCode ----
@@ -221,7 +309,6 @@ func TestGetItemListByCode_CacheMiss(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, got, 1)
 	assert.Equal(t, "Active", got[0].ItemName)
-	// Verify cache was set
 	_, ok := cacheData[fmt.Sprintf("%s%s", constant.SystemDictPrefix, "test_dict")]
 	assert.True(t, ok)
 }
@@ -244,7 +331,69 @@ func TestGetItemListByCode_EmptyResultsCacheShortTTL(t *testing.T) {
 	_, err := svc.GetItemListByCode(context.Background(), "nonexist")
 	require.NoError(t, err)
 
-	// Should have cached with short TTL (1 hour for empty results)
 	_, ok := cacheData[fmt.Sprintf("%s%s", constant.SystemDictPrefix, "nonexist")]
 	assert.True(t, ok)
+}
+
+// ---- Tests: CreateItem ----
+
+func TestCreateItem_DictNotFound(t *testing.T) {
+	logWriter := &mockLogWriter{}
+	svc := &DictService{dictRepo: &mockDictRepo{dict: nil}, logService: logWriter}
+
+	_, err := svc.CreateItem(testCtx(), &DictItemParam{
+		DictID: 1, ItemCode: "x", ItemName: "N", Status: "A",
+	})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrDictCodeNotFound))
+}
+
+func TestCreateItem_DuplicateCode(t *testing.T) {
+	logWriter := &mockLogWriter{}
+	svc := &DictService{
+		dictRepo:   &mockDictRepo{isItemDup: true, dict: testDict()},
+		logService: logWriter,
+	}
+
+	_, err := svc.CreateItem(testCtx(), &DictItemParam{
+		DictID: 1, ItemCode: "dup", ItemName: "N", Status: "A",
+	})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrDictItemCodeExist))
+}
+
+// ---- Tests: UpdateItem ----
+
+func TestUpdateItem_InvalidID(t *testing.T) {
+	svc := &DictService{}
+
+	_, err := svc.UpdateItem(testCtx(), &DictItemParam{
+		ID: -1, ItemCode: "x", ItemName: "N", Status: "A",
+	})
+	assert.True(t, errors.Is(err, ErrDictCodeItemNotFound))
+}
+
+func TestUpdateItem_ItemNotFound(t *testing.T) {
+	svc := &DictService{dictRepo: &mockDictRepo{dictItem: nil}}
+
+	_, err := svc.UpdateItem(testCtx(), &DictItemParam{
+		ID: 1, ItemCode: "x", ItemName: "N", Status: "A",
+	})
+	assert.Error(t, err)
+	assert.True(t, errors.Is(err, ErrDictCodeItemNotFound))
+}
+
+// ---- Tests: DeleteItemById ----
+
+func TestDeleteItem_InvalidID(t *testing.T) {
+	svc := &DictService{}
+	err := svc.DeleteItemById(testCtx(), -1)
+	assert.True(t, errors.Is(err, ErrDictCodeItemNotFound))
+}
+
+func TestDeleteItem_NotFound(t *testing.T) {
+	svc := &DictService{dictRepo: &mockDictRepo{dictItem: nil}}
+	err := svc.DeleteItemById(testCtx(), 1)
+	assert.Error(t, err)
+	assert.True(t, errors.Is(err, ErrDictCodeItemNotFound))
 }

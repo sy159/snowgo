@@ -35,10 +35,10 @@ type MenuService struct {
 	db         *repo.Repository
 	menuDao    MenuRepo
 	cache      xcache.Cache
-	logService *system.OperationLogService
+	logService system.OperationLogWriter
 }
 
-func NewMenuService(db *repo.Repository, cache xcache.Cache, menuDao MenuRepo, logService *system.OperationLogService) *MenuService {
+func NewMenuService(db *repo.Repository, cache xcache.Cache, menuDao MenuRepo, logService system.OperationLogWriter) *MenuService {
 	return &MenuService{
 		db:         db,
 		cache:      cache,

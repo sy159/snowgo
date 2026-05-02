@@ -9,6 +9,8 @@ import (
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	daoAccount "snowgo/internal/dao/account"
+	"snowgo/internal/service/system"
+	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xcryption"
 	"testing"
@@ -125,7 +127,44 @@ func (m *mockCache) Delete(_ context.Context, keys ...string) (int64, error) {
 	return int64(len(keys)), nil
 }
 
+// mockLogWriter 满足 system.OperationLogWriter 接口
+type mockLogWriter struct {
+	callCount int
+	err       error
+}
+
+func (m *mockLogWriter) CreateOperationLog(_ context.Context, _ *query.Query, _ *system.OperationLogInput) error {
+	m.callCount++
+	return m.err
+}
+
+// mockRolePerms 满足 RolePermsGetter 接口
+type mockRolePerms struct {
+	perms []string
+	menus []*MenuData
+	err   error
+}
+
+func (m *mockRolePerms) GetRolePermsListByRuleID(_ context.Context, _ int32) ([]string, error) {
+	return m.perms, m.err
+}
+
+func (m *mockRolePerms) GetRoleMenuListByRuleID(_ context.Context, _ int32) ([]*MenuData, error) {
+	return m.menus, m.err
+}
+
 // ---- Helpers ----
+
+func testCtx() context.Context {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, xauth.XUserId, int32(1))
+	ctx = context.WithValue(ctx, xauth.XUserName, "admin")
+	ctx = context.WithValue(ctx, xauth.XTraceId, "test-trace-id")
+	ctx = context.WithValue(ctx, xauth.XIp, "127.0.0.1")
+	ctx = context.WithValue(ctx, xauth.XUserAgent, "test-agent")
+	ctx = context.WithValue(ctx, xauth.XSessionId, "test-session")
+	return ctx
+}
 
 func testUser() *model.User {
 	nickname := "Test User"
@@ -245,7 +284,6 @@ func TestGetRoleIdsByUserId_CacheMiss(t *testing.T) {
 	got, err := svc.GetRoleIdsByUserId(context.Background(), 1)
 	require.NoError(t, err)
 	assert.Equal(t, []int32{3, 4}, got)
-	// Verify cache was written
 	_, ok := cacheData[fmt.Sprintf("%s%d", constant.CacheUserRolePrefix, int32(1))]
 	assert.True(t, ok)
 }
@@ -253,6 +291,63 @@ func TestGetRoleIdsByUserId_CacheMiss(t *testing.T) {
 func TestGetRoleIdsByUserId_InvalidID(t *testing.T) {
 	svc := &UserService{}
 	_, err := svc.GetRoleIdsByUserId(context.Background(), -1)
+	assert.True(t, errors.Is(err, ErrUserNotFound))
+}
+
+// ---- Tests: CreateUser ----
+
+func TestCreateUser_DuplicateName(t *testing.T) {
+	logWriter := &mockLogWriter{}
+	svc := &UserService{
+		userDao:    &mockUserDao{isDuplicate: true},
+		logService: logWriter,
+	}
+
+	_, err := svc.CreateUser(testCtx(), &UserParam{
+		Username: "dupuser", Tel: "13800000000", Password: "pwd", Nickname: "Dup",
+	})
+	assert.True(t, errors.Is(err, ErrUserNameTelExist))
+	assert.Equal(t, 0, logWriter.callCount)
+}
+
+func TestCreateUser_InvalidRole(t *testing.T) {
+	logWriter := &mockLogWriter{}
+	svc := &UserService{
+		userDao:    &mockUserDao{countRoles: 0},
+		logService: logWriter,
+	}
+
+	_, err := svc.CreateUser(testCtx(), &UserParam{
+		Username: "newuser", Tel: "13800000000", Password: "pwd",
+		Nickname: "New", RoleIds: []int32{999},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "设置的角色不存在")
+}
+
+func TestUpdateUser_InvalidID(t *testing.T) {
+	logWriter := &mockLogWriter{}
+	svc := &UserService{userDao: &mockUserDao{}, logService: logWriter}
+
+	_, err := svc.UpdateUser(testCtx(), &UserParam{
+		ID: -1, Username: "u", Tel: "13800000000", Nickname: "N",
+	})
+	assert.True(t, errors.Is(err, ErrUserNotFound))
+}
+
+// ---- Tests: DeleteById ----
+
+func TestDeleteById_InvalidID(t *testing.T) {
+	svc := &UserService{}
+	err := svc.DeleteById(testCtx(), -1)
+	assert.True(t, errors.Is(err, ErrUserNotFound))
+}
+
+// ---- Tests: ResetPwdById ----
+
+func TestResetPwdById_InvalidID(t *testing.T) {
+	svc := &UserService{}
+	err := svc.ResetPwdById(context.Background(), -1, "newpwd")
 	assert.True(t, errors.Is(err, ErrUserNotFound))
 }
 
@@ -267,6 +362,24 @@ func TestGetPermsListById_NoRolesReturnsEmpty(t *testing.T) {
 	perms, err := svc.GetPermsListById(context.Background(), 1)
 	require.NoError(t, err)
 	assert.Empty(t, perms)
+}
+
+func TestGetPermsListById_WithRoles(t *testing.T) {
+	roleIds := []int32{1}
+	cacheData := make(map[string]string)
+	svc := &UserService{
+		userDao: &mockUserDao{roleIds: roleIds},
+		cache:   &mockCache{data: cacheData},
+		roleService: &mockRolePerms{
+			perms: []string{"user:create", "user:delete"},
+		},
+	}
+
+	perms, err := svc.GetPermsListById(context.Background(), 1)
+	require.NoError(t, err)
+	assert.Len(t, perms, 2)
+	assert.Contains(t, perms, "user:create")
+	assert.Contains(t, perms, "user:delete")
 }
 
 func TestGetRoleIdsByUserId_InvalidUserID(t *testing.T) {
