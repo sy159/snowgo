@@ -3,11 +3,12 @@ package xlock
 import (
 	"context"
 	"errors"
+	"time"
+
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
 	"github.com/redis/go-redis/v9"
 	common "snowgo/pkg"
-	"time"
 )
 
 type RedisLock struct {
@@ -15,18 +16,32 @@ type RedisLock struct {
 	logger Logger
 }
 
-func NewRedisLock(client *redis.Client, logger Logger) Lock {
+func NewRedisLock(client *redis.Client, logger Logger) (Lock, error) {
+	if client == nil {
+		return nil, errors.New("redis client cannot be nil")
+	}
 	if logger == nil {
-		logger = &defaultLogger{} // fmt.Printf 封装
+		logger = &defaultLogger{}
 	}
 	return &RedisLock{
 		rl:     redsync.New(goredis.NewPool(client)),
 		logger: logger,
+	}, nil
+}
+
+// unlockWithTimeout 安全释放锁
+func (r *RedisLock) unlockWithTimeout(mutex *redsync.Mutex, key string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ok, unLockErr := mutex.UnlockContext(ctx)
+	if unLockErr != nil || !ok {
+		r.logger.Errorf("[redis lock] unlock failed key=%s ok=%v err=%v\n", key, ok, unLockErr)
+	} else {
+		r.logger.Infof("[redis lock] lock released key=%s", key)
 	}
 }
 
 func (r *RedisLock) LockWithTries(ctx context.Context, key string, expireSecond int64, tries int, fn func(isLock bool, lc LockContext) error) (err error) {
-	tries += 1 // 重试次数需要+1
 	if fn == nil {
 		return errors.New("fn is empty")
 	}
@@ -36,27 +51,19 @@ func (r *RedisLock) LockWithTries(ctx context.Context, key string, expireSecond 
 	if expireSecond < 1 {
 		expireSecond = 1
 	}
-	if tries < 1 {
-		tries = 1
+	if tries < 0 {
+		tries = 0
 	}
+	tries += 1 // tries 表示总尝试次数，调用方传 0 表示只试一次（+1=1次）
 	expiryOption := redsync.WithExpiry(time.Duration(expireSecond) * time.Second)
 	triesOption := redsync.WithTries(tries)
-	retryDelayOpt := redsync.WithRetryDelay(time.Millisecond * 100) // 重试间隔时间
+	retryDelayOpt := redsync.WithRetryDelay(time.Millisecond * 100)
 	mutex := r.rl.NewMutex(key, expiryOption, triesOption, retryDelayOpt)
 	if err = mutex.LockContext(ctx); err != nil {
 		return fn(false, newRedisLockContext(mutex, err))
 	}
 	r.logger.Infof("[redis lock] lock acquired key=%s expire=%ds tries=%d", key, expireSecond, tries)
-	// 释放锁
-	defer func() {
-		// 解锁使用 background context，避免外部 ctx被 cancel导致Unlock失败
-		ok, unLockErr := mutex.UnlockContext(context.Background())
-		if unLockErr != nil || !ok {
-			r.logger.Errorf("[redis lock] unlock failed key=%s ok=%v err=%v\n", key, ok, unLockErr)
-		} else {
-			r.logger.Infof("[redis lock] lock released key=%s", key)
-		}
-	}()
+	defer r.unlockWithTimeout(mutex, key)
 	return fn(true, newRedisLockContext(mutex, nil))
 }
 
@@ -74,32 +81,22 @@ func (r *RedisLock) LockWithTriesTime(ctx context.Context, key string, expireSec
 		triesTimeSecond = 1
 	}
 
-	// 间隔时间50ms，一秒就可以重试20次, 要保证大于锁重试时间，所以+1
 	retryDelay := 50 * time.Millisecond
 	tries := int(triesTimeSecond)*20 + 1
 
 	expiryOption := redsync.WithExpiry(time.Duration(expireSecond) * time.Second)
-	triesOption := redsync.WithTries(tries)                // 重试次数
-	retryDelayOption := redsync.WithRetryDelay(retryDelay) // 重试间隔时间
-	// 重试次数 * 间隔时间 > 锁重试时间，通过超时上下文管理锁重试时间
+	triesOption := redsync.WithTries(tries)
+	retryDelayOption := redsync.WithRetryDelay(retryDelay)
 	mutex := r.rl.NewMutex(key, expiryOption, triesOption, retryDelayOption)
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(triesTimeSecond)*time.Second)
+	// WHY: 使用 lockCtx 命名避免遮蔽函数参数 ctx
+	lockCtx, cancel := context.WithTimeout(ctx, time.Duration(triesTimeSecond)*time.Second)
 	defer cancel()
 
-	if err = mutex.LockContext(ctx); err != nil {
+	if err = mutex.LockContext(lockCtx); err != nil {
 		return fn(false, newRedisLockContext(mutex, err))
 	}
 	r.logger.Infof("[redis lock] lock acquired key=%s expire=%ds triesTime=%ds", key, expireSecond, triesTimeSecond)
-	// 释放锁
-	defer func() {
-		// 解锁使用 background context，避免外部 ctx被 cancel导致Unlock失败
-		ok, unLockErr := mutex.UnlockContext(context.Background())
-		if unLockErr != nil || !ok {
-			r.logger.Errorf("[redis lock] unlock failed key=%s ok=%v err=%v\n", key, ok, unLockErr)
-		} else {
-			r.logger.Infof("[redis lock] lock released key=%s", key)
-		}
-	}()
+	defer r.unlockWithTimeout(mutex, key)
 
 	return fn(true, newRedisLockContext(mutex, nil))
 }
@@ -130,23 +127,20 @@ func (r *RedisLock) ReTryLock(ctx context.Context, key string, expireSecond int6
 
 		if err = mutex.LockContext(ctx); err != nil {
 			r.logger.Errorf("[redis lock] redis retry lock failed key=%s attempt=%d err=%v", key, attempt, err)
-			time.Sleep(time.Millisecond*50 + time.Duration(common.WeakRandInt63n(20))*time.Millisecond)
+			// WHY: 使用 select+timer 替代 time.Sleep，使 sleep 可响应 context 取消
+			jitter := time.Millisecond*50 + time.Duration(common.WeakRandInt63n(20))*time.Millisecond
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(jitter):
+			}
 			attempt++
 			continue
 		}
 		break
 	}
 	r.logger.Infof("[redis lock] lock acquired key=%s expire=%ds", key, expireSecond)
-	// 释放锁
-	defer func() {
-		// 解锁使用 background context，避免外部 ctx被 cancel导致Unlock失败
-		ok, unLockErr := mutex.UnlockContext(context.Background())
-		if unLockErr != nil || !ok {
-			r.logger.Errorf("[redis lock] unlock failed key=%s ok=%v err=%v\n", key, ok, unLockErr)
-		} else {
-			r.logger.Infof("[redis lock] lock released key=%s", key)
-		}
-	}()
+	defer r.unlockWithTimeout(mutex, key)
 
 	return fn(newRedisLockContext(mutex, nil))
 }

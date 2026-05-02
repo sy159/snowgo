@@ -39,7 +39,7 @@ func PublishMessage(c *gin.Context) {
 	bodyBytes, _ := json.Marshal(body)
 	msg := &xmq.Message{
 		Body:    bodyBytes,
-		Headers: map[string]interface{}{"source": "http-api"},
+		Headers: map[string]any{"source": "http-api"},
 	}
 
 	// 如果是延时消息

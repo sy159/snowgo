@@ -124,7 +124,7 @@ func TestSecureRandInt63n(t *testing.T) {
 func TestErrorToString(t *testing.T) {
 	tests := []struct {
 		name string
-		in   interface{}
+		in   any
 		want string
 	}{
 		{"nil", nil, ""},

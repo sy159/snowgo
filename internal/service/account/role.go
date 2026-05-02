@@ -305,7 +305,7 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 	// 如果用户使用了角色，不能删除
 	isUsed, err := s.roleDao.IsUsedUserByIds(ctx, id)
 	if err != nil {
-		return fmt.Errorf(": %w", err)
+		return fmt.Errorf("检查角色使用情况失败: %w", err)
 	}
 	if isUsed {
 		return errors.New("该角色已被使用，无法删除")

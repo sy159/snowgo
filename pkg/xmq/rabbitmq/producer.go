@@ -75,7 +75,11 @@ func (p *Producer) Publish(ctx context.Context, exchange, routingKey string, msg
 	if err != nil {
 		status = "fail"
 	}
-	// 记录所有发送的业务消息
+	// 只记录 body 前128字节
+	truncatedBody := string(msg.Body)
+	if len(truncatedBody) > 128 {
+		truncatedBody = truncatedBody[:128] + "..."
+	}
 	p.log.Info(
 		ctx,
 		"publish msg",
@@ -83,7 +87,8 @@ func (p *Producer) Publish(ctx context.Context, exchange, routingKey string, msg
 		zap.String("exchange", exchange),
 		zap.String("routing_key", routingKey),
 		zap.String("message_id", msg.MessageId),
-		zap.String("message_body", string(msg.Body)),
+		zap.Int("message_body_len", len(msg.Body)),
+		zap.String("message_body_preview", truncatedBody),
 		zap.Any("message_header", msg.Headers),
 		zap.String("status", status),
 		zap.Error(err),
@@ -97,15 +102,16 @@ func (p *Producer) PublishDelayed(ctx context.Context, delayedExchange, routingK
 	if msg == nil {
 		return fmt.Errorf("nil message")
 	}
-	// 先尝试插件方案（x-delay）,rabbitmq已经安装rabbitmq_delayed_message_exchange插件，可直接实现延时
-	if msg.Headers == nil {
-		msg.Headers = make(map[string]interface{})
+	// 克隆 headers 后再修改，避免并发调用时修改共享 msg.Headers 产生数据竞争
+	headers := make(map[string]any, len(msg.Headers)+1)
+	for k, v := range msg.Headers {
+		headers[k] = v
 	}
-	msg.Headers["x-delay"] = delayMillis
+	headers["x-delay"] = delayMillis
+	msg.Headers = headers
 
 	// 尝试首选 publish
-	err := p.Publish(ctx, delayedExchange, routingKey, msg)
-	return err
+	return p.Publish(ctx, delayedExchange, routingKey, msg)
 	// 降级 TTL+DLX，根据情况实现
 }
 

@@ -46,7 +46,7 @@
 | 🚀 缓存系统 | go-redis | Redis 客户端封装，支持缓存与分布式锁 |
 | 🔐 鉴权系统 | JWT v5 | access_token / refresh_token 双 Token 鉴权，refresh_token 单用+JTI 追踪 |
 | 🛂 权限系统 | 自定义 RBAC | 基于菜单树结构的按钮/接口级权限控制 |
-| 🛡️ 限流中间件 | Token Bucket Limiter | 支持 IP 白名单、路由级限流、Key 级限流 |
+| 🛡️ 限流中间件 | Fixed Window + Token Bucket | 固定窗口（Redis 原子计数）+ 令牌桶（内存速率控制）；支持 IP 白名单、路由级限流、Key 级限流 |
 | 🔗 链路追踪 | OpenTelemetry + Tempo | 可选开启，trace_id 自动注入日志与 HTTP Header |
 | 📊 性能分析 | pprof | 按需开启，内网 IP 白名单保护 |
 | 🏥 健康检查 | /healthz / /readyz | 支持 K8s liveness / readiness probe |
@@ -129,11 +129,11 @@ snowgo
 ├── pkg/                      # 公共工具库
 │   ├── xauth/                # JWT 认证
 │   ├── xcache/               # Redis 缓存
-│   ├── xcryption/            # 密码哈希（bcrypt）
+│   ├── xcryption/            # 加密工具（bcrypt 哈希、AES-GCM 加解密、SHA256、ID 编码）
 │   ├── xdatabase/            # 数据库连接管理
 │   ├── xerror/               # 业务错误码
-│   ├── xlimiter/             # 限流器
-│   ├── xlock/                # Redis 分布式锁
+│   ├── xlimiter/             # 限流器（Fixed Window + Token Bucket）
+│   ├── xlock/                # Redis 分布式锁（基于 redsync，支持自动续期）
 │   ├── xlogger/              # Zap 日志封装（敏感字段脱敏）
 │   ├── xmq/                  # RabbitMQ 封装
 │   ├── xrequests/            # HTTP 请求客户端

@@ -7,7 +7,7 @@ import (
 
 type Cache interface {
 	// Eval 直接执行 script：script KEYS ARGV...
-	Eval(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error)
+	Eval(ctx context.Context, script string, keys []string, args ...any) (any, error)
 
 	// Get retrieves the value for a given key.
 	// Returns (value, false, nil) if the key does not exist.

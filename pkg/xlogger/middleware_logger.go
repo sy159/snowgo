@@ -36,7 +36,7 @@ func WithConsoleOutput(enabled bool) LogOptions {
 // WithFileMaxAgeDays 设置日志保存的天数
 func WithFileMaxAgeDays(days uint32) LogOptions {
 	return func(l *logOptions) {
-		if days > 2 {
+		if days >= 2 {
 			l.fileMaxAgeDays = days
 		}
 	}

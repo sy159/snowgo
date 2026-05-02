@@ -2,7 +2,6 @@ package xstr_tool
 
 import (
 	"snowgo/pkg"
-	"strings"
 )
 
 const (
@@ -91,10 +90,12 @@ func RandShuffleStr(n int, flag int) string {
 
 // IsUniqueStr 判断字符串是否不存在重复字符
 func IsUniqueStr(s string) bool {
-	for index, v := range s {
-		if strings.LastIndex(s, string(v)) != index {
+	seen := make(map[rune]struct{}, len(s))
+	for _, v := range s {
+		if _, ok := seen[v]; ok {
 			return false
 		}
+		seen[v] = struct{}{}
 	}
 	return true
 }

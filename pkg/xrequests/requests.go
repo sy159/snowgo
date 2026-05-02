@@ -46,7 +46,7 @@ type requestOptions struct {
 	request    *http.Request
 	query      map[string]string
 	formData   map[string]string // 表单数据
-	json       interface{}       // 支持直接传入JSON对象
+	json       any               // 支持直接传入JSON对象
 	timeout    time.Duration     // 支持单独设置超时
 }
 
@@ -157,9 +157,12 @@ func cloneHeader(header map[string]string) map[string]string {
 }
 
 // handleResponse 读取并封装响应
+// 限制响应体大小为 10MB，防止恶意服务器返回超大响应导致 OOM
+const maxResponseBodySize = 10 << 20 // 10 MB
+
 func handleResponse(resp *http.Response) (*Response, error) {
-	// 读取 body
-	body, err := io.ReadAll(resp.Body)
+	// 读取 body（限制大小防止 OOM）
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
 	if err != nil {
 		// 读取失败，确保关闭原始 body
 		_ = resp.Body.Close()
@@ -179,14 +182,16 @@ func handleResponse(resp *http.Response) (*Response, error) {
 	}, nil
 }
 
+// 始终创建新 map，避免修改传入的 defaults map
 func mergeHeader(defaults, custom map[string]string) map[string]string {
-	if defaults == nil {
-		defaults = make(map[string]string)
+	merged := make(map[string]string, len(defaults)+len(custom))
+	for k, v := range defaults {
+		merged[k] = v
 	}
 	for k, v := range custom {
-		defaults[k] = v
+		merged[k] = v
 	}
-	return defaults
+	return merged
 }
 
 func sleepBackoff(ctx context.Context, i int, base time.Duration) {
@@ -314,13 +319,13 @@ func (res *Response) Headers() http.Header {
 }
 
 // Json 返回body json内容
-func (res *Response) Json(v interface{}) error {
+func (res *Response) Json(v any) error {
 	return json.Unmarshal(res.Body, v)
 }
 
 // Map 返回body map内容
-func (res *Response) Map() (map[string]interface{}, error) {
-	var m map[string]interface{}
+func (res *Response) Map() (map[string]any, error) {
+	var m map[string]any
 	err := json.Unmarshal(res.Body, &m)
 	return m, err
 }
@@ -414,7 +419,7 @@ func WithFormData(formData map[string]string) Option {
 }
 
 // WithJSON json请求类型
-func WithJSON(jsonBody interface{}) Option {
+func WithJSON(jsonBody any) Option {
 	return func(o *requestOptions) { o.json = jsonBody }
 }
 

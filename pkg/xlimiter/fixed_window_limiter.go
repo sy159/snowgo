@@ -2,6 +2,7 @@ package xlimiter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -17,7 +18,10 @@ type FixedWindowLimiter struct {
 }
 
 // NewFixedWindowLimiter 固定窗口限流，适用于登录失败计数、短信请求次数限制、接口短期频率限制等
-func NewFixedWindowLimiter(cache xcache.Cache, key string, windowSecond int64, maxFails int64) *FixedWindowLimiter {
+func NewFixedWindowLimiter(cache xcache.Cache, key string, windowSecond int64, maxFails int64) (*FixedWindowLimiter, error) {
+	if cache == nil {
+		return nil, errors.New("cache cannot be nil")
+	}
 	if windowSecond <= 0 {
 		windowSecond = 60 // 默认 60s，避免 0 导致问题
 	}
@@ -29,14 +33,11 @@ func NewFixedWindowLimiter(cache xcache.Cache, key string, windowSecond int64, m
 		windowSec: windowSecond,
 		maxFails:  maxFails,
 		key:       key,
-	}
+	}, nil
 }
 
-// Add 尝试增加一次计数（原子）
-// 返回：allowed 是否允许继续操作，count 当前计数（在做 incr 后的值），ttl 剩余窗口时间（time.Duration），err 错误
-func (f *FixedWindowLimiter) Add(ctx context.Context) (allowed bool, count int64, ttl time.Duration, err error) {
-	// Lua 脚本：INCR -> 如果首次 INCR 设置 EXPIRE -> 获取 TTL -> 根据 count 与 maxFails 决定返回值
-	script := `
+// 提取为包级常量，避免每次 Add 调用都重新分配和解析 Lua 脚本字符串
+const fixedWindowScript = `
 local key = KEYS[1]
 local maxFails = tonumber(ARGV[1])
 local window = tonumber(ARGV[2])
@@ -57,12 +58,15 @@ end
 return {allowed, cnt, t}
 `
 
-	res, err := f.cache.Eval(ctx, script, []string{f.key}, strconv.FormatInt(f.maxFails, 10), strconv.FormatInt(f.windowSec, 10))
+// Add 尝试增加一次计数（原子）
+// 返回：allowed 是否允许继续操作，count 当前计数（在做 incr 后的值），ttl 剩余窗口时间（time.Duration），err 错误
+func (f *FixedWindowLimiter) Add(ctx context.Context) (allowed bool, count int64, ttl time.Duration, err error) {
+	res, err := f.cache.Eval(ctx, fixedWindowScript, []string{f.key}, strconv.FormatInt(f.maxFails, 10), strconv.FormatInt(f.windowSec, 10))
 	if err != nil {
 		return false, 0, 0, err
 	}
 
-	arr, ok := res.([]interface{})
+	arr, ok := res.([]any)
 	if !ok || len(arr) < 3 {
 		return false, 0, 0, fmt.Errorf("unexpected redis eval result type: %T", res)
 	}
@@ -98,8 +102,8 @@ func (f *FixedWindowLimiter) Reset(ctx context.Context) error {
 	return err
 }
 
-// parseRedisInt 从 Redis 返回的 interface{} 解析为 int64（兼容 int64 / string / []byte）
-func parseRedisInt(v interface{}) (int64, error) {
+// parseRedisInt 从 Redis 返回的 any 解析为 int64（兼容 int64 / string / []byte）
+func parseRedisInt(v any) (int64, error) {
 	switch t := v.(type) {
 	case int64:
 		return t, nil

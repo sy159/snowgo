@@ -98,7 +98,7 @@ func BuildLock(rdb *redis.Client, logger xlock.Logger) (xlock.Lock, error) {
 	if rdb == nil {
 		return nil, errors.New("please initialize redis first")
 	}
-	return xlock.NewRedisLock(rdb, logger), nil
+	return xlock.NewRedisLock(rdb, logger)
 }
 
 // BuildProducer 构建mq生产者

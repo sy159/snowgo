@@ -138,7 +138,7 @@ func (m *Manager) GenerateTokens(userId int32, username string) (token *Token, e
 // ParseToken 解析 JWT token
 func (m *Manager) ParseToken(tokenStr string) (*Claims, error) {
 	var claims Claims
-	token, err := jwt.ParseWithClaims(tokenStr, &claims, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &claims, func(token *jwt.Token) (any, error) {
 		return []byte(m.jwtConf.JwtSecret), nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 		jwt.WithIssuer(m.jwtConf.Issuer),

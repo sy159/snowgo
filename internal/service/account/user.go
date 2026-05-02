@@ -493,7 +493,7 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 	err = u.userDao.ResetPwdById(ctx, userId, pwd)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "修改用户(%d)密码异常: %v", userId, err)
-		return fmt.Errorf("用户信息查询失败: %w", err)
+		return fmt.Errorf("重置密码失败: %w", err)
 	}
 	xlogger.InfofCtx(ctx, "登录用户(%d-%s)重置用户(%d)密码成功", userContext.UserId, userContext.Username, userId)
 	return nil

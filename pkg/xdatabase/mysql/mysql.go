@@ -78,7 +78,7 @@ func processConfig(cfg config.MysqlConfig) config.MysqlConfig {
 
 // ensureTimeout 补充 DSN 中缺失的超时参数，避免零值无限等待
 func ensureTimeout(dsn string) string {
-	params := make([]string, 1)
+	params := make([]string, 0, 3)
 	if !strings.Contains(dsn, "timeout=") {
 		params = append(params, "timeout=5s")
 	}

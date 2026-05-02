@@ -43,12 +43,12 @@ func TestJson(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.NoError(t, err)
 	assert.Equal(t, float64(0), resp["code"])
 	assert.Equal(t, "success", resp["msg"])
-	assert.Equal(t, map[string]interface{}{"key": "value"}, resp["data"])
+	assert.Equal(t, map[string]any{"key": "value"}, resp["data"])
 	assert.NotNil(t, resp["timestamp"])
 }
 
@@ -63,12 +63,12 @@ func TestJsonByError(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.NoError(t, err)
 	assert.Equal(t, float64(0), resp["code"])
 	assert.Equal(t, "success", resp["msg"])
-	assert.Equal(t, map[string]interface{}{"key": "value"}, resp["data"])
+	assert.Equal(t, map[string]any{"key": "value"}, resp["data"])
 	assert.NotNil(t, resp["timestamp"])
 }
 
@@ -83,12 +83,12 @@ func TestSuccess(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.NoError(t, err)
 	assert.Equal(t, float64(0), resp["code"])
 	assert.Equal(t, "success", resp["msg"])
-	assert.Equal(t, map[string]interface{}{"key": "value"}, resp["data"])
+	assert.Equal(t, map[string]any{"key": "value"}, resp["data"])
 	assert.NotNil(t, resp["timestamp"])
 }
 
@@ -103,13 +103,13 @@ func TestFail(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.NoError(t, err)
 	assert.Equal(t, float64(400), resp["code"])
 	assert.Equal(t, "Bad Request", resp["msg"])
 	// Fail passes nil data which becomes empty struct {} in JSON
-	assert.Equal(t, map[string]interface{}{}, resp["data"])
+	assert.Equal(t, map[string]any{}, resp["data"])
 	assert.NotNil(t, resp["timestamp"])
 }
 
@@ -124,12 +124,12 @@ func TestFailByError(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.NoError(t, err)
 	assert.Equal(t, float64(500), resp["code"])
 	assert.Equal(t, "Internal Server Error", resp["msg"])
 	// FailByError passes nil data which becomes empty struct {} in JSON
-	assert.Equal(t, map[string]interface{}{}, resp["data"])
+	assert.Equal(t, map[string]any{}, resp["data"])
 	assert.NotNil(t, resp["timestamp"])
 }

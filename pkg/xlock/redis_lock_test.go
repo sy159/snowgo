@@ -9,11 +9,23 @@ import (
 	"snowgo/pkg/xlock"
 )
 
-func TestNewRedisLock_NilLogger(t *testing.T) {
-	lock := xlock.NewRedisLock(nil, nil)
-	if lock == nil {
-		t.Fatal("expected non-nil lock with nil logger")
+func TestNewRedisLock_NilClient(t *testing.T) {
+	_, err := xlock.NewRedisLock(nil, nil)
+	if err == nil {
+		t.Fatal("expected error for nil redis client")
 	}
+}
+
+func setupTestRedis(t *testing.T) *redis.Client {
+	t.Helper()
+	client := redis.NewClient(&redis.Options{
+		Addr:     "127.0.0.1:6379",
+		Password: "",
+		DB:       0,
+		PoolSize: 5,
+	})
+	t.Cleanup(func() { _ = client.Close() })
+	return client
 }
 
 func TestRedisLock(t *testing.T) {
@@ -25,7 +37,7 @@ func TestRedisLock(t *testing.T) {
 	})
 	t.Cleanup(func() { _ = rdb.Close() })
 
-	lock := xlock.NewRedisLock(rdb, nil)
+	lock, _ := xlock.NewRedisLock(rdb, nil)
 
 	t.Run("LockWithTries", func(t *testing.T) {
 		ctx := context.TODO()
@@ -111,7 +123,8 @@ func TestRedisLock(t *testing.T) {
 }
 
 func TestReTryLockValidation(t *testing.T) {
-	lock := xlock.NewRedisLock(nil, nil)
+	rdb := setupTestRedis(t)
+	lock, _ := xlock.NewRedisLock(rdb, nil)
 
 	t.Run("fnNil", func(t *testing.T) {
 		err := lock.ReTryLock(context.TODO(), "test-key", 5, nil)
@@ -139,7 +152,7 @@ func TestRedisLockContext_Unlock(t *testing.T) {
 	})
 	t.Cleanup(func() { _ = rdb.Close() })
 
-	lock := xlock.NewRedisLock(rdb, nil)
+	lock, _ := xlock.NewRedisLock(rdb, nil)
 
 	err := lock.LockWithTries(context.TODO(), "test-unlock-ctx-manual", 5, 1, func(isLock bool, lc xlock.LockContext) error {
 		if !isLock {
@@ -170,7 +183,7 @@ func TestLockWithTries_ExpireSecondDefault(t *testing.T) {
 	})
 	t.Cleanup(func() { _ = rdb.Close() })
 
-	lock := xlock.NewRedisLock(rdb, nil)
+	lock, _ := xlock.NewRedisLock(rdb, nil)
 
 	ctx := context.TODO()
 	err := lock.LockWithTries(ctx, "test-expire-default", 0, 1, func(isLock bool, lc xlock.LockContext) error {
@@ -190,7 +203,7 @@ func TestReTryLock_ContextCanceled(t *testing.T) {
 	})
 	t.Cleanup(func() { _ = rdb.Close() })
 
-	lock := xlock.NewRedisLock(rdb, nil)
+	lock, _ := xlock.NewRedisLock(rdb, nil)
 
 	ctx := context.TODO()
 	done := make(chan struct{})
@@ -225,7 +238,7 @@ func TestLockWithTriesTime_ExpireDefault(t *testing.T) {
 	})
 	t.Cleanup(func() { _ = rdb.Close() })
 
-	lock := xlock.NewRedisLock(rdb, nil)
+	lock, _ := xlock.NewRedisLock(rdb, nil)
 
 	ctx := context.TODO()
 	err := lock.LockWithTriesTime(ctx, "test-time-expire-default", 0, 0, func(isLock bool, lc xlock.LockContext) error {
@@ -237,7 +250,8 @@ func TestLockWithTriesTime_ExpireDefault(t *testing.T) {
 }
 
 func TestLockWithTries_ValidationErrors(t *testing.T) {
-	lock := xlock.NewRedisLock(nil, nil)
+	rdb := setupTestRedis(t)
+	lock, _ := xlock.NewRedisLock(rdb, nil)
 
 	t.Run("fnNil", func(t *testing.T) {
 		err := lock.LockWithTries(context.TODO(), "test-key", 5, 1, nil)
@@ -257,7 +271,8 @@ func TestLockWithTries_ValidationErrors(t *testing.T) {
 }
 
 func TestLockWithTriesTime_ValidationErrors(t *testing.T) {
-	lock := xlock.NewRedisLock(nil, nil)
+	rdb := setupTestRedis(t)
+	lock, _ := xlock.NewRedisLock(rdb, nil)
 
 	t.Run("fnNil", func(t *testing.T) {
 		err := lock.LockWithTriesTime(context.TODO(), "test-key", 5, 3, nil)
@@ -285,7 +300,7 @@ func TestReTryLock_ExpireSecondDefault(t *testing.T) {
 	})
 	t.Cleanup(func() { _ = rdb.Close() })
 
-	lock := xlock.NewRedisLock(rdb, nil)
+	lock, _ := xlock.NewRedisLock(rdb, nil)
 
 	ctx := context.TODO()
 	err := lock.ReTryLock(ctx, "test-expire-default", 0, func(lc xlock.LockContext) error {

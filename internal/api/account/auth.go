@@ -31,7 +31,12 @@ func Login(c *gin.Context) {
 
 	// 登录失败限流，3分钟内，最多失败5次
 	loginFailKey := fmt.Sprintf("%s%s", constant.CacheLoginFailPrefix, req.Username)
-	limiter := xlimiter.NewFixedWindowLimiter(cache, loginFailKey, constant.CacheLoginFailWindowSecond, 5)
+	limiter, err := xlimiter.NewFixedWindowLimiter(cache, loginFailKey, constant.CacheLoginFailWindowSecond, 5)
+	if err != nil {
+		xlogger.ErrorfCtx(ctx, "login limiter init error: %v", err)
+		xresponse.FailByError(c, e.HttpInternalServerError)
+		return
+	}
 	// 尝试增加失败计数前，先检查限流器
 	allowed, _, ttl, err := limiter.Add(ctx)
 	if err != nil {

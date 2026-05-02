@@ -117,9 +117,11 @@ type OtherDBConfig struct {
 // Get 获取当前配置（线程安全）
 func Get() Config {
 	if cfg := configAtomic.Load(); cfg != nil {
-		return cfg.(Config)
+		if c, ok := cfg.(Config); ok {
+			return c
+		}
 	}
-	return Config{}
+	panic("config: Get() called before Init()")
 }
 
 // Init 初始化配置（自动根据环境加载）

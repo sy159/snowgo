@@ -16,7 +16,7 @@ func NewRedisCache(client *redis.Client) Cache {
 }
 
 // Eval 在 Redis 上执行 lua 脚本并返回结果
-func (r *RedisCache) Eval(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error) {
+func (r *RedisCache) Eval(ctx context.Context, script string, keys []string, args ...any) (any, error) {
 	res, err := r.client.Eval(ctx, script, keys, args...).Result()
 	if err != nil {
 		return nil, err
@@ -122,7 +122,7 @@ func (r *RedisCache) ZAdd(ctx context.Context, key string, score float64, member
 
 // ZRem 删除有序集合的成员
 func (r *RedisCache) ZRem(ctx context.Context, key string, members ...string) error {
-	args := make([]interface{}, len(members))
+	args := make([]any, len(members))
 	for i, m := range members {
 		args[i] = m
 	}

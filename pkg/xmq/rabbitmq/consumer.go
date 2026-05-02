@@ -266,19 +266,6 @@ func (c *Consumer) workerLoop(ctx context.Context, unit *consumerUnit, workerID 
 // handleDeliveryInProcess: 在进程内重试，失败后记录错误日志
 func (c *Consumer) handleDeliveryInProcess(parentCtx context.Context, _ *amqp.Channel, unit *consumerUnit, d amqp.Delivery) {
 	meta := unit.meta
-	// 处理异常情况
-	if meta.Prefetch <= 0 {
-		meta.Prefetch = 1
-	}
-	if meta.WorkerNum <= 0 {
-		meta.WorkerNum = 1
-	}
-	if meta.RetryLimit <= 0 {
-		meta.RetryLimit = 1
-	}
-	if meta.HandlerTimeout <= 0 {
-		meta.HandlerTimeout = 60 * time.Second
-	}
 
 	// prepare message
 	headers := map[string]any{}
@@ -334,12 +321,11 @@ func (c *Consumer) handleDeliveryInProcess(parentCtx context.Context, _ *amqp.Ch
 		}
 	}
 
-	// 超过重试次数 -> 如果需要，可把未消费消息发送死信队列
-
-	// Ack 原消息，避免无限重试 / redelivery（因为我们已记录失败）
+	// 超过重试次数 -> Nack 拒绝消息（requeue=false），让死信队列捕获
+	// WHY: 使用 Nack 替代 Ack，避免消息被静默丢弃；如果配置了死信队列，消息会被路由到 DLX
 	ackCtx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
-	if ackErr := d.Ack(false); ackErr != nil {
+	if ackErr := d.Nack(false, false); ackErr != nil {
 		c.logger.Warn(ackCtx,
 			fmt.Sprintf("ack failed queue=%s message_id=%s err=%v", unit.queue, d.MessageId, ackErr),
 			zap.String("event", xmq.EventConsumerConsumeACk),
@@ -354,6 +340,20 @@ func (c *Consumer) Register(ctx context.Context, queue string, handler xmq.Handl
 	}
 	if meta == nil {
 		meta = defaultMeta()
+	} else {
+		// apply defaults for zero-value fields
+		if meta.Prefetch <= 0 {
+			meta.Prefetch = 1
+		}
+		if meta.WorkerNum <= 0 {
+			meta.WorkerNum = 1
+		}
+		if meta.RetryLimit <= 0 {
+			meta.RetryLimit = 1
+		}
+		if meta.HandlerTimeout <= 0 {
+			meta.HandlerTimeout = 60 * time.Second
+		}
 	}
 
 	u := &consumerUnit{

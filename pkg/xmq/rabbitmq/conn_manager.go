@@ -703,6 +703,18 @@ func (m *producerConnManager) Publish(ctx context.Context, exchange, routingKey 
 }
 
 // reconnectWatcher: deterministic exponential backoff, reconnect and refresh pool
+// sleepWithContext sleeps for duration d, but returns early if ctx is cancelled.
+func sleepWithContextCM(ctx context.Context, d time.Duration) {
+	if d <= 0 {
+		return
+	}
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(d):
+	}
+}
+
 func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 	defer m.wg.Done()
 	initDelay := m.cfg.ReconnectInitialDelay
@@ -728,7 +740,7 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 					fmt.Sprintf("producer reconnect fail, err is: %s", err),
 					zap.String("event", xmq.EventProducerReconnection),
 				)
-				time.Sleep(backoff)
+				sleepWithContextCM(ctx, backoff)
 				backoff *= 2
 				if backoff > maxDelay {
 					backoff = maxDelay
@@ -740,7 +752,7 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 			if err := m.refreshPool(ctx, newConn); err != nil {
 				m.poolMu.Unlock()
 				_ = newConn.Close()
-				time.Sleep(backoff)
+				sleepWithContextCM(ctx, backoff)
 				backoff *= 2
 				if backoff > maxDelay {
 					backoff = maxDelay
@@ -830,7 +842,7 @@ drained:
 				ctx,
 				"producer conn close timeout waiting inflight",
 				zap.String("event", xmq.EventProducerCloseConnection),
-				zap.String("error", fmt.Sprintf("producer conn close,inflight(%d) didn't finish", m.inflight)),
+				zap.String("error", fmt.Sprintf("producer conn close,inflight(%d) didn't finish", atomic.LoadInt64(&m.inflight))),
 			)
 			goto closeConn
 		case <-tick.C:
@@ -942,7 +954,7 @@ func (m *consumerConnManager) reconnectWatcher(ctx context.Context) {
 					fmt.Sprintf("consumer reconnect dial failed, err is: %s", err),
 					zap.String("event", xmq.EventConsumerReconnection),
 				)
-				time.Sleep(backoff)
+				sleepWithContextCM(ctx, backoff)
 				backoff *= 2
 				if backoff > maxDelay {
 					backoff = maxDelay
@@ -991,6 +1003,8 @@ func (m *consumerConnManager) GetConsumerChannel(ctx context.Context) (*amqp.Cha
 }
 
 func (m *consumerConnManager) Close(ctx context.Context) {
+	// 必须设置 closed 标志，否则 reconnectWatcher 检测到连接关闭后会立即重连，导致 goroutine 泄漏
+	atomic.StoreInt32(&m.closed, 1)
 	// cancel background goroutine if any
 	if m.stopCancel != nil {
 		m.stopCancel()

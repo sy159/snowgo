@@ -54,7 +54,7 @@ func TestMiddlewareLogger_Info(t *testing.T) {
 	}
 
 	// Verify JSON structure
-	var entry map[string]interface{}
+	var entry map[string]any
 	if err := json.Unmarshal([]byte(strings.TrimSpace(output)), &entry); err != nil {
 		t.Fatalf("output is not valid JSON: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestMiddlewareLogger_MultipleEntries(t *testing.T) {
 	}
 
 	for _, line := range lines {
-		var entry map[string]interface{}
+		var entry map[string]any
 		if err := json.Unmarshal([]byte(line), &entry); err != nil {
 			t.Fatalf("line is not valid JSON: %v", err)
 		}

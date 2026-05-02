@@ -19,7 +19,7 @@ func mockServerForTest() *httptest.Server {
 		body, _ := io.ReadAll(r.Body)
 		_ = r.Body.Close()
 
-		resp := map[string]interface{}{
+		resp := map[string]any{
 			"method": r.Method,
 			"query":  r.URL.RawQuery,
 			"body":   string(body),
@@ -48,7 +48,7 @@ func TestPostJSONWithAllOptions(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		_ = r.Body.Close()
 
-		respData := map[string]interface{}{
+		respData := map[string]any{
 			"method": r.Method,
 			"query":  r.URL.RawQuery,
 			"body":   string(body),
@@ -65,7 +65,7 @@ func TestPostJSONWithAllOptions(t *testing.T) {
 	defer server.Close()
 
 	// -------------------- 请求参数 --------------------
-	jsonData := map[string]interface{}{
+	jsonData := map[string]any{
 		"name":  "Alice",
 		"email": "alice@example.com",
 	}
@@ -106,7 +106,7 @@ func TestPostJSONWithAllOptions(t *testing.T) {
 	}
 
 	// 3. Body 解析
-	var bodyMap map[string]interface{}
+	var bodyMap map[string]any
 	if err := resp.Json(&bodyMap); err != nil {
 		t.Fatalf("failed to parse response body: %v", err)
 	}
@@ -122,8 +122,8 @@ func TestPostJSONWithAllOptions(t *testing.T) {
 	}
 
 	// 6. 校验请求 Header
-	headerMap := bodyMap["header"].(map[string]interface{})
-	vals := headerMap["X-Test"].([]interface{})
+	headerMap := bodyMap["header"].(map[string]any)
+	vals := headerMap["X-Test"].([]any)
 	if len(vals) == 0 || vals[0].(string) != "abc" {
 		t.Fatalf("expected X-Test=abc, got %v", vals)
 	}
@@ -132,7 +132,7 @@ func TestPostJSONWithAllOptions(t *testing.T) {
 	if bodyMap["body"] == nil || bodyMap["body"] == "" {
 		t.Fatalf("expected body not empty")
 	}
-	var bodySent map[string]interface{}
+	var bodySent map[string]any
 	if err := json.Unmarshal([]byte(bodyMap["body"].(string)), &bodySent); err != nil {
 		t.Fatalf("failed to unmarshal body JSON: %v", err)
 	}
@@ -161,13 +161,13 @@ func TestWithHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var m map[string]interface{}
+	var m map[string]any
 	if err := resp.Json(&m); err != nil {
 		t.Fatal(err)
 	}
 
-	headerMap := m["header"].(map[string]interface{})
-	vals := headerMap["X-Test"].([]interface{})
+	headerMap := m["header"].(map[string]any)
+	vals := headerMap["X-Test"].([]any)
 	if len(vals) == 0 || vals[0].(string) != "abc" {
 		t.Fatalf("expected X-Test=abc, got %v", vals)
 	}
@@ -183,7 +183,7 @@ func TestWithJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var m map[string]interface{}
+	var m map[string]any
 	if err := resp.Json(&m); err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestWithBodyString(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var m map[string]interface{}
+	var m map[string]any
 	if err := resp.Json(&m); err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +219,7 @@ func TestWithQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var m map[string]interface{}
+	var m map[string]any
 	if err := resp.Json(&m); err != nil {
 		t.Fatal(err)
 	}
@@ -482,7 +482,7 @@ func TestWithBody(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var m map[string]interface{}
+	var m map[string]any
 	if err := resp.Json(&m); err != nil {
 		t.Fatal(err)
 	}

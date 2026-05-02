@@ -46,14 +46,16 @@ func main() {
 	)
 	consumer, err := rabbitmq.NewConsumer(context.Background(), consumerCfg)
 	if err != nil {
-		panic(err)
+		logger.Error(context.Background(), "failed to create consumer", zap.Error(err))
+		os.Exit(1)
 	}
 
 	// 注册所有队列
 	if err := worker.RegisterConsumer(context.Background(), consumer, &worker.ConsumerDeps{
 		Logger: logger,
 	}); err != nil {
-		panic(err)
+		logger.Error(context.Background(), "failed to register consumer", zap.Error(err))
+		os.Exit(1)
 	}
 
 	// 启动
@@ -63,6 +65,7 @@ func main() {
 	go func() {
 		if err := consumer.Start(ctx); err != nil {
 			logger.Error(ctx, "consumer start fail", zap.Error(err))
+			stop()
 		}
 	}()
 
