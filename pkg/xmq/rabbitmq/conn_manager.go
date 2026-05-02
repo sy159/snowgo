@@ -708,18 +708,6 @@ func (m *producerConnManager) Publish(ctx context.Context, exchange, routingKey 
 }
 
 // reconnectWatcher: deterministic exponential backoff, reconnect and refresh pool
-// sleepWithContext sleeps for duration d, but returns early if ctx is cancelled.
-func sleepWithContextCM(ctx context.Context, d time.Duration) {
-	if d <= 0 {
-		return
-	}
-	select {
-	case <-ctx.Done():
-		return
-	case <-time.After(d):
-	}
-}
-
 func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 	defer m.wg.Done()
 	initDelay := m.cfg.ReconnectInitialDelay
@@ -745,7 +733,7 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 					fmt.Sprintf("producer reconnect fail, err is: %s", err),
 					zap.String("event", xmq.EventProducerReconnection),
 				)
-				sleepWithContextCM(ctx, backoff)
+				sleepWithContext(ctx, backoff)
 				backoff *= 2
 				if backoff > maxDelay {
 					backoff = maxDelay
@@ -757,7 +745,7 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 			if err := m.refreshPool(ctx, newConn); err != nil {
 				m.poolMu.Unlock()
 				_ = newConn.Close()
-				sleepWithContextCM(ctx, backoff)
+				sleepWithContext(ctx, backoff)
 				backoff *= 2
 				if backoff > maxDelay {
 					backoff = maxDelay
@@ -959,7 +947,7 @@ func (m *consumerConnManager) reconnectWatcher(ctx context.Context) {
 					fmt.Sprintf("consumer reconnect dial failed, err is: %s", err),
 					zap.String("event", xmq.EventConsumerReconnection),
 				)
-				sleepWithContextCM(ctx, backoff)
+				sleepWithContext(ctx, backoff)
 				backoff *= 2
 				if backoff > maxDelay {
 					backoff = maxDelay
