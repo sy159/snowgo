@@ -18,7 +18,6 @@ type MenuInfo struct {
 	Icon      string      `json:"icon"`
 	Perms     string      `json:"perms"`
 	SortOrder int32       `json:"sort_order"`
-	Status    string      `json:"status"`
 	CreatedAt string      `json:"created_at"`
 	UpdatedAt string      `json:"updated_at"`
 	Children  []*MenuInfo `json:"children"`

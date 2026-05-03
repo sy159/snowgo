@@ -23,7 +23,6 @@ type RoleListCondition struct {
 	Ids    []int32 `json:"ids"`
 	Name   string  `json:"name"`
 	Code   string  `json:"code"`
-	Status string  `json:"status"`
 	Offset int32   `json:"offset"`
 	Limit  int32   `json:"limit"`
 }

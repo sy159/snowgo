@@ -19,7 +19,6 @@ import (
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"sort"
-	"strconv"
 	"time"
 )
 
@@ -27,7 +26,7 @@ import (
 type UserRepo interface {
 	CreateUser(ctx context.Context, user *model.SysUser) (*model.SysUser, error)
 	TransactionCreateUser(ctx context.Context, tx *query.Query, user *model.SysUser) (*model.SysUser, error)
-	TransactionUpdateUser(ctx context.Context, tx *query.Query, userId int32, username, tel, nickname string) error
+	TransactionUpdateUser(ctx context.Context, tx *query.Query, user *model.SysUser) error
 	TransactionCreateUserRole(ctx context.Context, tx *query.Query, userRole *model.SysUserRole) error
 	TransactionCreateUserRoleInBatches(ctx context.Context, tx *query.Query, userRoleList []*model.SysUserRole) error
 	TransactionDeleteUserRole(ctx context.Context, tx *query.Query, userId int32) error
@@ -70,6 +69,9 @@ type UserParam struct {
 	Password string  `json:"password"`
 	Tel      string  `json:"tel" binding:"required"`
 	Nickname string  `json:"nickname"`
+	Email    string  `json:"email"`
+	Remark   string  `json:"remark"`
+	Status   *int8   `json:"status"`
 	RoleIds  []int32 `json:"role_ids"`
 }
 
@@ -78,7 +80,11 @@ type UserInfo struct {
 	Username  string
 	Tel       string
 	Nickname  string
-	Status    string
+	Email     string
+	Remark    string
+	Status    int8
+	CreatedBy int32
+	UpdatedBy int32
 	RoleList  []*UserRole
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -89,7 +95,7 @@ type UserPermissionInfo struct {
 	Username    string            `json:"username"`
 	Tel         string            `json:"tel"`
 	Nickname    string            `json:"nickname"`
-	Status      string            `json:"status"`
+	Status      int8              `json:"status"`
 	RoleList    []*UserRole       `json:"role_list"`
 	Menus       []*MenuInfo       `json:"menu_list"`
 	Permissions []*UserPermission `json:"permission_list"`
@@ -170,13 +176,26 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		}
 
 		// 创建用户
+		var emailPtr, nicknamePtr, remarkPtr *string
+		if userParam.Email != "" {
+			emailPtr = &userParam.Email
+		}
+		if userParam.Nickname != "" {
+			nicknamePtr = &userParam.Nickname
+		}
+		if userParam.Remark != "" {
+			remarkPtr = &userParam.Remark
+		}
 		userObj, err = u.userDao.TransactionCreateUser(ctx, tx, &model.SysUser{
 			Username:  userParam.Username,
 			Password:  pwd,
 			Tel:       userParam.Tel,
-			Nickname:  &userParam.Nickname,
+			Nickname:  nicknamePtr,
+			Email:     emailPtr,
+			Remark:    remarkPtr,
 			Status:    &activeStatus,
 			IsDeleted: false,
+			CreatedBy: &userContext.UserId,
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "用户创建失败: %+v err: %v", userParam, err)
@@ -271,8 +290,27 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 	}
 
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
-		// 更新用户
-		err = u.userDao.TransactionUpdateUser(ctx, tx, userParam.ID, userParam.Username, userParam.Tel, userParam.Nickname)
+		// 更新用户（指针字段仅在非空时传入）
+		var nicknamePtr, emailPtr, remarkPtr *string
+		if userParam.Nickname != "" {
+			nicknamePtr = &userParam.Nickname
+		}
+		if userParam.Email != "" {
+			emailPtr = &userParam.Email
+		}
+		if userParam.Remark != "" {
+			remarkPtr = &userParam.Remark
+		}
+		err = u.userDao.TransactionUpdateUser(ctx, tx, &model.SysUser{
+			ID:        userParam.ID,
+			Username:  userParam.Username,
+			Tel:       userParam.Tel,
+			Nickname:  nicknamePtr,
+			Email:     emailPtr,
+			Remark:    remarkPtr,
+			Status:    userParam.Status,
+			UpdatedBy: &userContext.UserId,
+		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "用户更新失败: %+v err: %v", userParam, err)
 			return fmt.Errorf("用户更新失败: %w", err)
@@ -369,7 +407,11 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 		Username:  user.Username,
 		Tel:       user.Tel,
 		Nickname:  common.DerefOrZero(user.Nickname),
-		Status:    strconv.FormatInt(int64(common.DerefOrZero(user.Status)), 10),
+		Email:     common.DerefOrZero(user.Email),
+		Remark:    common.DerefOrZero(user.Remark),
+		Status:    common.DerefOrZero(user.Status),
+		CreatedBy: common.DerefOrZero(user.CreatedBy),
+		UpdatedBy: common.DerefOrZero(user.UpdatedBy),
 		RoleList:  roles,
 		CreatedAt: common.DerefOrZero(user.CreatedAt),
 		UpdatedAt: common.DerefOrZero(user.UpdatedAt),
@@ -398,7 +440,11 @@ func (u *UserService) GetUserList(ctx context.Context, condition *UserListCondit
 			Username:  user.Username,
 			Tel:       user.Tel,
 			Nickname:  common.DerefOrZero(user.Nickname),
-			Status:    strconv.FormatInt(int64(common.DerefOrZero(user.Status)), 10),
+			Email:     common.DerefOrZero(user.Email),
+			Remark:    common.DerefOrZero(user.Remark),
+			Status:    common.DerefOrZero(user.Status),
+			CreatedBy: common.DerefOrZero(user.CreatedBy),
+			UpdatedBy: common.DerefOrZero(user.UpdatedBy),
 			CreatedAt: common.DerefOrZero(user.CreatedAt),
 			UpdatedAt: common.DerefOrZero(user.UpdatedAt),
 		})
@@ -406,7 +452,7 @@ func (u *UserService) GetUserList(ctx context.Context, condition *UserListCondit
 	return &UserList{List: userInfoList, Total: total}, nil
 }
 
-// DeleteById 删除用户
+// DeleteById 删除用户（软删除：设置 is_deleted 和 deleted_at）
 func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 	// 获取登录ctx
 	userContext, err := xauth.GetUserContext(ctx)
@@ -418,7 +464,7 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 		return ErrUserNotFound
 	}
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
-		// 删除用户
+		// 软删除用户
 		err := u.userDao.TransactionDeleteById(ctx, tx, userId)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "用户删除异常: %v", err)
@@ -555,7 +601,9 @@ func (u *UserService) Authenticate(ctx context.Context, username, password strin
 		Username:  user.Username,
 		Tel:       user.Tel,
 		Nickname:  common.DerefOrZero(user.Nickname),
-		Status:    strconv.FormatInt(int64(common.DerefOrZero(user.Status)), 10),
+		Email:     common.DerefOrZero(user.Email),
+		Remark:    common.DerefOrZero(user.Remark),
+		Status:    common.DerefOrZero(user.Status),
 		CreatedAt: common.DerefOrZero(user.CreatedAt),
 		UpdatedAt: common.DerefOrZero(user.UpdatedAt),
 	}, nil

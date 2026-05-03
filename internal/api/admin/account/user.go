@@ -20,7 +20,11 @@ type UserListInfo struct {
 	Username  string `json:"username"`
 	Tel       string `json:"tel"`
 	Nickname  string `json:"nickname"`
-	Status    string `json:"status"`
+	Email     string `json:"email"`
+	Remark    string `json:"remark"`
+	Status    int8   `json:"status"`
+	CreatedBy int32  `json:"created_by"`
+	UpdatedBy int32  `json:"updated_by"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
@@ -30,7 +34,11 @@ type UserInfo struct {
 	Username  string      `json:"username"`
 	Tel       string      `json:"tel"`
 	Nickname  string      `json:"nickname"`
-	Status    string      `json:"status"`
+	Email     string      `json:"email"`
+	Remark    string      `json:"remark"`
+	Status    int8        `json:"status"`
+	CreatedBy int32       `json:"created_by"`
+	UpdatedBy int32       `json:"updated_by"`
 	CreatedAt string      `json:"created_at"`
 	UpdatedAt string      `json:"updated_at"`
 	RoleList  []*UserRole `json:"role_list"`
@@ -177,7 +185,11 @@ func GetUserInfo(c *gin.Context) {
 		Username:  user.Username,
 		Tel:       user.Tel,
 		Nickname:  user.Nickname,
+		Email:     user.Email,
+		Remark:    user.Remark,
 		Status:    user.Status,
+		CreatedBy: user.CreatedBy,
+		UpdatedBy: user.UpdatedBy,
 		CreatedAt: user.CreatedAt.Format(constant.TimeFmtWithMS),
 		UpdatedAt: user.UpdatedAt.Format(constant.TimeFmtWithMS),
 		RoleList:  roleList,
@@ -219,7 +231,11 @@ func GetUserList(c *gin.Context) {
 			Username:  user.Username,
 			Tel:       user.Tel,
 			Nickname:  user.Nickname,
+			Email:     user.Email,
+			Remark:    user.Remark,
 			Status:    user.Status,
+			CreatedBy: user.CreatedBy,
+			UpdatedBy: user.UpdatedBy,
 			CreatedAt: user.CreatedAt.Format(constant.TimeFmtWithMS),
 			UpdatedAt: user.UpdatedAt.Format(constant.TimeFmtWithMS),
 		})
@@ -232,24 +248,26 @@ func GetUserList(c *gin.Context) {
 
 // DeleteUserById 用户删除
 func DeleteUserById(c *gin.Context) {
-	var user UserInfo
-	if err := c.ShouldBindJSON(&user); err != nil {
+	var param struct {
+		ID int32 `json:"id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&param); err != nil {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	if user.ID < 1 {
+	if param.ID < 1 {
 		xresponse.FailByError(c, e.UserNotFound)
 		return
 	}
 	ctx := c.Request.Context()
 	container := di.GetContainer(c)
-	err := container.UserService.DeleteById(ctx, user.ID)
+	err := container.UserService.DeleteById(ctx, param.ID)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "delete user is err: %v", err)
 		xresponse.FailByError(c, e.UserDeleteError)
 		return
 	}
-	xresponse.Success(c, &gin.H{"id": user.ID})
+	xresponse.Success(c, &gin.H{"id": param.ID})
 }
 
 func ResetPwdById(c *gin.Context) {

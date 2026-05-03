@@ -75,7 +75,7 @@ func (m *mockUserDao) TransactionCreateUser(_ context.Context, _ *query.Query, u
 	return user, m.err
 }
 
-func (m *mockUserDao) TransactionUpdateUser(_ context.Context, _ *query.Query, _ int32, _, _, _ string) error {
+func (m *mockUserDao) TransactionUpdateUser(_ context.Context, _ *query.Query, _ *model.SysUser) error {
 	return m.err
 }
 
@@ -172,6 +172,7 @@ func testCtx() context.Context {
 
 func testUser() *model.SysUser {
 	nickname := "Test User"
+	email := "test@example.com"
 	status := constant.UserStatusActive
 	now := time.Now()
 	return &model.SysUser{
@@ -180,6 +181,7 @@ func testUser() *model.SysUser {
 		Password:  "$2a$10$dummyhash",
 		Tel:       "13800138000",
 		Nickname:  &nickname,
+		Email:     &email,
 		Status:    &status,
 		CreatedAt: &now,
 		UpdatedAt: &now,

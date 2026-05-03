@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"gorm.io/gen"
+	"gorm.io/gen/field"
 	"gorm.io/gorm"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
 	"strconv"
+	"time"
 )
 
 // UserDao UserRepo接口实现
@@ -50,13 +52,33 @@ func (u *UserDao) TransactionCreateUser(ctx context.Context, tx *query.Query, us
 	return user, nil
 }
 
-// TransactionUpdateUser 更新用户
-func (u *UserDao) TransactionUpdateUser(ctx context.Context, tx *query.Query, userId int32, username, tel, nickname string) error {
-	_, err := tx.WithContext(ctx).SysUser.Where(tx.SysUser.ID.Eq(userId)).UpdateSimple(
-		tx.SysUser.Username.Value(username),
-		tx.SysUser.Tel.Value(tel),
-		tx.SysUser.Nickname.Value(nickname),
-	)
+// TransactionUpdateUser 更新用户（事务内）
+// 根据传入的 model.SysUser 非零值字段进行部分更新
+func (u *UserDao) TransactionUpdateUser(ctx context.Context, tx *query.Query, user *model.SysUser) error {
+	if user.ID <= 0 {
+		return errors.New("用户id不存在")
+	}
+	m := tx.WithContext(ctx).SysUser.Where(tx.SysUser.ID.Eq(user.ID))
+	clauses := []field.AssignExpr{
+		tx.SysUser.Username.Value(user.Username),
+		tx.SysUser.Tel.Value(user.Tel),
+	}
+	if user.Nickname != nil {
+		clauses = append(clauses, tx.SysUser.Nickname.Value(*user.Nickname))
+	}
+	if user.Email != nil {
+		clauses = append(clauses, tx.SysUser.Email.Value(*user.Email))
+	}
+	if user.Remark != nil {
+		clauses = append(clauses, tx.SysUser.Remark.Value(*user.Remark))
+	}
+	if user.Status != nil {
+		clauses = append(clauses, tx.SysUser.Status.Value(uint8(*user.Status)))
+	}
+	if user.UpdatedBy != nil {
+		clauses = append(clauses, tx.SysUser.UpdatedBy.Value(*user.UpdatedBy))
+	}
+	_, err := m.UpdateSimple(clauses...)
 	if err != nil {
 		return err
 	}
@@ -90,12 +112,17 @@ func (u *UserDao) TransactionDeleteUserRole(ctx context.Context, tx *query.Query
 	return nil
 }
 
-// TransactionDeleteById 删除用户
+// TransactionDeleteById 删除用户（事务内）
+// 软删除：设置 is_deleted = true 并记录 deleted_at
 func (u *UserDao) TransactionDeleteById(ctx context.Context, tx *query.Query, userId int32) error {
 	if userId <= 0 {
 		return errors.New("用户id不存在")
 	}
-	_, err := tx.SysUser.WithContext(ctx).Where(tx.SysUser.ID.Eq(userId)).UpdateSimple(tx.SysUser.IsDeleted.Value(true))
+	deletedAt := gorm.DeletedAt{Time: time.Now(), Valid: true}
+	_, err := tx.SysUser.WithContext(ctx).Where(tx.SysUser.ID.Eq(userId)).UpdateSimple(
+		tx.SysUser.IsDeleted.Value(true),
+		tx.SysUser.DeletedAt.Value(deletedAt),
+	)
 	if err != nil {
 		return err
 	}
@@ -279,18 +306,18 @@ func (u *UserDao) NickNameScope(nickname string) func(tx gen.Dao) gen.Dao {
 	}
 }
 
-// DeleteById 删除用户by id
-// UpdateSimple: gen独有的，会处理零值问题、会调用Hook、并且更新时间戳
-// UpdateColumnSimple：gen独有的，会处理零值问题、不是调用Hook、不会更新时间戳、性能更高，类似执行原生sql
-// Save: 会处理零值问题，但是是全部更新
-// Updates: 不会处理零值问题、会调用Hook、并且更新时间戳（map时会更新零值）
-// UpdateColumns: 会处理零值问题、不会调用Hook、不会更新时间戳、性能更高，类似执行原生sql，跟save差不多，不过不会更新时间戳
+// DeleteById 删除用户by id（软删除）
+// 设置 is_deleted = true 并记录 deleted_at
 func (u *UserDao) DeleteById(ctx context.Context, userId int32) error {
 	if userId <= 0 {
 		return errors.New("用户id不存在")
 	}
 	m := u.repo.Query().SysUser
-	_, err := m.WithContext(ctx).Where(m.ID.Eq(userId)).UpdateSimple(m.IsDeleted.Value(true))
+	deletedAt := gorm.DeletedAt{Time: time.Now(), Valid: true}
+	_, err := m.WithContext(ctx).Where(m.ID.Eq(userId)).UpdateSimple(
+		m.IsDeleted.Value(true),
+		m.DeletedAt.Value(deletedAt),
+	)
 	if err != nil {
 		return err
 	}
