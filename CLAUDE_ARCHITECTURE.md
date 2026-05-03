@@ -1,249 +1,143 @@
 # CLAUDE_ARCHITECTURE.md
 
-> Architecture, database design, transactions, caching, interface availability & performance for snowgo.
+> Database, transactions, caching, query rules for snowgo.
 >
 > [Back to CLAUDE.md](./CLAUDE.md)
-
----
-
-## Table of Contents
-
-1. [Layered Architecture](#1-layered-architecture)
-2. [Dependency Injection](#2-dependency-injection)
-3. [DAL Code Generation](#3-dal-code-generation)
-4. [Database Design](#4-database-design)
-5. [Transactions](#5-transactions)
-6. [Caching Strategy](#6-caching-strategy)
-7. [Interface Availability & Performance](#7-interface-availability--performance)
-8. [Query Optimization](#8-query-optimization)
-9. [Feature Development Workflow](#9-feature-development-workflow)
-10. [Code Comments](#10-code-comments-mandatory)
 
 ---
 
 ## 1. Layered Architecture
 
 ```
-Router -> API -> Service -> DAO -> DAL (GORM Gen) -> MySQL / Redis
+Router → API → Service → DAO → DAL (GORM Gen) → MySQL / Redis
 ```
 
-| Layer | Responsibility | Rules |
-|-------|---------------|-------|
-| Router | HTTP routing, middleware mounting | No business logic, no direct DB calls |
-| API | Request validation, response formatting | Input binding, DTO conversion. No transactions |
-| Service | Business orchestration, caching, transactions | ALL business rules. Coordinates DAO within transactions |
-| DAO | Data access abstraction | Wraps GORM Gen. Direct + transaction methods. No business logic |
-| DAL | Auto-generated model + query | Never hand-edit. Generated via make gen |
-
-Communication rules: Each layer calls only the layer below. API calls Service (never DAO). Service calls DAO (never GORM Gen directly). DAO wraps GORM Gen, returns errors directly.
+- Each layer calls only the layer below. API → Service (never DAO). Service → DAO (never GORM Gen directly).
+- `repo` (`dal/repo/repo.go`) provides `WriteQuery()` / `ReadQuery()` / `Query()` / `ChangeDB()`.
+- DI: `di.GetContainer(c)` or `di.GetSystemContainer(c)`. Option pattern, LIFO close.
 
 ---
 
-## 2. Dependency Injection
+## 2. Database Design
 
-All infrastructure in internal/di/container.go. Option pattern for configuration. CloseManager shuts down in LIFO order. Access in handlers: di.GetContainer(c) or di.GetSystemContainer(c).
+### 2.1 Schema
 
----
-
-## 3. DAL Code Generation
-
-internal/dal/model/ and internal/dal/query/ are machine-generated. Workflow: design schema -> make gen add / make gen update -> make gen query. Manual edits will be overwritten and break production.
-
----
-
-## 4. Database Design
-
-### 4.1 Schema
+Design principle: drive schema by query patterns, avoid over-engineering, choose types reasonably, cover high-frequency queries with indexes.
 
 | Item | Rule |
 |------|------|
-| Table name | t_<module>_<entity> or <module>_<entity>. Consistent within project |
-| Association table | <entity_a>_<entity_b> (e.g., user_role) |
-| Foreign keys | None. Application-level integrity only |
-| created_at | Mandatory. TIMESTAMP or DATETIME with DEFAULT CURRENT_TIMESTAMP |
-| updated_at | Only for tables with UPDATE operations. Omit for read-only config tables |
-| Primary key | INT for small/config tables (< 100M rows); BIGINT for high-growth tables. New tables default to BIGINT |
-| NOT NULL | Default. Avoid nullable columns unless truly optional |
+| Table name | `<module>_<entity>` (e.g., `user`, `role_menu`) |
+| Association table | `<entity_a>_<entity_b>` (e.g., `user_role`) |
+| Foreign keys | None. Application-level integrity |
+| created_at | Mandatory. TIMESTAMP/DATETIME with DEFAULT CURRENT_TIMESTAMP |
+| updated_at | Only for tables with UPDATE |
+| Primary key | BIGINT default. INT for small/config tables |
+| NOT NULL | Default. Avoid nullable unless truly optional |
 | Boolean | TINYINT(1) DEFAULT 0. 0 = false, 1 = true |
-| Status/enum | VARCHAR with allowed values in column comments (e.g., 'Allowed: Active,Inactive'). Use strings, not numbers. Constants in internal/constant/constant.go |
-| Strings | VARCHAR(n) - pick n carefully, not all 255 |
-| Money | DECIMAL. Semi-structured data: JSON |
+| Status/enum | VARCHAR with allowed values in column comments. Strings, not numbers |
+| Money | DECIMAL. Semi-structured: JSON |
+| Strings | VARCHAR(n) — set n based on actual business limits, avoid blanket VARCHAR(255) |
 
-### 4.2 Soft Delete
+### 2.2 Soft Delete
 
-USE when: audit/compliance required, referential integrity matters, users expect undo.
-DO NOT USE when: high-volume log tables, junction tables, storage cost sensitive.
+USE: audit/compliance, referential integrity, user undo.
+SKIP: high-volume logs, junction tables.
 
-If used: column is_deleted TINYINT(1) NOT NULL DEFAULT 0. Index only if querying both deleted and undeleted rows. Use UpdateSimple; do not rely on GORM Delete hook. Document rationale.
+Column: `is_deleted TINYINT(1) NOT NULL DEFAULT 0`. Index only if querying both states. Use `UpdateSimple`.
 
-### 4.3 Index Design
-
-Design indexes based on actual query patterns, not theoretical possibilities.
-
-When to create: WHERE filter columns (frequent), ORDER BY, JOIN ON, GROUP BY. High-cardinality columns. Low-cardinality (boolean, gender) should use composite indexes, not standalone.
+### 2.3 Index Design
 
 | Type | Usage |
 |------|-------|
-| Single-column | High-cardinality single-field filtering (username, tel) |
+| Single-column | High-cardinality field filtering |
 | Composite | Multiple columns. Equality first, then range, then sort |
 | Unique | Business uniqueness (uk_code, uk_username) |
-| Covering | All SELECT columns included - avoids table lookup |
+| Covering | All SELECT columns included |
 | Association | Composite unique (a_id, b_id) |
 
-Left-prefix rule (最左前缀原则): (a, b, c) serves (a), (a, b), (a, b, c). Cannot serve (b), (c), (b, c), (a, c). Range queries (> < LIKE prefix%) break the chain.
+Left-prefix rule: `(a, b, c)` serves `(a)`, `(a, b)`, `(a, b, c)`. Range queries break the chain.
 
-Index invalidation: LIKE '%term%' (leading wildcard), function on index (YEAR()), implicit type conversion, OR with unindexed branch, NOT/!=, skip leftmost column.
+**Performance checklist**: avoid SELECT * on large tables; use EXPLAIN before committing complex queries; avoid implicit type conversion in WHERE; prefer covering indexes for hot paths; composite index for low-cardinality + high-cardinality columns; no leading wildcard LIKE in production queries.
 
 ---
 
-## 5. Transactions
+## 3. Transactions
 
-All multi-table writes must use transactions. Never call container.SomeService.Method() inside a transaction. Service MUST NOT directly use GORM Gen query APIs.
-
-Operation logs: current phase uses synchronous writes within the transaction to guarantee data consistency. Only important operations are logged (create, update, delete of core business entities). When throughput becomes a bottleneck, migrate to async via MQ.
+All multi-table writes must use transactions. Never call `container.SomeService.Method()` inside a transaction. Service MUST NOT directly use GORM Gen query APIs.
 
 ```go
 err := db.WriteQuery().Transaction(func(tx *query.Query) error {
     // Use Transaction* DAO variants
-    // Write operation log within same tx
+    // Operation log within same tx
     return nil
 })
 ```
 
-Read/write separation:
+Read/write separation: `repo.WriteQuery()` for mutations, `repo.ReadQuery()` for reads, `repo.Query()` default (write node).
 
-| Method | Usage |
-|--------|-------|
-| repo.WriteQuery() | All mutations (INSERT, UPDATE, DELETE) |
-| repo.ReadQuery() | Read-only queries that tolerate replication lag |
-| repo.Query() | Default (resolves to write node) |
+DAO pattern: `CreateXxx(ctx, model)` direct use, `TransactionCreateXxx(ctx, tx, model)` for transactions. Always use Transaction* variant inside transactions.
 
-DAO method pattern: each DAO provides CreateXxx(ctx, model) for direct use and TransactionCreateXxx(ctx, tx, model) for transaction use. Always use the Transaction* variant inside service transactions.
+Operation logs: synchronous within transaction for consistency.
+
+**Read-write in transactions**: All reads and writes inside a transaction go to the write node. Outside transactions, reads default to `ReadQuery()`; use `WriteQuery()` explicitly when strong consistency is required.
+
+**Reusing business logic in transactions**: When business logic from another service is needed inside a transaction, extract it as a DAO method or a stateless utility function in `pkg/`. Never call another service to avoid implicit transaction nesting or circular dependencies.
 
 ---
 
-## 6. Caching Strategy
+## 4. Caching Strategy
 
-Cache at Service layer, never in DAO. Keys: constant.CacheXXXPrefix + entity ID. Format: module:entity:<id> (colon-separated). Invalidation MUST happen after successful DB commit. Never inside a transaction. Cache set is non-blocking - failure is logged but never propagated to client.
-
-### Key Convention
-
-Cache key constants are defined in `internal/constant/cache_key.go`. Use `constant.CacheXxxPrefix + value` pattern — never construct key strings inline.
+Service layer only. Keys: `constant.CacheXXXPrefix + value`. Invalidation **after** DB commit — never inside transaction. Cache set is non-blocking; failure logged, never propagated.
 
 | Constant | Key Pattern | TTL | Scope |
 |----------|-------------|-----|-------|
 | CacheMenuTree | `account:menu_data` | 15 days | Menu tree |
 | CacheUserRolePrefix | `account:user_role:<userId>` | 15 days | User-role mapping |
-| CacheRolePermsPrefix | `account:role_perms:<roleId>` | 15 days | Role-permission mapping |
-| CacheRoleMenuPrefix | `account:role_menu:<roleId>` | 15 days | Role-menu mapping |
+| CacheRolePermsPrefix | `account:role_perms:<roleId>` | 15 days | Role-permission |
+| CacheRoleMenuPrefix | `account:role_menu:<roleId>` | 15 days | Role-menu |
 | SystemDictPrefix | `system:dict:<code>` | 30 days (1h if empty) | Dict items |
 
-Non-cache Redis keys (same file):
+Non-cache keys: `CacheLoginFailPrefix` (login failure, 3 min), `CacheRefreshJtiPrefix` (JWT refresh JTI).
 
-| Constant | Key Pattern | TTL | Scope |
-|----------|-------------|-----|-------|
-| CacheLoginFailPrefix | `login:fail:<username>` | 3 min | Login failure window |
-| CacheRefreshJtiPrefix | `jwt:refresh:jti:<sessionId>` | session | Refresh token JTI tracking |
-
-### Pattern: Read-Through + Write-Behind
-
-READ: try cache first, miss → DB → fill cache (non-blocking). WRITE: transaction → commit → invalidate cache AFTER (never inside transaction). Failure to set cache is logged but never propagated to client.
+Pattern: Read-through (cache → miss → DB → fill non-blocking). Write-behind (tx → commit → invalidate).
 
 ---
 
-## 7. Interface Availability & Performance
+## 5. Interface Availability
 
-### 7.1 Availability Patterns
+Graceful degradation: Cache down → query DB. DB down → return stale cache.
 
-Read-heavy, infrequently-changing data (menus, permissions, dicts) — see §6 Caching Strategy for the read-through pattern.
+External calls: `context.WithTimeout`. Retry transient errors only — max 3 times, exponential backoff. No retry on 4xx, validation errors, unique constraint violations.
 
-Graceful degradation: Cache down → still query DB. DB down → return cached stale data. Never let a single dependency failure bring down the entire interface.
-
-### 7.2 Idempotency
-
-| Scenario | Strategy |
-|----------|----------|
-| Create by unique key | Unique index - duplicate returns specific error |
-| Duplicate request | Check request_id in Redis before processing |
-| Status transitions | Check current state: WHERE status = 'Active' |
-| Payment/financial | Distributed lock + unique transaction number |
-
-### 7.3 Distributed Lock
-
-Use xlock.RedisLock for read-modify-write concurrent operations. Callback-based API — unlock is managed internally. Not a substitute for unique indexes.
-
-### 7.4 Async Processing (MQ)
-
-Long-running or non-critical operations decoupled via RabbitMQ: email/SMS notifications, data sync, batch processing.
-
-### 7.5 Retry & Timeout
-
-External calls: wrap with context.WithTimeout. Retry transient errors only (network timeout, connection refused) - max 3 times, exponential backoff. No retry on 4xx, validation errors, unique constraint violations. RabbitMQ has built-in reconnection - no additional retry wrapper.
-
-### 7.6 Interface Checklist
-
-- Read: cache tried first, miss handled, fill non-blocking
-- Write: idempotent for duplicates
-- Concurrent: distributed lock if read-modify-write
-- Timeout: context with timeout for external calls
-- Degradation: graceful fallback when dependency is down
-- Error isolation: cache/lock failures not propagated as 500
+Idempotency: unique index for create-by-key, request_id in Redis for duplicate detection, WHERE status for transitions, distributed lock + unique tx number for financial.
 
 ---
 
-## 8. Query Optimization
+## 6. Query Optimization
 
-Avoid N+1 queries. Use JOINs or Preload. Use GORM Gen scopes for reusable dynamic filters. Paginate all list endpoints. Default limit: constant.DefaultLimit (10). SELECT specific columns over SELECT *. EXPLAIN before committing complex queries.
+Paginate all lists. Default limit: `constant.DefaultLimit` (10). Avoid N+1 (JOINs/Preload). GORM Gen scopes for dynamic filters.
 
 | Concern | Guideline |
 |---------|-----------|
-| List queries | Always paginated, never unbounded |
-| Tree data | Load all rows, build tree in memory. No recursive DB queries |
-| Aggregation | COUNT with narrow filters + index; large tables use approximate counts |
-| Batch ops | Validate size limits, use bulk insert/update |
-| Fuzzy search | Use ES/Meilisearch. No LIKE '%term%' on large tables |
-| Export | Stream results, never load full dataset into memory |
+| Trees | Load all rows, build in memory |
+| Batch ops | Validate size limits, bulk insert/update |
+| Fuzzy search | ES/Meilisearch. No LIKE '%term%' on large tables |
+| Export | Stream results |
 
-### Performance Targets
-
-| Metric | Target |
-|--------|--------|
-| API P99 read latency | < 200ms |
-| API P99 write latency | < 500ms |
-| Slow SQL threshold | 2 seconds |
-| Cache hit rate (user-role / permission) | > 90% |
+Performance targets: P99 read < 200ms, write < 500ms, slow SQL > 2s, cache hit rate > 90%.
 
 ---
 
-## 9. Feature Development Workflow
+## 7. Code Comments
 
-1. Database Design: list query patterns -> design schema (types, comments, indexes) -> decide soft-delete per table -> safety check for existing table changes -> created_at mandatory, updated_at if needed
-2. Generate: make gen add -> make gen query
-3. DAO: implement internal/dao/{module}/ with direct + transaction methods
-4. Service: implement internal/service/{module}/ with business logic, caching, operation logging
-5. API: implement internal/api/{module}/ with binding, validation, DTO conversion
-6. Routes: register in internal/router/{module}_router.go. Apply JWT + PermissionAuth
-7. Permissions: add constants to internal/constant/permission.go
-8. DI: wire service into internal/di/container.go
-9. Config: add config structs to config/config.go if needed
-10. Tests: Service unit tests (mock DAO) + DAO integration tests
-11. Docs: update README.md if user-facing behavior changes
-12. CI: update .github/workflows/ if infrastructure changes
-
----
-
-## 10. Code Comments (MANDATORY)
-
-Simple code needs no comments. The following must have comments:
+Core and complex code must have Chinese comments. Simple code needs none. The following must have comments:
 
 | What | Why |
 |------|-----|
-| Transaction boundaries | Where Transaction() begins/ends, which tables are involved |
-| Cache behavior | What is cached, when invalidated, TTL, why this strategy |
-| Complex business logic | Non-obvious rules, hidden constraints, workarounds for specific bugs |
-| Index rationale | Why this index was added or not added |
-| Soft delete decisions | Why a table uses or does not use soft delete |
-| Error handling branches | Why a specific error is handled differently |
-| Interface design choices | Why cache-first, why distributed lock, why async |
+| Transaction boundaries | Where Transaction() begins/ends, tables involved |
+| Cache behavior | What cached, when invalidated, TTL, why |
+| Complex business logic | Non-obvious rules, hidden constraints |
+| Index rationale | Why this index (or not) |
+| Error handling branches | Why handled differently |
 
-Comment style: one short line explaining WHY, not WHAT. The code already tells WHAT.
+Style: one line. WHY, not WHAT.
