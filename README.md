@@ -186,7 +186,18 @@ make mysql-init   # 初始化数据库表与数据
 make mq-init      # 声明 RabbitMQ 队列与交换机
 ```
 
-### 4. 运行项目
+### 4. 测试账号
+
+初始化 SQL 包含以下测试数据：
+
+| 账号 | 密码 | 角色 | 说明 |
+|------|------|------|------|
+| `admin` | `123456` | 管理员（admin） | 拥有全部权限 |
+| `test` | `123456` | 只读（read_only） | 仅具备查询与查看权限，不允许任何写操作 |
+
+> 两个账号的初始密码相同，登录后请及时修改。
+
+### 5. 运行项目
 
 #### 本地运行
 
@@ -276,9 +287,10 @@ make consumer-build     # 构建 Consumer Docker 镜像
 make build-all          # 构建全部 Docker 镜像
 
 # 开发
-make gen do=init        # 生成所有表的 Model 并初始化数据库
-make gen do=update      # 更新已有表的 Model + Query
-make gen-query          # 重新生成 Query API
+make gen do=init        # 生成所有表的 Model
+make gen do=add         # 交互式添加指定表的 Model
+make gen do=update      # 更新已有表的 Model
+make gen do=query       # 重新生成 Query API
 make mysql-init         # 初始化数据库数据
 make mq-init            # 声明 RabbitMQ 拓扑
 

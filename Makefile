@@ -140,8 +140,8 @@ tidy: ## Clean up go.mod dependencies
 # --- Code Generation ---
 
 .PHONY: gen
-gen: ## Generate DAL code (usage: make gen do=init|query)
-	@go run ./internal/dal/cmd/gen/main.go $(do) && make gen-query
+gen: ## Generate DAL code (usage: make gen do=init|add|update|query)
+	@go run ./internal/dal/cmd/gen/main.go $(do)
 
 .PHONY: gen-query
 gen-query: ## Generate Query code
