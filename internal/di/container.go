@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -11,10 +14,10 @@ import (
 	"snowgo/config"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/repo"
-	accountDao "snowgo/internal/dao/account"
-	systemDao "snowgo/internal/dao/system"
-	accountService "snowgo/internal/service/account"
-	systemService "snowgo/internal/service/system"
+	accountDao "snowgo/internal/dao/admin/account"
+	systemDao "snowgo/internal/dao/admin/system"
+	accountService "snowgo/internal/service/admin/account"
+	systemService "snowgo/internal/service/admin/system"
 	"snowgo/pkg/xauth/jwt"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xdatabase/mysql"
@@ -22,8 +25,6 @@ import (
 	"snowgo/pkg/xlock"
 	"snowgo/pkg/xmq"
 	"snowgo/pkg/xmq/rabbitmq"
-	"sync"
-	"time"
 )
 
 // Container 统一管理依赖
@@ -290,13 +291,13 @@ func (c *Container) GetRDB() *redis.Client {
 	return c.db.RDB
 }
 
-// GetAccountContainer 获取注入的cache、service等
+// GetAccountContainer 获取注入的account service等
 func GetAccountContainer(c *gin.Context) *AccountContainer {
 	container := GetContainer(c)
 	return &container.AccountContainer
 }
 
-// GetSystemContainer 获取注入的cache、service等
+// GetSystemContainer 获取注入的system service等
 func GetSystemContainer(c *gin.Context) *SystemContainer {
 	container := GetContainer(c)
 	return &container.SystemContainer

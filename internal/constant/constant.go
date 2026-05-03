@@ -34,8 +34,8 @@ const (
 
 // 用户相关
 const (
-	UserStatusActive   = "Active"
-	UserStatusDisabled = "Disabled" //被禁用
+	UserStatusActive   int8 = 1 // 活跃
+	UserStatusDisabled int8 = 2 // 被禁用
 
 	// MenuTypeDir 菜单相关
 	MenuTypeDir  = "Dir"

@@ -17,44 +17,44 @@ import (
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:             db,
-		Menu:           newMenu(db, opts...),
-		OperationLog:   newOperationLog(db, opts...),
-		Role:           newRole(db, opts...),
-		RoleMenu:       newRoleMenu(db, opts...),
-		SystemDict:     newSystemDict(db, opts...),
-		SystemDictItem: newSystemDictItem(db, opts...),
-		User:           newUser(db, opts...),
-		UserRole:       newUserRole(db, opts...),
+		db:              db,
+		SysDict:         newSysDict(db, opts...),
+		SysDictItem:     newSysDictItem(db, opts...),
+		SysMenu:         newSysMenu(db, opts...),
+		SysOperationLog: newSysOperationLog(db, opts...),
+		SysRole:         newSysRole(db, opts...),
+		SysRoleMenu:     newSysRoleMenu(db, opts...),
+		SysUser:         newSysUser(db, opts...),
+		SysUserRole:     newSysUserRole(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	Menu           menu
-	OperationLog   operationLog
-	Role           role
-	RoleMenu       roleMenu
-	SystemDict     systemDict
-	SystemDictItem systemDictItem
-	User           user
-	UserRole       userRole
+	SysDict         sysDict
+	SysDictItem     sysDictItem
+	SysMenu         sysMenu
+	SysOperationLog sysOperationLog
+	SysRole         sysRole
+	SysRoleMenu     sysRoleMenu
+	SysUser         sysUser
+	SysUserRole     sysUserRole
 }
 
 func (q *Query) Available() bool { return q.db != nil }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:             db,
-		Menu:           q.Menu.clone(db),
-		OperationLog:   q.OperationLog.clone(db),
-		Role:           q.Role.clone(db),
-		RoleMenu:       q.RoleMenu.clone(db),
-		SystemDict:     q.SystemDict.clone(db),
-		SystemDictItem: q.SystemDictItem.clone(db),
-		User:           q.User.clone(db),
-		UserRole:       q.UserRole.clone(db),
+		db:              db,
+		SysDict:         q.SysDict.clone(db),
+		SysDictItem:     q.SysDictItem.clone(db),
+		SysMenu:         q.SysMenu.clone(db),
+		SysOperationLog: q.SysOperationLog.clone(db),
+		SysRole:         q.SysRole.clone(db),
+		SysRoleMenu:     q.SysRoleMenu.clone(db),
+		SysUser:         q.SysUser.clone(db),
+		SysUserRole:     q.SysUserRole.clone(db),
 	}
 }
 
@@ -68,39 +68,39 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:             db,
-		Menu:           q.Menu.replaceDB(db),
-		OperationLog:   q.OperationLog.replaceDB(db),
-		Role:           q.Role.replaceDB(db),
-		RoleMenu:       q.RoleMenu.replaceDB(db),
-		SystemDict:     q.SystemDict.replaceDB(db),
-		SystemDictItem: q.SystemDictItem.replaceDB(db),
-		User:           q.User.replaceDB(db),
-		UserRole:       q.UserRole.replaceDB(db),
+		db:              db,
+		SysDict:         q.SysDict.replaceDB(db),
+		SysDictItem:     q.SysDictItem.replaceDB(db),
+		SysMenu:         q.SysMenu.replaceDB(db),
+		SysOperationLog: q.SysOperationLog.replaceDB(db),
+		SysRole:         q.SysRole.replaceDB(db),
+		SysRoleMenu:     q.SysRoleMenu.replaceDB(db),
+		SysUser:         q.SysUser.replaceDB(db),
+		SysUserRole:     q.SysUserRole.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	Menu           *menuDo
-	OperationLog   *operationLogDo
-	Role           *roleDo
-	RoleMenu       *roleMenuDo
-	SystemDict     *systemDictDo
-	SystemDictItem *systemDictItemDo
-	User           *userDo
-	UserRole       *userRoleDo
+	SysDict         *sysDictDo
+	SysDictItem     *sysDictItemDo
+	SysMenu         *sysMenuDo
+	SysOperationLog *sysOperationLogDo
+	SysRole         *sysRoleDo
+	SysRoleMenu     *sysRoleMenuDo
+	SysUser         *sysUserDo
+	SysUserRole     *sysUserRoleDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		Menu:           q.Menu.WithContext(ctx),
-		OperationLog:   q.OperationLog.WithContext(ctx),
-		Role:           q.Role.WithContext(ctx),
-		RoleMenu:       q.RoleMenu.WithContext(ctx),
-		SystemDict:     q.SystemDict.WithContext(ctx),
-		SystemDictItem: q.SystemDictItem.WithContext(ctx),
-		User:           q.User.WithContext(ctx),
-		UserRole:       q.UserRole.WithContext(ctx),
+		SysDict:         q.SysDict.WithContext(ctx),
+		SysDictItem:     q.SysDictItem.WithContext(ctx),
+		SysMenu:         q.SysMenu.WithContext(ctx),
+		SysOperationLog: q.SysOperationLog.WithContext(ctx),
+		SysRole:         q.SysRole.WithContext(ctx),
+		SysRoleMenu:     q.SysRoleMenu.WithContext(ctx),
+		SysUser:         q.SysUser.WithContext(ctx),
+		SysUserRole:     q.SysUserRole.WithContext(ctx),
 	}
 }
 

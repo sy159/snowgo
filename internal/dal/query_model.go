@@ -4,13 +4,13 @@ import "snowgo/internal/dal/model"
 
 func GetQueryModels() []interface{} {
 	return []interface{}{
-		&model.Menu{},
-		&model.OperationLog{},
-		&model.RoleMenu{},
-		&model.Role{},
-		&model.SystemDictItem{},
-		&model.SystemDict{},
-		&model.UserRole{},
-		&model.User{},
+		&model.SysDictItem{},
+		&model.SysDict{},
+		&model.SysMenu{},
+		&model.SysOperationLog{},
+		&model.SysRoleMenu{},
+		&model.SysRole{},
+		&model.SysUserRole{},
+		&model.SysUser{},
 	}
 }

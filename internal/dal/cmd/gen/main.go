@@ -118,7 +118,7 @@ func genModelByTables(db *gorm.DB, tablesStr string) {
 			if strings.HasPrefix(ct, "tinyint(1)") {
 				return "bool"
 			}
-			return "byte"
+			return "int8"
 		},
 		"decimal": func(columnType gorm.ColumnType) (dataType string) {
 			return "decimal.Decimal"

@@ -107,7 +107,7 @@ snowgo
 ├── docs/
 │   └── sql/                  # 数据库初始化 SQL
 ├── internal/
-│   ├── api/                  # HTTP Handler（account / system 模块）
+│   ├── api/                  # HTTP Handler（admin/account、admin/system 模块）
 │   ├── constant/             # 常量与权限定义
 │   ├── dal/                  # 数据访问层（自动生成的 Model + Query）
 │   │   ├── cmd/gen/          # GORM Gen 代码生成入口
@@ -115,16 +115,18 @@ snowgo
 │   │   ├── model/            # 生成的 Model（禁止手动编辑）
 │   │   ├── query/            # 生成的 Query API（禁止手动编辑）
 │   │   └── repo/             # Repository 封装（读写分离）
-│   ├── dao/                  # DAO 层（account / system）
+│   ├── dao/                  # DAO 层（admin/account、admin/system）
 │   ├── di/                   # 依赖注入容器
 │   ├── router/
 │   │   ├── middleware/       # 中间件（鉴权、限流、日志、链路追踪等）
 │   │   ├── router.go         # 路由初始化
-│   │   ├── account_router.go # 用户/角色/菜单路由
-│   │   ├── system_router.go  # 字典/日志路由
-│   │   └── root_router.go    # 根路由（登录、健康检查等）
+│   │   ├── admin/            # 后台管理路由（统一 /admin 前缀）
+│   │   │   ├── router.go     # admin 入口，分组注册 auth/account/system
+│   │   │   ├── account_router.go  # 用户/角色/菜单路由
+│   │   │   └── system_router.go   # 字典/操作日志路由
+│   │   └── root_router.go    # 根路由（测试、健康检查等）
 │   ├── server/               # HTTP Server 生命周期管理
-│   ├── service/              # 业务逻辑层（account / system）
+│   ├── service/              # 业务逻辑层（admin/account、admin/system）
 │   └── worker/               # MQ Consumer Handler
 ├── pkg/                      # 公共工具库
 │   ├── xauth/                # JWT 认证

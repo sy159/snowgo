@@ -5,6 +5,7 @@ import (
 	"snowgo/config"
 	"snowgo/internal/api"
 	"snowgo/internal/di"
+	"snowgo/internal/router/admin"
 	"snowgo/internal/router/middleware"
 	"snowgo/pkg/xenv"
 	e "snowgo/pkg/xerror"
@@ -72,8 +73,7 @@ func loadRouter(router *gin.Engine) {
 
 	rootRouters(apiGroup) // 根目录下路由
 	options := []option{  // 根据不同分组注册路由
-		accountRouters, // 用户相关路由
-		systemRouters,  // 系统相关路由
+		admin.Register, // 后台管理相关路由
 	}
 
 	// 注册其他分组下的路由

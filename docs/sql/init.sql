@@ -10,7 +10,7 @@ CREATE TABLE `sys_user`
     `password`   VARCHAR(255) NOT NULL COMMENT 'pwd',
     `email`      VARCHAR(100)          DEFAULT NULL COMMENT '邮箱',
     `remark`     VARCHAR(500)          DEFAULT NULL COMMENT '备注',
-    `status`     TINYINT      NOT NULL DEFAULT 1 COMMENT '用户状态：1 活跃, 2 禁用登录',
+    `status`     TINYINT(4)   NOT NULL DEFAULT 1 COMMENT '用户状态：1 活跃, 2 禁用登录',
     `created_by` INT(11)               DEFAULT NULL COMMENT '创建人 ID',
     `updated_by` INT(11)               DEFAULT NULL COMMENT '更新人 ID',
     `is_deleted` TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '是否删除：0=未删除，1=已删除',
@@ -104,7 +104,7 @@ CREATE TABLE `sys_operation_log`
     `operator_name` VARCHAR(64) NOT NULL COMMENT '操作人用户名',
     `operator_type` VARCHAR(32) NOT NULL DEFAULT 'User' COMMENT '操作来源类型，如 User/System/Job/Api',
     `resource`      VARCHAR(32) NOT NULL COMMENT '操作资源类型，如 user/role/menu',
-    `resource_id`   INT         NOT NULL COMMENT '资源ID，如 user 表的主键 ID',
+    `resource_id`   BIGINT      NOT NULL COMMENT '资源ID，如 user 表的主键 ID',
     `action`        VARCHAR(10) NOT NULL DEFAULT 'Create' COMMENT '操作类型：Create/Update/Delete，默认 Create',
     `trace_id`      VARCHAR(64) NULL COMMENT '链路id',
     `before_data`   JSON        NULL COMMENT '修改前数据快照（仅 update/delete 时填）',
@@ -161,7 +161,8 @@ CREATE TABLE `sys_dict_item`
 # 用户数据
 INSERT INTO `sys_user` (`username`, `tel`, `nickname`, `password`, `remark`)
 VALUES ('admin', '18712345678', '如何好听', '$2a$10$XqU5GKb6wbGXjckKxQtMF.b8nn6MlC17tk2Y.ap//n8swLOQ4fZwO', '管理员'),
-       ('test', '18700000001', '只读测试用户', '$2a$10$XqU5GKb6wbGXjckKxQtMF.b8nn6MlC17tk2Y.ap//n8swLOQ4fZwO', '只读测试用户');
+       ('test', '18700000001', '只读测试用户', '$2a$10$XqU5GKb6wbGXjckKxQtMF.b8nn6MlC17tk2Y.ap//n8swLOQ4fZwO',
+        '只读测试用户');
 
 # 菜单数据
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
