@@ -1,3 +1,10 @@
+# Env files (template .env.example is committed)
+.env
+!.env.example
+
+# Runtime data directories
+data/
+
 !.gitkeep
 *.log
 /logs/

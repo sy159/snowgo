@@ -7,10 +7,11 @@ import (
 
 type Cache interface {
 	// Eval 直接执行 script：script KEYS ARGV...
-	Eval(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error)
+	Eval(ctx context.Context, script string, keys []string, args ...any) (any, error)
 
 	// Get retrieves the value for a given key.
-	Get(ctx context.Context, key string) (string, error)
+	// Returns (value, false, nil) if the key does not exist.
+	Get(ctx context.Context, key string) (string, bool, error)
 
 	// Set sets a key-value pair with an expiration time.
 	Set(ctx context.Context, key string, value string, expiration time.Duration) error
@@ -28,7 +29,8 @@ type Cache interface {
 	HSet(ctx context.Context, key string, field string, value string) error
 
 	// HGet retrieves the value of a field in a hash.
-	HGet(ctx context.Context, key string, field string) (string, error)
+	// Returns (value, false, nil) if the field does not exist.
+	HGet(ctx context.Context, key string, field string) (string, bool, error)
 
 	// HGetAll retrieves all fields and values in a hash.
 	HGetAll(ctx context.Context, key string) (map[string]string, error)

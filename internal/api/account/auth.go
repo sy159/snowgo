@@ -31,7 +31,12 @@ func Login(c *gin.Context) {
 
 	// 登录失败限流，3分钟内，最多失败5次
 	loginFailKey := fmt.Sprintf("%s%s", constant.CacheLoginFailPrefix, req.Username)
-	limiter := xlimiter.NewFixedWindowLimiter(cache, loginFailKey, constant.CacheLoginFailWindowSecond, 5)
+	limiter, err := xlimiter.NewFixedWindowLimiter(cache, loginFailKey, constant.CacheLoginFailWindowSecond, 5)
+	if err != nil {
+		xlogger.ErrorfCtx(ctx, "login limiter init error: %v", err)
+		xresponse.FailByError(c, e.HttpInternalServerError)
+		return
+	}
 	// 尝试增加失败计数前，先检查限流器
 	allowed, _, ttl, err := limiter.Add(ctx)
 	if err != nil {
@@ -99,12 +104,12 @@ func RefreshToken(c *gin.Context) {
 			xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenExpired.GetErrMsg())
 			return
 		}
-		xlogger.ErrorfCtx(c.Request.Context(), "parse token(%s) is err: %v", req.RefreshToken, err)
+		xlogger.ErrorfCtx(ctx, "parse token(%s) is err: %v", req.RefreshToken, err)
 		xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenInvalid.GetErrMsg())
 		return
 	}
 
-	// 生成新的token
+	// 生成新的token（先生成，再删除旧 JTI，确保生成失败时旧 token 仍可用）
 	token, err := jwtMgr.RefreshTokens(req.RefreshToken)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "refresh access token err: %s", err.Error())
@@ -112,6 +117,7 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
+	// 删除旧 jti（防止重放）
 	jtiKey := constant.CacheRefreshJtiPrefix + claims.ID
 	if del, _ := container.Cache.Delete(ctx, jtiKey); del == 0 {
 		xlogger.ErrorfCtx(ctx, "refresh token reuse attempt: userID=%d, jti=%s", claims.UserId, claims.ID)

@@ -36,7 +36,7 @@ func WithConsoleOutput(enabled bool) LogOptions {
 // WithFileMaxAgeDays 设置日志保存的天数
 func WithFileMaxAgeDays(days uint32) LogOptions {
 	return func(l *logOptions) {
-		if days > 2 {
+		if days >= 2 {
 			l.fileMaxAgeDays = days
 		}
 	}
@@ -67,9 +67,7 @@ func NewLogger(basePath, name string, opts ...LogOptions) *MiddlewareLogger {
 		infoWriter = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), infoWriter)
 	}
 
-	core := zapcore.NewTee(
-		zapcore.NewCore(encoder, infoWriter, infoLevel),
-	)
+	core := zapcore.NewCore(encoder, infoWriter, infoLevel)
 
 	zapLogger := zap.New(
 		core,

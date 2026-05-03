@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     go build -trimpath -ldflags="-s -w" -o /out/consumer ./cmd/consumer
 
 
-FROM alpine:latest AS runtime
+FROM alpine:3.21 AS runtime
 
 # 安装运行时依赖并设置时区
 RUN apk add --no-cache \
@@ -30,18 +30,13 @@ RUN apk add --no-cache \
     && echo "Asia/Shanghai" > /etc/timezone \
     && rm -rf /var/cache/apk/*
 
-ENV APP_HOME=/app
-ENV PORT=8000
-# 环境变量示例，消费使用
-ENV CONFIG_PATH=${APP_HOME}/config \
-    LOG_PATH=${APP_HOME}/logs \
+ENV APP_HOME=/app \
+    CONFIG_PATH=/app/config \
+    LOG_PATH=/app/logs \
     TZ=Asia/Shanghai
 
 WORKDIR ${APP_HOME}
 
 COPY --from=builder /out/consumer ${APP_HOME}/
-COPY --from=builder /src/config ${APP_HOME}/config/
-
-EXPOSE ${PORT}
 
 ENTRYPOINT ["/app/consumer"]

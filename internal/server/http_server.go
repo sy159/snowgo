@@ -2,8 +2,8 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"net/http"
 	"snowgo/config"
 	"snowgo/internal/di"
@@ -61,7 +61,7 @@ func StopHttpServer() (err error) {
 	defer cancel()
 	// x秒内优雅关闭服务（将未处理完的请求处理完再关闭服务）
 	if err := HttpServer.Shutdown(ctx); err != nil {
-		xlogger.Panicf("Server Shutdown: %s", err.Error())
+		xlogger.Errorf("Server Shutdown: %s", err.Error())
 	}
 	xlogger.Info("Server Shutdown...")
 	return

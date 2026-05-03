@@ -1,7 +1,6 @@
 package xcryption
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -9,11 +8,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/pkg/errors"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Sha256 Sha256加密
+// Sha256 返回输入的 SHA-256 十六进制字符串。
+// 注意：此函数不使用 salt，不适用于密码哈希或安全敏感场景。
+// 密码请使用 HashPassword（bcrypt）或 AesGCMEncrypt（对称加密）。
 func Sha256(s string) string {
 	m := sha256.New()
 	m.Write([]byte(s))
@@ -33,97 +34,70 @@ func CheckPassword(hashedPassword, password string) bool {
 	return err == nil
 }
 
-// PKCS7填充，PKCS5就是blockSize固定为8
-func pkcs7Padding(src []byte, blockSize int) []byte {
-	padding := blockSize - len(src)%blockSize
-	padText := bytes.Repeat([]byte{byte(padding)}, padding)
-	return append(src, padText...)
-}
-
-// PKCS7取出填充
-func pkcs7UnPadding(origData []byte) ([]byte, error) {
-	length := len(origData)
-	if length == 0 {
-		return nil, errors.New("密文为空")
-	}
-	unPadding := int(origData[length-1])
-	if unPadding > length || unPadding > aes.BlockSize {
-		return nil, errors.New("无效的填充")
-	}
-	return origData[:(length - unPadding)], nil
-}
-
-// AesCBCEncrypt aes cbc模式加密,使用base64编码更直观 key长度(16，24，32)执行AES-128, AES-192, AES-256算法，IV随机生成
-func AesCBCEncrypt(plainText, key string) (string, error) {
-	// 检查密钥长度是否有效
+// AesGCMEncrypt AES-GCM 模式加密，使用 base64 编码
+func AesGCMEncrypt(plainText, key string) (string, error) {
 	keyByte := []byte(key)
 	if len(keyByte) != 16 && len(keyByte) != 24 && len(keyByte) != 32 {
 		return "", fmt.Errorf("无效的密钥长度：必须为 16, 24 或 32 字节，当前为 %d", len(keyByte))
 	}
 
-	// 创建 AES 密码块
 	block, err := aes.NewCipher(keyByte)
 	if err != nil {
-		return "", errors.Wrap(err, "创建 AES 密码块失败")
+		return "", fmt.Errorf("创建 AES 密码块失败: %w", err)
 	}
 
-	// 填充明文
-	plainByte := pkcs7Padding([]byte(plainText), block.BlockSize())
-
-	// 生成随机 IV
-	iv := make([]byte, block.BlockSize())
-	if _, err := rand.Read(iv); err != nil {
-		return "", errors.Wrap(err, "生成 IV 失败")
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("创建 GCM 模式失败: %w", err)
 	}
 
-	// 使用 CBC 模式加密
-	blockMode := cipher.NewCBCEncrypter(block, iv)
-	cipherText := make([]byte, len(plainByte))
-	blockMode.CryptBlocks(cipherText, plainByte)
+	// GCM 推荐使用 12 字节 nonce，由 crypto/rand 生成保证不可预测
+	nonce := make([]byte, aesGCM.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return "", fmt.Errorf("生成 nonce 失败: %w", err)
+	}
 
-	// 拼接IV和密文并返回Base64编码；拼接方式: [IV | 密文]
-	cipherText = append(iv, cipherText...)
+	// Seal 将 nonce 前置拼接: [nonce | 密文+tag]
+	cipherText := aesGCM.Seal(nonce, nonce, []byte(plainText), nil)
 	return base64.StdEncoding.EncodeToString(cipherText), nil
 }
 
-// AesCBCDecrypt aes cbc解密
-func AesCBCDecrypt(cipherText, key string) (string, error) {
-	// 解码 Base64 密文
+// AesGCMDecrypt AES-GCM 模式解密
+// 密文结构: base64([nonce(12字节) | 密文 | tag(16字节)])
+func AesGCMDecrypt(cipherText, key string) (string, error) {
 	cipherByte, err := base64.StdEncoding.DecodeString(cipherText)
 	if err != nil {
-		return "", errors.Wrap(err, "解码 Base64 密文失败")
+		return "", fmt.Errorf("解码 Base64 密文失败: %w", err)
 	}
 
-	// 检查密钥长度是否有效
 	keyByte := []byte(key)
 	if len(keyByte) != 16 && len(keyByte) != 24 && len(keyByte) != 32 {
 		return "", fmt.Errorf("无效的密钥长度：必须为 16, 24 或 32 字节，当前为 %d", len(keyByte))
 	}
 
-	// 创建 AES 密码块
 	block, err := aes.NewCipher(keyByte)
 	if err != nil {
-		return "", errors.Wrap(err, "创建 AES 密码块失败")
+		return "", fmt.Errorf("创建 AES 密码块失败: %w", err)
 	}
 
-	blockSize := block.BlockSize()
-	if len(cipherByte) < blockSize {
-		return "", errors.New("密文长度不足，无法提取 IV")
-	}
-
-	// 分离 IV 和密文
-	iv := cipherByte[:blockSize]
-	cipherByte = cipherByte[blockSize:]
-
-	// 使用 CBC 模式解密
-	blockMode := cipher.NewCBCDecrypter(block, iv)
-	plainText := make([]byte, len(cipherByte))
-	blockMode.CryptBlocks(plainText, cipherByte)
-
-	// 去除填充
-	plainText, err = pkcs7UnPadding(plainText)
+	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", errors.Wrap(err, "去除填充失败")
+		return "", fmt.Errorf("创建 GCM 模式失败: %w", err)
+	}
+
+	nonceSize := aesGCM.NonceSize()
+	if len(cipherByte) < nonceSize {
+		return "", fmt.Errorf("密文长度不足，无法提取 nonce")
+	}
+
+	// 分离 nonce 和密文+tag
+	nonce := cipherByte[:nonceSize]
+	cipherByte = cipherByte[nonceSize:]
+
+	// Open 内部验证 tag，密文被篡改或密钥错误时返回 error
+	plainText, err := aesGCM.Open(nil, nonce, cipherByte, nil)
+	if err != nil {
+		return "", fmt.Errorf("解密失败（密文可能被篡改或密钥错误）: %w", err)
 	}
 
 	return string(plainText), nil

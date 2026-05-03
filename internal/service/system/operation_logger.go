@@ -3,7 +3,8 @@ package system
 import (
 	"context"
 	"encoding/json"
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
@@ -13,11 +14,18 @@ import (
 	"time"
 )
 
+// OperationLogWriter 定义跨模块写操作日志的接口，用于解耦依赖
+type OperationLogWriter interface {
+	CreateOperationLog(ctx context.Context, tx *query.Query, input *OperationLogInput) error
+}
+
 // OperationLogRepo 定义opt log相关db操作接口
 type OperationLogRepo interface {
 	TransactionCreate(ctx context.Context, tx *query.Query, operationLog *model.OperationLog) (*model.OperationLog, error)
 	GetOperationLogList(ctx context.Context, condition *daoSystem.OperationLogCondition) ([]*model.OperationLog, int64, error)
 }
+
+var _ OperationLogWriter = (*OperationLogService)(nil)
 
 type OperationLogInput struct {
 	OperatorID   int32
@@ -143,7 +151,7 @@ func (o *OperationLogService) GetOperationLogList(ctx context.Context, condition
 	})
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "获取操作日志信息列表异常: %v", err)
-		return nil, errors.WithMessage(err, "操作日志信息列表查询失败")
+		return nil, fmt.Errorf("操作日志信息列表查询失败: %w", err)
 	}
 	logList := make([]*OperationLog, 0, len(operationLogList))
 	for _, operationLog := range operationLogList {

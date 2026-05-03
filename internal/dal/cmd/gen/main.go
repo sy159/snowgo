@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
 	"go/token"
 	"go/types"
 	"golang.org/x/tools/go/packages"
@@ -15,6 +14,7 @@ import (
 	"snowgo/internal/dal"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 func init() {
@@ -23,6 +23,28 @@ func init() {
 }
 
 var modelPkg = "snowgo/internal/dal/model"
+
+// camelCase converts a snake_case or underscore-separated string to CamelCase.
+func camelCase(s string) string {
+	if s == "" {
+		return ""
+	}
+	nextUpper := true
+	var b strings.Builder
+	for _, r := range s {
+		if r == '_' || r == '-' {
+			nextUpper = true
+			continue
+		}
+		if nextUpper {
+			b.WriteRune(unicode.ToUpper(r))
+			nextUpper = false
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
 
 // generate code
 func main() {
@@ -106,7 +128,7 @@ func genModelByTables(db *gorm.DB, tablesStr string) {
 
 	g.WithModelNameStrategy(func(tableName string) (targetTableName string) {
 		var prefix = "t_"
-		return generator.CamelCase(strings.TrimPrefix(tableName, prefix))
+		return camelCase(strings.TrimPrefix(tableName, prefix))
 	})
 
 	g.WithFileNameStrategy(func(tableName string) (targetTableName string) {

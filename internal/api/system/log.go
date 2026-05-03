@@ -5,6 +5,7 @@ import (
 	"snowgo/internal/constant"
 	"snowgo/internal/di"
 	"snowgo/internal/service/system"
+	common "snowgo/pkg"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
@@ -50,6 +51,8 @@ func GetOperationLogList(c *gin.Context) {
 		return
 	} else if logListReq.Limit == 0 {
 		logListReq.Limit = constant.DefaultLimit
+	} else if logListReq.Limit > constant.MaxLimit {
+		logListReq.Limit = constant.MaxLimit
 	}
 
 	container := di.GetSystemContainer(c)
@@ -65,15 +68,15 @@ func GetOperationLogList(c *gin.Context) {
 			ID:           operationLog.ID,
 			OperatorID:   operationLog.OperatorID,
 			OperatorName: operationLog.OperatorName,
-			OperatorType: *operationLog.OperatorType,
+			OperatorType: common.DerefOrZero(operationLog.OperatorType),
 			Resource:     operationLog.Resource,
 			ResourceID:   operationLog.ResourceID,
-			TraceID:      *operationLog.TraceID,
-			Action:       *operationLog.Action,
-			BeforeData:   *operationLog.BeforeData,
-			AfterData:    *operationLog.AfterData,
-			Description:  *operationLog.Description,
-			IP:           *operationLog.IP,
+			TraceID:      common.DerefOrZero(operationLog.TraceID),
+			Action:       common.DerefOrZero(operationLog.Action),
+			BeforeData:   common.DerefOrZero(operationLog.BeforeData),
+			AfterData:    common.DerefOrZero(operationLog.AfterData),
+			Description:  common.DerefOrZero(operationLog.Description),
+			IP:           common.DerefOrZero(operationLog.IP),
 			CreatedAt:    operationLog.CreatedAt.Format(constant.TimeFmtWithMS),
 		})
 	}

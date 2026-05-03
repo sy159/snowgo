@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"snowgo/pkg/xcryption"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -23,7 +24,10 @@ func TestId2CodeAndCode2Id(t *testing.T) {
 
 	for _, test := range tests {
 		testId := int64(test.id)
-		code := xcryption.Id2Code(testId, test.minLength)
+		code, err := xcryption.Id2Code(testId, test.minLength)
+		if err != nil {
+			t.Fatalf("Id2Code failed: %v", err)
+		}
 		if len(code) < test.minLength {
 			t.Fatalf("code length %d < minLength %d", len(code), test.minLength)
 		}
@@ -39,12 +43,19 @@ func TestId2CodeAndCode2Id(t *testing.T) {
 	}
 }
 
+func TestId2CodeNegative(t *testing.T) {
+	_, err := xcryption.Id2Code(-1, 6)
+	if err == nil {
+		t.Fatal("expected error for negative id")
+	}
+}
+
 func BenchmarkId2CodeConcurrent(b *testing.B) {
 	concurrency := 50 // 并发 goroutine 数
 	total := 100000   // 总生成数量
 
 	var wg sync.WaitGroup
-	errCount := 0
+	var errCount int64
 	start := time.Now()
 
 	for i := 0; i < concurrency; i++ {
@@ -54,12 +65,14 @@ func BenchmarkId2CodeConcurrent(b *testing.B) {
 			for j := 0; j < total/concurrency; j++ {
 				id := int64(rand.Intn(1000000))
 				minLen := 6 + rand.Intn(6) // 随机 minLength 6~11
-				code := xcryption.Id2Code(id, minLen)
-				decoded, err := xcryption.Code2Id(code)
+				code, err := xcryption.Id2Code(id, minLen)
 				if err != nil {
-					errCount++
-				} else if decoded != id {
-					errCount++
+					atomic.AddInt64(&errCount, 1)
+					continue
+				}
+				decoded, err := xcryption.Code2Id(code)
+				if err != nil || decoded != id {
+					atomic.AddInt64(&errCount, 1)
 				}
 			}
 		}()
@@ -77,7 +90,7 @@ func TestRandomStress(t *testing.T) {
 	concurrency := 20
 	total := 50000
 	var wg sync.WaitGroup
-	errCount := 0
+	var errCount int64
 
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
@@ -86,10 +99,14 @@ func TestRandomStress(t *testing.T) {
 			for j := 0; j < total/concurrency; j++ {
 				id := int64(rand.Intn(1_000_000_000))
 				minLen := 6 + rand.Intn(12)
-				code := xcryption.Id2Code(id, minLen)
+				code, err := xcryption.Id2Code(id, minLen)
+				if err != nil {
+					atomic.AddInt64(&errCount, 1)
+					continue
+				}
 				decoded, err := xcryption.Code2Id(code)
 				if err != nil || decoded != id {
-					errCount++
+					atomic.AddInt64(&errCount, 1)
 				}
 			}
 		}()

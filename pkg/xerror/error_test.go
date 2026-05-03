@@ -11,7 +11,7 @@ func TestNewCode(t *testing.T) {
 	code := xerror.NewCode(xerror.CategoryHttp, 90001, "Test Error")
 
 	if code.GetErrCode() != 90001 {
-		t.Errorf("Expected error code 100, but got %d", code.GetErrCode())
+		t.Errorf("Expected error code 90001, but got %d", code.GetErrCode())
 	}
 
 	if code.GetErrMsg() != "Test Error" {
@@ -31,34 +31,15 @@ func TestCodeToString(t *testing.T) {
 	}
 }
 
-func TestSetErrCode(t *testing.T) {
-	// 测试 SetErrCode 方法
-	code := xerror.NewCode(xerror.CategoryHttp, 90003, "Initial Message")
-	code.SetErrCode(90004)
-
-	if code.GetErrCode() != 90004 {
-		t.Errorf("Expected error code 300, but got %d", code.GetErrCode())
-	}
-}
-
-func TestSetErrMsg(t *testing.T) {
-	// 测试 SetErrMsg 方法
-	code := xerror.NewCode(xerror.CategoryHttp, 90005, "Initial Message")
-	code.SetErrMsg("Updated Message")
-
-	if code.GetErrMsg() != "Updated Message" {
-		t.Errorf("Expected error message 'Updated Message', but got '%s'", code.GetErrMsg())
-	}
-}
-
-func TestSetCategory(t *testing.T) {
-	// 测试 SetCategory 方法
-	code := xerror.NewCode(xerror.CategoryHttp, 90006, "Initial Message")
-	code.SetCategory("Updated Category")
-
-	if code.GetCategory() != "Updated Category" {
-		t.Errorf("Expected Category 'Updated Category', but got '%s'", code.GetCategory())
-	}
+func TestDuplicateCodePanics(t *testing.T) {
+	// 重复 errCode 注册应 panic 而非静默覆盖
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic for duplicate error code")
+		}
+	}()
+	_ = xerror.NewCode(xerror.CategoryHttp, 90003, "First")
+	_ = xerror.NewCode(xerror.CategoryHttp, 90003, "Duplicate")
 }
 
 func TestErrorCodes(t *testing.T) {
@@ -98,5 +79,33 @@ func TestCodeJSON(t *testing.T) {
 	expected := `{"code":90011,"msg":"Bad Request","category":"http"}`
 	if string(raw) != expected {
 		t.Errorf("Expected JSON '%s', but got '%s'", expected, string(raw))
+	}
+}
+
+func TestCodeError(t *testing.T) {
+	// 测试 Code 实现 error 接口
+	code := xerror.NewCode(xerror.CategoryHttp, 90020, "test error message")
+	if code.Error() != "test error message" {
+		t.Errorf("Expected Error() 'test error message', but got '%s'", code.Error())
+	}
+}
+
+func TestGetCodes(t *testing.T) {
+	// 测试 GetCodes 返回所有已注册的错误码
+	codes := xerror.GetCodes()
+	if len(codes) == 0 {
+		t.Fatal("Expected at least some registered codes")
+	}
+
+	// 验证 OK code 在列表中
+	found := false
+	for _, c := range codes {
+		if c.GetErrCode() == 0 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Expected to find OK code in GetCodes result")
 	}
 }

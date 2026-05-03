@@ -2,19 +2,19 @@ package mysql
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
 	"gorm.io/plugin/dbresolver"
 	"log"
+	"net/url"
 	"os"
 	"runtime"
 	"snowgo/config"
 	"snowgo/pkg/xcolor"
-	"strings"
 	"time"
 )
 
@@ -26,11 +26,11 @@ type MyDB struct {
 // NewMysql 创建mysql db
 func NewMysql(cfg config.MysqlConfig, otherCfg config.OtherDBConfig) (*MyDB, error) {
 	if len(cfg.DSN) == 0 && len(cfg.MainsDSN) == 0 && len(cfg.SlavesDSN) == 0 {
-		return nil, errors.New("Please initialize mysql configuration first")
+		return nil, errors.New("please initialize mysql configuration first")
 	}
 	db, err := connectMysql(cfg)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	myDB := &MyDB{
 		DB:    db,
@@ -39,7 +39,7 @@ func NewMysql(cfg config.MysqlConfig, otherCfg config.OtherDBConfig) (*MyDB, err
 	for k, v := range otherCfg.DBMap {
 		otherDb, err := connectMysql(v)
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, err
 		}
 		myDB.DbMap[k] = otherDb
 	}
@@ -65,6 +65,10 @@ func processConfig(cfg config.MysqlConfig) config.MysqlConfig {
 	if processCfg.ConnMaxIdleTime <= 0 {
 		processCfg.ConnMaxIdleTime = 10 * time.Minute
 	}
+	// 空闲时间超过最大生命周期逻辑矛盾，连接在关闭前就超过最大存活时间
+	if processCfg.ConnMaxIdleTime > processCfg.ConnMaxLifeTime {
+		processCfg.ConnMaxIdleTime = processCfg.ConnMaxLifeTime
+	}
 
 	if processCfg.SlowSqlThresholdTime <= 0 {
 		processCfg.SlowSqlThresholdTime = 2 * time.Second
@@ -72,15 +76,27 @@ func processConfig(cfg config.MysqlConfig) config.MysqlConfig {
 	return processCfg
 }
 
+// ensureTimeout 补充 DSN 中缺失的超时参数，避免零值无限等待
 func ensureTimeout(dsn string) string {
-	if strings.Contains(dsn, "timeout=") {
-		return dsn // 已设置timeout跳过
+	u, err := url.Parse(dsn)
+	if err != nil {
+		return dsn
 	}
-	// 自动追加参数
-	if strings.Contains(dsn, "?") {
-		return dsn + "&timeout=5s"
+
+	q := u.Query()
+
+	if q.Get("timeout") == "" {
+		q.Set("timeout", "5s")
 	}
-	return dsn + "?timeout=5s"
+	if q.Get("readTimeout") == "" {
+		q.Set("readTimeout", "10s")
+	}
+	if q.Get("writeTimeout") == "" {
+		q.Set("writeTimeout", "10s")
+	}
+
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 // 连接mysql
@@ -144,13 +160,12 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 	// 未开启读写分离配置
 	if !mysqlConfig.EnableReadWriteSeparation {
 		return db, nil
-	} else {
-		if len(mysqlConfig.MainsDSN) == 0 {
-			return nil, errors.New("读写分离需要配置主库地址")
-		}
-		if len(mysqlConfig.SlavesDSN) == 0 {
-			mysqlConfig.SlavesDSN = mysqlConfig.MainsDSN
-		}
+	}
+	if len(mysqlConfig.MainsDSN) == 0 {
+		return nil, errors.New("读写分离需要配置主库地址")
+	}
+	if len(mysqlConfig.SlavesDSN) == 0 {
+		mysqlConfig.SlavesDSN = mysqlConfig.MainsDSN
 	}
 
 	// 读写分离配置
@@ -195,19 +210,23 @@ func closeMysql(db *gorm.DB) error {
 // Close 关闭所有数据库连接
 func (m *MyDB) Close() error {
 	visited := make(map[*gorm.DB]bool, 4)
-	var closeErr error
+	var errs []error
 	if _, ok := visited[m.DB]; !ok {
-		closeErr = closeMysql(m.DB)
+		if err := closeMysql(m.DB); err != nil {
+			errs = append(errs, err)
+		}
 		visited[m.DB] = true
 	}
 
 	for _, v := range m.DbMap {
 		if _, ok := visited[v]; !ok {
-			closeErr = closeMysql(v)
+			if err := closeMysql(v); err != nil {
+				errs = append(errs, err)
+			}
 			visited[v] = true
 		}
 	}
-	return closeErr
+	return errors.Join(errs...)
 }
 
 // CheckDBAlive 检查数据库连接是否存活
@@ -218,12 +237,12 @@ func (m *MyDB) CheckDBAlive(ctx context.Context) (bool, error) {
 		}
 		sqlDB, err := db.DB()
 		if err != nil {
-			return false, errors.WithStack(err)
+			return false, err
 		}
 		// 尝试执行简单的查询来检查连接是否存活
 		err = sqlDB.PingContext(ctx)
 		if err != nil {
-			return false, errors.WithStack(err)
+			return false, err
 		}
 	}
 	return true, nil

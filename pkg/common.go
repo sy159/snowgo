@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -33,7 +34,7 @@ func init() {
 	}
 	n, err := snowflake.NewNode(int64(nodeID))
 	if err != nil {
-		panic("Failed to initialize snowflake node: " + err.Error())
+		panic("failed to initialize snowflake node: " + err.Error())
 	}
 	sfNode = n
 }
@@ -89,7 +90,7 @@ func GenerateID() string {
 }
 
 // ErrorToString 错误转字符串（可安全处理 panic）
-func ErrorToString(err interface{}) string {
+func ErrorToString(err any) string {
 	switch v := err.(type) {
 	case nil:
 		return ""
@@ -102,17 +103,21 @@ func ErrorToString(err interface{}) string {
 	}
 }
 
-// StructToMap 结构体转 map[string]interface{}，仅提取 tagName 的标签字段  示例：tagName="json" → 取 json:"xxx" 的字段
-func StructToMap(in interface{}, tagName string) (map[string]interface{}, error) {
-	out := make(map[string]interface{})
+// StructToMap 结构体转 map[string]any，仅提取 tagName 的标签字段  示例：tagName="json" → 取 json:"xxx" 的字段
+func StructToMap(in any, tagName string) (map[string]any, error) {
+	out := make(map[string]any)
 
 	v := reflect.ValueOf(in)
 	if v.Kind() == reflect.Ptr {
+		// nil 指针需单独检查，v.Elem() 对 nil 指针返回 invalid Value，错误信息不明确
+		if v.IsNil() {
+			return nil, fmt.Errorf("StructToMap: nil pointer passed")
+		}
 		v = v.Elem()
 	}
 
 	if v.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("StructToMap only accepts struct or struct pointer; got %T", v)
+		return nil, fmt.Errorf("StructToMap only accepts struct or struct pointer; got %T", in)
 	}
 
 	t := v.Type()
@@ -123,7 +128,23 @@ func StructToMap(in interface{}, tagName string) (map[string]interface{}, error)
 		if tagValue == "" {
 			continue
 		}
+		// 解析 tag 值，如 "name,omitempty" → "name"
+		if idx := strings.Index(tagValue, ","); idx != -1 {
+			tagValue = tagValue[:idx]
+		}
+		if tagValue == "-" {
+			continue
+		}
 		out[tagValue] = v.Field(i).Interface()
 	}
 	return out, nil
+}
+
+// DerefOrZero 安全解引用任意指针类型，nil 时返回零值
+func DerefOrZero[T any](v *T) T {
+	if v == nil {
+		var zero T
+		return zero
+	}
+	return *v
 }

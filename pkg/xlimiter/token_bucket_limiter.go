@@ -17,6 +17,8 @@ var (
 
 	// cleanupOnce 确保清理任务只启动一次
 	cleanupOnce sync.Once
+	// cleanupCancel 用于停止清理协程
+	cleanupCancel context.CancelFunc
 	// 默认清理间隔和空闲阈值
 	defaultCleanupInterval = 10 * time.Minute
 	defaultIdleThreshold   = 30 * time.Minute
@@ -43,20 +45,21 @@ func BucketEvery(interval time.Duration) BucketLimit {
 // 参数：key（自定义分类 key）、limit（令牌生成速率, 每秒多少个）、burst（桶容量）
 // 返回：限流器实例，以及是否首次创建。
 func NewTokenBucket(key string, limit BucketLimit, burst int) (*BucketLimiter, bool) {
+	if burst <= 0 {
+		panic("xlimiter: burst must be positive")
+	}
 	// 启动后台清理
 	ensureCleanup()
 
 	fullKey := prefixKey + key
-	if l, ok := limiterMap.Load(fullKey); ok {
-		return l.(*BucketLimiter), false
-	}
 	bl := &BucketLimiter{
 		key:     fullKey,
 		limiter: rate.NewLimiter(limit, burst),
 	}
 	bl.lastGetTime.Store(time.Now().UnixNano())
-	limiterMap.Store(fullKey, bl)
-	return bl, true
+	// LoadOrStore: 如果 key 已存在则返回已有实例，否则存入新实例
+	actual, loaded := limiterMap.LoadOrStore(fullKey, bl)
+	return actual.(*BucketLimiter), !loaded
 }
 
 // Allow 尝试立即获取令牌，成功返回 true（非阻塞），并更新时间戳。
@@ -104,19 +107,33 @@ func (bl *BucketLimiter) Close() {
 // ensureCleanup 启动后台清理协程，仅执行一次。清理超过空闲阈值的限流器。
 func ensureCleanup() {
 	cleanupOnce.Do(func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		cleanupCancel = cancel
 		go func() {
 			ticker := time.NewTicker(defaultCleanupInterval)
 			defer ticker.Stop()
-			for range ticker.C {
-				now := time.Now().UnixNano()
-				limiterMap.Range(func(k, v interface{}) bool {
-					bl := v.(*BucketLimiter)
-					if now-bl.lastGetTime.Load() > defaultIdleThreshold.Nanoseconds() {
-						limiterMap.Delete(k)
-					}
-					return true
-				})
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					now := time.Now().UnixNano()
+					limiterMap.Range(func(k, v any) bool {
+						bl := v.(*BucketLimiter)
+						if now-bl.lastGetTime.Load() > defaultIdleThreshold.Nanoseconds() {
+							limiterMap.Delete(k)
+						}
+						return true
+					})
+				}
 			}
 		}()
 	})
+}
+
+// StopCleanup 停止后台清理协程，通常在程序关闭时调用。
+func StopCleanup() {
+	if cleanupCancel != nil {
+		cleanupCancel()
+	}
 }

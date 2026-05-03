@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"context"
-	"github.com/pkg/errors"
+	"errors"
 	"snowgo/internal/di"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xauth/jwt"

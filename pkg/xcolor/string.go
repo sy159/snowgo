@@ -1,10 +1,6 @@
-//go:build darwin
-// +build darwin
-
 package xcolor
 
 import (
-	"fmt"
 	"net/http"
 	e "snowgo/pkg/xerror"
 	"strconv"
@@ -12,62 +8,62 @@ import (
 
 // RedFont ...
 func RedFont(msg string) string {
-	return fmt.Sprintf("\x1b[31m%s\x1b[0m", msg)
+	return "\x1b[31m" + msg + "\x1b[0m"
 }
 
 // RedBackground ...
 func RedBackground(msg string) string {
-	return fmt.Sprintf("\x1b[41m%s\x1b[0m", msg)
+	return "\x1b[41m" + msg + "\x1b[0m"
 }
 
 // GreenFont ...
 func GreenFont(msg string) string {
-	return fmt.Sprintf("\x1b[32m%s\x1b[0m", msg)
+	return "\x1b[32m" + msg + "\x1b[0m"
 }
 
 // GreenBackground ...
 func GreenBackground(msg string) string {
-	return fmt.Sprintf("\x1b[42m%s\x1b[0m", msg)
+	return "\x1b[42m" + msg + "\x1b[0m"
 }
 
 // YellowFont 黄色字体
 func YellowFont(msg string) string {
-	return fmt.Sprintf("\x1b[33m%s\x1b[0m", msg)
+	return "\x1b[33m" + msg + "\x1b[0m"
 }
 
 // YellowBackground 黄色背景
 func YellowBackground(msg string) string {
-	return fmt.Sprintf("\x1b[43m%s\x1b[0m", msg)
+	return "\x1b[43m" + msg + "\x1b[0m"
 }
 
 // BlueFont 蓝色字体
 func BlueFont(msg string) string {
-	return fmt.Sprintf("\x1b[34m%s\x1b[0m", msg)
+	return "\x1b[34m" + msg + "\x1b[0m"
 }
 
 // BlueBackground 蓝色背景
 func BlueBackground(msg string) string {
-	return fmt.Sprintf("\x1b[44m%s\x1b[0m", msg)
+	return "\x1b[44m" + msg + "\x1b[0m"
 }
 
 // PurpleFont 紫色字体
 func PurpleFont(msg string) string {
-	return fmt.Sprintf("\x1b[35m%s\x1b[0m", msg)
+	return "\x1b[35m" + msg + "\x1b[0m"
 }
 
 // PurpleBackground 紫色背景
 func PurpleBackground(msg string) string {
-	return fmt.Sprintf("\x1b[45m%s\x1b[0m", msg)
+	return "\x1b[45m" + msg + "\x1b[0m"
 }
 
 // WhiteFont 白色字体
 func WhiteFont(msg string) string {
-	return fmt.Sprintf("\x1b[37m%s\x1b[0m", msg)
+	return "\x1b[37m" + msg + "\x1b[0m"
 }
 
 // WhiteBackground 白色背景
 func WhiteBackground(msg string) string {
-	return fmt.Sprintf("\x1b[47m%s\x1b[0m", msg)
+	return "\x1b[47m" + msg + "\x1b[0m"
 }
 
 // StatusCodeColor 根据状态码返回对应颜色

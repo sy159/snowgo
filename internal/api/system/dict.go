@@ -6,6 +6,7 @@ import (
 	"snowgo/internal/constant"
 	"snowgo/internal/di"
 	"snowgo/internal/service/system"
+	common "snowgo/pkg"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
@@ -67,7 +68,7 @@ func GetDictList(c *gin.Context) {
 			ID:          dict.ID,
 			Code:        dict.Code,
 			Name:        dict.Name,
-			Description: *dict.Description,
+			Description: common.DerefOrZero(dict.Description),
 			CreatedAt:   dict.CreatedAt.Format(constant.TimeFmtWithMS),
 			UpdatedAt:   dict.UpdatedAt.Format(constant.TimeFmtWithMS),
 		})
@@ -182,9 +183,9 @@ func GetItemListByDictCode(c *gin.Context) {
 			ID:          item.ID,
 			ItemName:    item.ItemName,
 			ItemCode:    item.ItemCode,
-			Status:      *item.Status,
+			Status:      common.DerefOrZero(item.Status),
 			SortOrder:   item.SortOrder,
-			Description: *item.Description,
+			Description: common.DerefOrZero(item.Description),
 			CreatedAt:   item.CreatedAt.Format(constant.TimeFmtWithMS),
 			UpdatedAt:   item.UpdatedAt.Format(constant.TimeFmtWithMS),
 		})

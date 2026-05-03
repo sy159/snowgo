@@ -21,7 +21,7 @@ func String(c *gin.Context, res string) {
 }
 
 // Json 统一处理格式，返回包含data
-func Json(c *gin.Context, code int, msg string, data interface{}) {
+func Json(c *gin.Context, code int, msg string, data any) {
 	if data == nil {
 		data = struct{}{}
 	}
@@ -36,12 +36,12 @@ func Json(c *gin.Context, code int, msg string, data interface{}) {
 }
 
 // JsonByError 统一处理格式,参数为e.Code类型，data返回
-func JsonByError(c *gin.Context, code e.Code, data interface{}) {
+func JsonByError(c *gin.Context, code e.Code, data any) {
 	Json(c, code.GetErrCode(), code.GetErrMsg(), data)
 }
 
 // Success 成功返回
-func Success(c *gin.Context, data interface{}) {
+func Success(c *gin.Context, data any) {
 	Json(c, e.OK.GetErrCode(), e.OK.GetErrMsg(), data)
 }
 

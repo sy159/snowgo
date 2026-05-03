@@ -3,6 +3,7 @@ package rabbitmq
 import (
 	"context"
 	"fmt"
+	"slices"
 	"snowgo/pkg/xmq"
 	"sync"
 	"sync/atomic"
@@ -66,7 +67,7 @@ func (l *pendingList) decCount(n int32) {
 		}
 		newv := old - n
 		if newv < 0 {
-			newv = 0
+			newv = max(0, newv)
 		}
 		if atomic.CompareAndSwapInt32(&l.count, old, newv) {
 			return
@@ -95,6 +96,10 @@ func (l *pendingList) ackLE(tag uint64, ack bool) int {
 			l.list[j].rec = nil
 		}
 		l.list = l.list[i:]
+		// 压缩底层数组，避免容量远大于长度导致内存浪费
+		if cap(l.list) > 2*len(l.list) {
+			l.list = slices.Clone(l.list)
+		}
 		// #nosec G115 -- 值已在安全范围内，int -> int32 转换可控
 		l.decCount(int32(i))
 	}
@@ -728,7 +733,7 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 					fmt.Sprintf("producer reconnect fail, err is: %s", err),
 					zap.String("event", xmq.EventProducerReconnection),
 				)
-				time.Sleep(backoff)
+				sleepWithContext(ctx, backoff)
 				backoff *= 2
 				if backoff > maxDelay {
 					backoff = maxDelay
@@ -740,7 +745,7 @@ func (m *producerConnManager) reconnectWatcher(ctx context.Context) {
 			if err := m.refreshPool(ctx, newConn); err != nil {
 				m.poolMu.Unlock()
 				_ = newConn.Close()
-				time.Sleep(backoff)
+				sleepWithContext(ctx, backoff)
 				backoff *= 2
 				if backoff > maxDelay {
 					backoff = maxDelay
@@ -830,7 +835,7 @@ drained:
 				ctx,
 				"producer conn close timeout waiting inflight",
 				zap.String("event", xmq.EventProducerCloseConnection),
-				zap.String("error", fmt.Sprintf("producer conn close,inflight(%d) didn't finish", m.inflight)),
+				zap.String("error", fmt.Sprintf("producer conn close,inflight(%d) didn't finish", atomic.LoadInt64(&m.inflight))),
 			)
 			goto closeConn
 		case <-tick.C:
@@ -942,7 +947,7 @@ func (m *consumerConnManager) reconnectWatcher(ctx context.Context) {
 					fmt.Sprintf("consumer reconnect dial failed, err is: %s", err),
 					zap.String("event", xmq.EventConsumerReconnection),
 				)
-				time.Sleep(backoff)
+				sleepWithContext(ctx, backoff)
 				backoff *= 2
 				if backoff > maxDelay {
 					backoff = maxDelay
@@ -991,6 +996,8 @@ func (m *consumerConnManager) GetConsumerChannel(ctx context.Context) (*amqp.Cha
 }
 
 func (m *consumerConnManager) Close(ctx context.Context) {
+	// 必须设置 closed 标志，否则 reconnectWatcher 检测到连接关闭后会立即重连，导致 goroutine 泄漏
+	atomic.StoreInt32(&m.closed, 1)
 	// cancel background goroutine if any
 	if m.stopCancel != nil {
 		m.stopCancel()

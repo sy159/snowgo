@@ -2,7 +2,7 @@ package account
 
 import (
 	"context"
-	"github.com/pkg/errors"
+	"errors"
 	"gorm.io/gen"
 	"gorm.io/gorm"
 	"snowgo/internal/dal/model"
@@ -59,7 +59,7 @@ func (r *RoleDao) IsCodeExists(ctx context.Context, code string, roleId int32) (
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
 		}
-		return true, errors.WithStack(err)
+		return true, err
 	}
 	return true, nil
 }
@@ -68,7 +68,7 @@ func (r *RoleDao) IsCodeExists(ctx context.Context, code string, roleId int32) (
 func (r *RoleDao) CreateRole(ctx context.Context, role *model.Role) (*model.Role, error) {
 	err := r.repo.Query().WithContext(ctx).Role.Create(role)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return role, nil
 }
@@ -77,7 +77,7 @@ func (r *RoleDao) CreateRole(ctx context.Context, role *model.Role) (*model.Role
 func (r *RoleDao) TransactionCreateRole(ctx context.Context, tx *query.Query, role *model.Role) (*model.Role, error) {
 	err := tx.WithContext(ctx).Role.Create(role)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return role, nil
 }
@@ -90,7 +90,19 @@ func (r *RoleDao) UpdateRole(ctx context.Context, role *model.Role) (*model.Role
 	m := r.repo.Query().Role
 	err := m.WithContext(ctx).Where(m.ID.Eq(role.ID)).Save(role)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
+	}
+	return role, nil
+}
+
+// TransactionUpdateRole 事务内更新角色
+func (r *RoleDao) TransactionUpdateRole(ctx context.Context, tx *query.Query, role *model.Role) (*model.Role, error) {
+	if role.ID <= 0 {
+		return nil, errors.New("角色id不存在")
+	}
+	err := tx.WithContext(ctx).Role.Where(tx.Role.ID.Eq(role.ID)).Save(role)
+	if err != nil {
+		return nil, err
 	}
 	return role, nil
 }
@@ -103,7 +115,7 @@ func (r *RoleDao) DeleteById(ctx context.Context, roleId int32) error {
 	m := r.repo.Query().Role
 	_, err := m.WithContext(ctx).Where(m.ID.Eq(roleId)).Delete()
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -116,7 +128,7 @@ func (r *RoleDao) GetRoleById(ctx context.Context, roleId int32) (*model.Role, e
 	m := r.repo.Query().Role
 	role, err := m.WithContext(ctx).Where(m.ID.Eq(roleId)).First()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return role, nil
 }
@@ -131,7 +143,7 @@ func (r *RoleDao) GetRoleList(ctx context.Context, cond *RoleListCondition) ([]*
 			r.IdsScope(cond.Ids),
 		).FindByPage(int(cond.Offset), int(cond.Limit))
 	if err != nil {
-		return nil, 0, errors.WithStack(err)
+		return nil, 0, err
 	}
 	return list, total, nil
 }
@@ -170,7 +182,7 @@ func (r *RoleDao) IdsScope(ids []int32) func(tx gen.Dao) gen.Dao {
 func (r *RoleDao) TransactionCreateRoleMenu(ctx context.Context, tx *query.Query, roleMenuList []*model.RoleMenu) error {
 	err := tx.WithContext(ctx).RoleMenu.CreateInBatches(roleMenuList, 1000)
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -179,7 +191,7 @@ func (r *RoleDao) TransactionCreateRoleMenu(ctx context.Context, tx *query.Query
 func (r *RoleDao) TransactionDeleteRoleMenu(ctx context.Context, tx *query.Query, roleId int32) error {
 	_, err := tx.WithContext(ctx).RoleMenu.Where(tx.RoleMenu.RoleID.Eq(roleId)).Delete()
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -191,7 +203,7 @@ func (r *RoleDao) TransactionDeleteById(ctx context.Context, tx *query.Query, ro
 	}
 	_, err := tx.WithContext(ctx).Role.Where(tx.Role.ID.Eq(roleId)).Delete()
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	return nil
 }
@@ -204,7 +216,7 @@ func (r *RoleDao) IsUsedUserByIds(ctx context.Context, roleId int32) (bool, erro
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
 		}
-		return true, errors.WithStack(err)
+		return true, err
 	}
 	return true, nil
 }
@@ -221,7 +233,7 @@ func (r *RoleDao) GetMenuIdsByRoleId(ctx context.Context, roleId int32) ([]int32
 	menuIds := make([]int32, 0, 10)
 	err := m.WithContext(ctx).Select(m.MenuID).Where(m.RoleID.Eq(roleId)).Pluck(m.MenuID, &menuIds)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return menuIds, nil
 }
@@ -237,7 +249,7 @@ func (r *RoleDao) GetMenuPermsByRoleId(ctx context.Context, roleId int32) ([]str
 		Select(menu.Perms).
 		Pluck(menu.Perms, &menuPermsList)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return menuPermsList, nil
 }
@@ -253,9 +265,28 @@ func (r *RoleDao) GetMenuListByRoleId(ctx context.Context, roleId int32) ([]*mod
 		Select(menu.ALL).
 		Scan(&menuList)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return menuList, nil
+}
+
+// GetMenuPermsByRoleIds 批量获取多个角色的菜单 perms 列表
+func (r *RoleDao) GetMenuPermsByRoleIds(ctx context.Context, roleIds []int32) ([]string, error) {
+	if len(roleIds) == 0 {
+		return nil, nil
+	}
+	m := r.repo.Query().RoleMenu
+	menu := r.repo.Query().Menu
+	permsList := make([]string, 0, len(roleIds)*5)
+	err := m.WithContext(ctx).
+		Join(menu, m.MenuID.EqCol(menu.ID)).
+		Where(m.RoleID.In(roleIds...), menu.Perms.IsNotNull(), menu.Perms.Neq("")).
+		Select(menu.Perms).
+		Pluck(menu.Perms, &permsList)
+	if err != nil {
+		return nil, err
+	}
+	return permsList, nil
 }
 
 // ListRoleMenuPerms 查询每个角色绑定的接口perms权限名
@@ -269,7 +300,7 @@ func (r *RoleDao) ListRoleMenuPerms(ctx context.Context) ([]*RoleMenuPerm, error
 		Select(m.RoleID, menu.Perms).
 		Scan(&rows)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return rows, nil
 }

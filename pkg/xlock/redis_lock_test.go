@@ -2,15 +2,31 @@ package xlock_test
 
 import (
 	"context"
-	"fmt"
-	"github.com/go-redis/redis/v8"
-	"go.uber.org/zap"
-	"snowgo/config"
-	"snowgo/pkg/xlock"
-	"snowgo/pkg/xlogger"
 	"testing"
 	"time"
+
+	"github.com/redis/go-redis/v9"
+	"snowgo/pkg/xlock"
 )
+
+func TestNewRedisLock_NilClient(t *testing.T) {
+	_, err := xlock.NewRedisLock(nil, nil)
+	if err == nil {
+		t.Fatal("expected error for nil redis client")
+	}
+}
+
+func setupTestRedis(t *testing.T) *redis.Client {
+	t.Helper()
+	client := redis.NewClient(&redis.Options{
+		Addr:     "127.0.0.1:6379",
+		Password: "",
+		DB:       0,
+		PoolSize: 5,
+	})
+	t.Cleanup(func() { _ = client.Close() })
+	return client
+}
 
 func TestRedisLock(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
@@ -19,111 +35,278 @@ func TestRedisLock(t *testing.T) {
 		DB:       0,
 		PoolSize: 5,
 	})
-	defer func() { _ = rdb.Close() }()
-	// 初始化配置文件
-	config.Init("../../config")
-	xlogger.Init("./logs")
+	t.Cleanup(func() { _ = rdb.Close() })
 
-	lock := xlock.NewRedisLock(rdb, zap.S())
+	lock, _ := xlock.NewRedisLock(rdb, nil)
 
-	t.Run("Test LockWithTries", func(t *testing.T) {
+	t.Run("LockWithTries", func(t *testing.T) {
 		ctx := context.TODO()
 		key := "test-lock-with-tries"
-		// Simulate an existing lock
-		_ = rdb.SetNX(ctx, key, "locked", 500*time.Millisecond).Val()
-		//if !initialLock {
-		//	t.Fatalf("Failed to simulate existing lock")
-		//}
+		_ = rdb.SetArgs(ctx, key, "locked", redis.SetArgs{Mode: "NX", TTL: 500 * time.Millisecond}).Val()
 
 		err := lock.LockWithTries(ctx, key, 5, 6, func(isLock bool, lc xlock.LockContext) error {
-			fmt.Printf("Test LockWithTries is lock: %t, err is: %v\n", isLock, lc.Err())
+			t.Logf("isLock=%t, err=%v", isLock, lc.Err())
 			return nil
 		})
-		fmt.Printf("Test LockWithTries err is: %v\n", err)
+		t.Logf("err=%v", err)
 	})
 
-	t.Run("Test LockWithTriesTime", func(t *testing.T) {
+	t.Run("LockWithTriesTime", func(t *testing.T) {
 		ctx := context.TODO()
 		key := "test-lock-with-tries-time"
-
-		// Simulate an existing lock
-		_ = rdb.SetNX(ctx, key, "locked", 1900*time.Millisecond).Val()
-		//if !initialLock {
-		//	t.Fatalf("Failed to simulate existing lock")
-		//}
+		_ = rdb.SetArgs(ctx, key, "locked", redis.SetArgs{Mode: "NX", TTL: 1900 * time.Millisecond}).Val()
 
 		err := lock.LockWithTriesTime(ctx, key, 5, 3, func(isLock bool, lc xlock.LockContext) error {
-			fmt.Printf("Test LockWithTriesTime is lock: %t, err is: %v\n", isLock, lc.Err())
+			t.Logf("isLock=%t, err=%v", isLock, lc.Err())
 			return nil
 		})
-		fmt.Printf("Test LockWithTriesTime err is: %v\n", err)
+		t.Logf("err=%v", err)
 	})
 
-	t.Run("Test TryLock", func(t *testing.T) {
+	t.Run("TryLock", func(t *testing.T) {
 		ctx := context.TODO()
-		key := "test-try-lock"
+		key := "test-try-lock-fresh"
 		err := lock.TryLock(ctx, key, 5, func(isLock bool, lc xlock.LockContext) error {
-			fmt.Printf("Test TryLock is lock: %t, err is: %v\n", isLock, lc.Err())
+			t.Logf("isLock=%t, err=%v", isLock, lc.Err())
 			return nil
 		})
-		fmt.Printf("Test TryLock err is: %v\n", err)
+		t.Logf("err=%v", err)
 	})
 
-	t.Run("Test TryLock", func(t *testing.T) {
+	t.Run("TryLock_Existing", func(t *testing.T) {
 		ctx := context.TODO()
-		key := "test-try-lock"
-
-		// Simulate an existing lock
-		_ = rdb.SetNX(ctx, key, "locked", 1*time.Second).Val()
-		//if !initialLock {
-		//	t.Fatalf("Failed to simulate existing lock")
-		//}
+		key := "test-try-lock-existing"
+		_ = rdb.SetArgs(ctx, key, "locked", redis.SetArgs{Mode: "NX", TTL: 1 * time.Second}).Val()
 
 		err := lock.TryLock(ctx, key, 5, func(isLock bool, lc xlock.LockContext) error {
-			fmt.Printf("Test TryLock is lock: %t, err is: %v\n", isLock, lc.Err())
+			t.Logf("isLock=%t, err=%v", isLock, lc.Err())
 			return nil
 		})
-		fmt.Printf("Test TryLock err is: %v\n", err)
+		t.Logf("err=%v", err)
 	})
 
-	t.Run("Test ReTryLock", func(t *testing.T) {
-		ctx := context.TODO()
+	t.Run("ReTryLock", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.TODO(), 3*time.Second)
+		defer cancel()
 		key := "test-retry-lock"
-
-		// Simulate an existing lock
-		_ = rdb.SetNX(ctx, key, "locked", 10*time.Second).Val()
-		//if !initialLock {
-		//	t.Fatalf("Failed to simulate existing lock")
-		//}
+		_ = rdb.SetArgs(ctx, key, "locked", redis.SetArgs{Mode: "NX", TTL: 10 * time.Second}).Val()
 
 		err := lock.ReTryLock(ctx, key, 5, func(lc xlock.LockContext) error {
-			fmt.Printf("Test ReTryLock err is: %v\n", lc.Err())
+			t.Logf("err=%v", lc.Err())
 			return nil
 		})
-		fmt.Printf("Test ReTryLock err is: %v\n", err)
+		if err == nil {
+			t.Log("ReTryLock acquired lock")
+		} else {
+			t.Logf("ReTryLock err=%v", err)
+		}
 	})
 
-	t.Run("Test Extend", func(t *testing.T) {
+	t.Run("Extend", func(t *testing.T) {
 		ctx := context.TODO()
-		key := "test-unlock"
-
-		// Simulate an existing lock
-		_ = rdb.SetNX(ctx, key, "locked", 1*time.Second).Val()
-		//if !initialLock {
-		//	t.Fatalf("Failed to simulate existing lock")
-		//}
+		key := "test-extend-lock"
+		_ = rdb.SetArgs(ctx, key, "locked", redis.SetArgs{Mode: "NX", TTL: 1 * time.Second}).Val()
 
 		startTime := time.Now()
 		err := lock.LockWithTriesTime(ctx, key, 5, 2, func(isLock bool, lc xlock.LockContext) error {
-			fmt.Printf("start func time: %fs\n", time.Since(startTime).Seconds())
+			t.Logf("extend start: %.2fs", time.Since(startTime).Seconds())
 			time.Sleep(2 * time.Second)
-			fmt.Printf("exec cost time %fs\n", time.Since(startTime).Seconds())
+			t.Logf("exec cost: %.2fs", time.Since(startTime).Seconds())
 			success, err := lc.Extend(ctx)
-			fmt.Printf("Test Extend is: %t, err is: %v\n", success, err)
+			t.Logf("Extend=%t, err=%v", success, err)
 			time.Sleep(4 * time.Second)
-			fmt.Printf("end func time %fs\n", time.Since(startTime).Seconds())
+			t.Logf("extend end: %.2fs", time.Since(startTime).Seconds())
 			return nil
 		})
-		fmt.Printf("Test Extend err is: %v\n", err)
+		t.Logf("err=%v", err)
 	})
+}
+
+func TestReTryLockValidation(t *testing.T) {
+	rdb := setupTestRedis(t)
+	lock, _ := xlock.NewRedisLock(rdb, nil)
+
+	t.Run("fnNil", func(t *testing.T) {
+		err := lock.ReTryLock(context.TODO(), "test-key", 5, nil)
+		if err == nil {
+			t.Fatal("expected error for nil fn")
+		}
+	})
+
+	t.Run("emptyKey", func(t *testing.T) {
+		err := lock.ReTryLock(context.TODO(), "", 5, func(lc xlock.LockContext) error {
+			return nil
+		})
+		if err == nil {
+			t.Fatal("expected error for empty key")
+		}
+	})
+}
+
+func TestRedisLockContext_Unlock(t *testing.T) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "127.0.0.1:6379",
+		Password: "",
+		DB:       0,
+		PoolSize: 5,
+	})
+	t.Cleanup(func() { _ = rdb.Close() })
+
+	lock, _ := xlock.NewRedisLock(rdb, nil)
+
+	err := lock.LockWithTries(context.TODO(), "test-unlock-ctx-manual", 5, 1, func(isLock bool, lc xlock.LockContext) error {
+		if !isLock {
+			return nil
+		}
+		rlc, ok := lc.(*xlock.RedisLockContext)
+		if !ok {
+			t.Fatal("expected *RedisLockContext")
+		}
+		ok, err := rlc.Unlock(context.Background())
+		if err != nil {
+			t.Logf("Unlock error: %v", err)
+		}
+		t.Logf("Unlock result: %t", ok)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("LockWithTries error: %v", err)
+	}
+}
+
+func TestLockWithTries_ExpireSecondDefault(t *testing.T) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "127.0.0.1:6379",
+		Password: "",
+		DB:       0,
+		PoolSize: 5,
+	})
+	t.Cleanup(func() { _ = rdb.Close() })
+
+	lock, _ := xlock.NewRedisLock(rdb, nil)
+
+	ctx := context.TODO()
+	err := lock.LockWithTries(ctx, "test-expire-default", 0, 1, func(isLock bool, lc xlock.LockContext) error {
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("LockWithTries with expireSecond=0 error: %v", err)
+	}
+}
+
+func TestReTryLock_ContextCanceled(t *testing.T) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "127.0.0.1:6379",
+		Password: "",
+		DB:       0,
+		PoolSize: 5,
+	})
+	t.Cleanup(func() { _ = rdb.Close() })
+
+	lock, _ := xlock.NewRedisLock(rdb, nil)
+
+	ctx := context.TODO()
+	done := make(chan struct{})
+	go func() {
+		_ = lock.LockWithTries(ctx, "test-cancel-lock", 10, 1, func(isLock bool, lc xlock.LockContext) error {
+			<-done
+			return nil
+		})
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := lock.ReTryLock(cancelCtx, "test-cancel-lock", 5, func(lc xlock.LockContext) error {
+		return nil
+	})
+	if err == nil {
+		t.Fatal("expected error for canceled context")
+	}
+
+	close(done)
+}
+
+func TestLockWithTriesTime_ExpireDefault(t *testing.T) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "127.0.0.1:6379",
+		Password: "",
+		DB:       0,
+		PoolSize: 5,
+	})
+	t.Cleanup(func() { _ = rdb.Close() })
+
+	lock, _ := xlock.NewRedisLock(rdb, nil)
+
+	ctx := context.TODO()
+	err := lock.LockWithTriesTime(ctx, "test-time-expire-default", 0, 0, func(isLock bool, lc xlock.LockContext) error {
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("LockWithTriesTime with defaults error: %v", err)
+	}
+}
+
+func TestLockWithTries_ValidationErrors(t *testing.T) {
+	rdb := setupTestRedis(t)
+	lock, _ := xlock.NewRedisLock(rdb, nil)
+
+	t.Run("fnNil", func(t *testing.T) {
+		err := lock.LockWithTries(context.TODO(), "test-key", 5, 1, nil)
+		if err == nil {
+			t.Fatal("expected error for nil fn")
+		}
+	})
+
+	t.Run("emptyKey", func(t *testing.T) {
+		err := lock.LockWithTries(context.TODO(), "", 5, 1, func(isLock bool, lc xlock.LockContext) error {
+			return nil
+		})
+		if err == nil {
+			t.Fatal("expected error for empty key")
+		}
+	})
+}
+
+func TestLockWithTriesTime_ValidationErrors(t *testing.T) {
+	rdb := setupTestRedis(t)
+	lock, _ := xlock.NewRedisLock(rdb, nil)
+
+	t.Run("fnNil", func(t *testing.T) {
+		err := lock.LockWithTriesTime(context.TODO(), "test-key", 5, 3, nil)
+		if err == nil {
+			t.Fatal("expected error for nil fn")
+		}
+	})
+
+	t.Run("emptyKey", func(t *testing.T) {
+		err := lock.LockWithTriesTime(context.TODO(), "", 5, 3, func(isLock bool, lc xlock.LockContext) error {
+			return nil
+		})
+		if err == nil {
+			t.Fatal("expected error for empty key")
+		}
+	})
+}
+
+func TestReTryLock_ExpireSecondDefault(t *testing.T) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "127.0.0.1:6379",
+		Password: "",
+		DB:       0,
+		PoolSize: 5,
+	})
+	t.Cleanup(func() { _ = rdb.Close() })
+
+	lock, _ := xlock.NewRedisLock(rdb, nil)
+
+	ctx := context.TODO()
+	err := lock.ReTryLock(ctx, "test-expire-default", 0, func(lc xlock.LockContext) error {
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("ReTryLock with expireSecond=0 error: %v", err)
+	}
 }

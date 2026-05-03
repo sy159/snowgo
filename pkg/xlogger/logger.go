@@ -37,6 +37,7 @@ type prefixWriter struct {
 	prefix string
 }
 
+// 返回 len(b) 而非底层写入的字节数，遵守 io.Writer 契约（0 <= n <= len(b)）
 func (p *prefixWriter) Write(b []byte) (int, error) {
 	lines := strings.Split(string(b), "\n")
 	for i, line := range lines {
@@ -44,7 +45,8 @@ func (p *prefixWriter) Write(b []byte) (int, error) {
 			lines[i] = p.prefix + line
 		}
 	}
-	return p.w.Write([]byte(strings.Join(lines, "\n")))
+	_, err := p.w.Write([]byte(strings.Join(lines, "\n")))
+	return len(b), err
 }
 
 // Init 初始化Logger,设置zap全局logger
@@ -269,7 +271,7 @@ func getTimeWriter(filename string, maxAgeDay uint32) zapcore.WriteSyncer {
 		maxAgeDay = 365 * 30
 	}
 	hook, err := rotatelogs.New(
-		strings.ReplaceAll(filename, ".log", "")+"-%Y-%m-%d.log",     // 分割的新文件名(没有使用go的format格式, %Y%m%d%H%M%S）
+		strings.TrimSuffix(filename, ".log")+"-%Y-%m-%d.log",         // 只去除尾部 .log
 		rotatelogs.WithLinkName(filename),                            // 生成软链，指向最新日志文件
 		rotatelogs.WithMaxAge(time.Duration(maxAgeDay)*24*time.Hour), // 文件最多保留时间
 		rotatelogs.WithRotationTime(24*time.Hour),                    // 文件分割间隔
@@ -277,11 +279,8 @@ func getTimeWriter(filename string, maxAgeDay uint32) zapcore.WriteSyncer {
 	)
 
 	if err != nil {
-		// 降级到 stdout，避免 panic 导致服务无法启动
-		zap.L().Error("create rotate log writer failed, fallback to stdout",
-			zap.String("filename", filename),
-			zap.Error(err),
-		)
+		// Init 期间全局 logger 尚未初始化，降级到 stderr
+		_, _ = fmt.Fprintf(os.Stderr, "[logger] create rotate log writer failed for %s, fallback to stdout: %v\n", filename, err)
 		return zapcore.AddSync(os.Stdout)
 	}
 	return zapcore.AddSync(hook)
@@ -349,7 +348,7 @@ func getTraceField(ctx context.Context) zap.Field {
 	}
 	// trace信息
 	if tid := xtrace.GetTraceID(ctx); tid != "" {
-		return zap.String("trace_id", fmt.Sprintf("%v", tid))
+		return zap.String("trace_id", tid)
 	}
 	return zap.Skip()
 }

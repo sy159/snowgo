@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	common "snowgo/pkg"
@@ -46,7 +47,7 @@ type requestOptions struct {
 	request    *http.Request
 	query      map[string]string
 	formData   map[string]string // 表单数据
-	json       interface{}       // 支持直接传入JSON对象
+	json       any               // 支持直接传入JSON对象
 	timeout    time.Duration     // 支持单独设置超时
 }
 
@@ -95,7 +96,11 @@ func prepareRequestBody(opts *requestOptions) error {
 func createHTTPRequest(method, urlStr string, opts *requestOptions) (*http.Request, error) {
 	if opts.request != nil {
 		req := opts.request.Clone(opts.ctx)
-		req.URL, _ = url.Parse(urlStr) // 统一用外部拼好的 URL
+		parsedURL, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, fmt.Errorf("parse url failed: %w", err)
+		}
+		req.URL = parsedURL
 
 		// 把 opts.bodyBytes 写进去
 		if len(opts.body) > 0 {
@@ -145,17 +150,16 @@ func copyClient(client *http.Client) *http.Client {
 
 // cloneHeader 复制header，防止header被修改
 func cloneHeader(header map[string]string) map[string]string {
-	cpHeader := make(map[string]string, len(header))
-	for k, v := range header {
-		cpHeader[k] = v
-	}
-	return cpHeader
+	return maps.Clone(header)
 }
 
 // handleResponse 读取并封装响应
+// 限制响应体大小为 10MB，防止恶意服务器返回超大响应导致 OOM
+const maxResponseBodySize = 10 << 20 // 10 MB
+
 func handleResponse(resp *http.Response) (*Response, error) {
-	// 读取 body
-	body, err := io.ReadAll(resp.Body)
+	// 读取 body（限制大小防止 OOM）
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
 	if err != nil {
 		// 读取失败，确保关闭原始 body
 		_ = resp.Body.Close()
@@ -175,14 +179,21 @@ func handleResponse(resp *http.Response) (*Response, error) {
 	}, nil
 }
 
+// 始终创建新 map，避免修改传入的 defaults map
 func mergeHeader(defaults, custom map[string]string) map[string]string {
-	if defaults == nil {
-		defaults = make(map[string]string)
+	merged := make(map[string]string, len(defaults)+len(custom))
+	maps.Copy(merged, defaults)
+	maps.Copy(merged, custom)
+	return merged
+}
+
+func isIdempotentMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return true
+	default:
+		return false
 	}
-	for k, v := range custom {
-		defaults[k] = v
-	}
-	return defaults
 }
 
 func sleepBackoff(ctx context.Context, i int, base time.Duration) {
@@ -195,7 +206,8 @@ func sleepBackoff(ctx context.Context, i int, base time.Duration) {
 		backoff = maxBackoff
 	}
 
-	jitter := time.Duration(common.WeakRandInt63n(int64(backoff)))
+	// equal jitter: at least half backoff, plus random up to half
+	jitter := backoff/2 + time.Duration(common.WeakRandInt63n(int64(backoff/2+1)))
 
 	timer := time.NewTimer(jitter)
 	defer timer.Stop()
@@ -267,6 +279,7 @@ func Request(method, rawURL string, opts ...Option) (*Response, error) {
 		resp, err := client.Do(httpReq)
 		if err != nil {
 			lastErr = err
+			// 网络层错误（连接/超时/DNS），安全重试
 			if i < reqOpts.maxRetries {
 				sleepBackoff(reqOpts.ctx, i, 100*time.Millisecond)
 				continue
@@ -276,8 +289,8 @@ func Request(method, rawURL string, opts ...Option) (*Response, error) {
 		response, err := handleResponse(resp)
 		if err != nil {
 			lastErr = err
-			// 如果还有重试机会，继续重试；否则返回错误
-			if i < reqOpts.maxRetries {
+			// 仅幂等方法可安全重试（非幂等方法重试可能导致重复提交）
+			if i < reqOpts.maxRetries && isIdempotentMethod(method) {
 				sleepBackoff(reqOpts.ctx, i, 100*time.Millisecond)
 				continue
 			}
@@ -310,13 +323,13 @@ func (res *Response) Headers() http.Header {
 }
 
 // Json 返回body json内容
-func (res *Response) Json(v interface{}) error {
+func (res *Response) Json(v any) error {
 	return json.Unmarshal(res.Body, v)
 }
 
 // Map 返回body map内容
-func (res *Response) Map() (map[string]interface{}, error) {
-	var m map[string]interface{}
+func (res *Response) Map() (map[string]any, error) {
+	var m map[string]any
 	err := json.Unmarshal(res.Body, &m)
 	return m, err
 }
@@ -410,7 +423,7 @@ func WithFormData(formData map[string]string) Option {
 }
 
 // WithJSON json请求类型
-func WithJSON(jsonBody interface{}) Option {
+func WithJSON(jsonBody any) Option {
 	return func(o *requestOptions) { o.json = jsonBody }
 }
 

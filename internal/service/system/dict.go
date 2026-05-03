@@ -3,8 +3,8 @@ package system
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"gorm.io/gorm"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
@@ -40,10 +40,10 @@ type DictService struct {
 	db         *repo.Repository
 	cache      xcache.Cache
 	dictRepo   DictRepo
-	logService *OperationLogService
+	logService OperationLogWriter
 }
 
-func NewDictService(db *repo.Repository, cache xcache.Cache, dictRepo DictRepo, logService *OperationLogService) *DictService {
+func NewDictService(db *repo.Repository, cache xcache.Cache, dictRepo DictRepo, logService OperationLogWriter) *DictService {
 	return &DictService{
 		db:         db,
 		cache:      cache,
@@ -138,7 +138,7 @@ func (d *DictService) GetDictList(ctx context.Context, condition *DictListCondit
 	})
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "获取系统字典列表异常: %v", err)
-		return nil, errors.WithMessage(err, "系统字典列表查询失败")
+		return nil, fmt.Errorf("系统字典列表查询失败: %w", err)
 	}
 	dictInfoList := make([]*DictInfo, 0, len(dictList))
 	for _, dict := range dictList {
@@ -162,19 +162,18 @@ func (d *DictService) CreateDict(ctx context.Context, param *DictParam) (int32, 
 		return 0, err
 	}
 
-	// 检查code是否存在
-	isDuplicate, err := d.dictRepo.IsCodeDuplicate(ctx, param.Code, 0)
-	if err != nil {
-		xlogger.ErrorfCtx(ctx, "查询code是否存在异常: %v", err)
-		return 0, errors.WithMessage(err, "查询字典编码是否存在异常")
-	}
-	if isDuplicate {
-		return 0, ErrDictCodeExist
-	}
-
 	// 创建字典
 	var dict *model.SystemDict
 	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 检查code是否存在（事务内防止并发竞争）
+		isDuplicate, err := d.dictRepo.IsCodeDuplicate(ctx, param.Code, 0)
+		if err != nil {
+			return fmt.Errorf("查询字典编码是否存在异常: %w", err)
+		}
+		if isDuplicate {
+			return ErrDictCodeExist
+		}
+
 		// 创建字典
 		dict, err = d.dictRepo.TransactionCreateDict(ctx, tx, &model.SystemDict{
 			Code:        param.Code,
@@ -183,7 +182,7 @@ func (d *DictService) CreateDict(ctx context.Context, param *DictParam) (int32, 
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典创建失败: %+v err: %v", param, err)
-			return errors.WithMessage(err, "字典创建失败")
+			return fmt.Errorf("字典创建失败: %w", err)
 		}
 
 		// 创建操作日志
@@ -203,7 +202,7 @@ func (d *DictService) CreateDict(ctx context.Context, param *DictParam) (int32, 
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", param, err)
-			return errors.WithMessage(err, "操作日志创建失败")
+			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 		return nil
 
@@ -233,14 +232,14 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 			return 0, ErrDictCodeNotFound
 		}
 		xlogger.ErrorfCtx(ctx, "获取字典(%d)信息异常: %v", param.ID, err)
-		return 0, errors.WithMessage(err, "字典信息查询失败")
+		return 0, fmt.Errorf("字典信息查询失败: %w", err)
 	}
 
 	// 检查code是否存在
 	isDuplicate, err := d.dictRepo.IsCodeDuplicate(ctx, param.Code, oldDict.ID)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "查询code是否存在异常: %v", err)
-		return 0, errors.WithMessage(err, "查询字典编码是否存在异常")
+		return 0, fmt.Errorf("查询字典编码是否存在异常: %w", err)
 	}
 	if isDuplicate {
 		return 0, ErrDictCodeExist
@@ -257,7 +256,7 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典更新失败: %+v err: %v", param, err)
-			return errors.WithMessage(err, "字典更新失败")
+			return fmt.Errorf("字典更新失败: %w", err)
 		}
 
 		// 如果更新了dict code，还需要更新item表对应的dict code
@@ -265,7 +264,7 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 			err = d.dictRepo.TransactionUpdateItemByDictID(ctx, tx, param.ID, param.Code)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "字典枚举更新失败: %+v err: %v", param, err)
-				return errors.WithMessage(err, "字典枚举更新失败")
+				return fmt.Errorf("字典枚举更新失败: %w", err)
 			}
 
 			// 清除code对应item缓存
@@ -294,7 +293,7 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", param, err)
-			return errors.WithMessage(err, "操作日志创建失败")
+			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 		return nil
 	})
@@ -324,7 +323,7 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 			return ErrDictCodeNotFound
 		}
 		xlogger.ErrorfCtx(ctx, "获取字典(%d)信息异常: %v", dict.ID, err)
-		return errors.WithMessage(err, "字典信息查询失败")
+		return fmt.Errorf("字典信息查询失败: %w", err)
 	}
 
 	// 删除字典
@@ -333,14 +332,14 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 		err = d.dictRepo.TransactionDeleteItemByDictID(ctx, tx, id)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典(%d)枚举删除失败:  err: %v", id, err)
-			return errors.WithMessage(err, "字典枚举删除失败")
+			return fmt.Errorf("字典枚举删除失败: %w", err)
 		}
 
 		// 删除字典
 		err = d.dictRepo.TransactionDeleteById(ctx, tx, id)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典(%d)删除失败:  err: %v", id, err)
-			return errors.WithMessage(err, "字典删除失败")
+			return fmt.Errorf("字典删除失败: %w", err)
 		}
 
 		// 创建操作日志
@@ -360,7 +359,7 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", id, err)
-			return errors.WithMessage(err, "操作日志创建失败")
+			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 		return nil
 	})
@@ -385,7 +384,7 @@ func (d *DictService) GetItemListByCode(ctx context.Context, code string) ([]*It
 
 	// 尝试从缓存读取
 	cacheKey := fmt.Sprintf("%s%s", constant.SystemDictPrefix, code)
-	if data, err := d.cache.Get(ctx, cacheKey); err == nil && data != "" {
+	if data, ok, _ := d.cache.Get(ctx, cacheKey); ok {
 		var m []*ItemInfo
 		if err := json.Unmarshal([]byte(data), &m); err == nil {
 			return m, nil
@@ -395,7 +394,7 @@ func (d *DictService) GetItemListByCode(ctx context.Context, code string) ([]*It
 	itemList, err := d.dictRepo.GetItemListByDictCode(ctx, code)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "获取系统字典枚举列表异常: %v", err)
-		return nil, errors.WithMessage(err, "系统字典枚举列表查询失败")
+		return nil, fmt.Errorf("系统字典枚举列表查询失败: %w", err)
 	}
 	itemInfoList := make([]*ItemInfo, 0, len(itemList))
 	for _, item := range itemList {
@@ -438,22 +437,21 @@ func (d *DictService) CreateItem(ctx context.Context, param *DictItemParam) (int
 			return 0, ErrDictCodeNotFound
 		}
 		xlogger.ErrorfCtx(ctx, "获取字典(%d)信息异常: %v", param.DictID, err)
-		return 0, errors.WithMessage(err, "字典信息查询失败")
-	}
-
-	// 检查code是否存在
-	isDuplicate, err := d.dictRepo.IsCodeItemDuplicate(ctx, dict.ID, param.ItemCode, 0)
-	if err != nil {
-		xlogger.ErrorfCtx(ctx, "查询item code是否存在异常: %v", err)
-		return 0, errors.WithMessage(err, "查询字典item编码是否存在异常")
-	}
-	if isDuplicate {
-		return 0, ErrDictItemCodeExist
+		return 0, fmt.Errorf("字典信息查询失败: %w", err)
 	}
 
 	// 创建字典item
 	var item *model.SystemDictItem
 	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 检查item code是否存在（事务内防止并发竞争）
+		isDuplicate, err := d.dictRepo.IsCodeItemDuplicate(ctx, dict.ID, param.ItemCode, 0)
+		if err != nil {
+			return fmt.Errorf("查询字典item编码是否存在异常: %w", err)
+		}
+		if isDuplicate {
+			return ErrDictItemCodeExist
+		}
+
 		// 创建字典item
 		item, err = d.dictRepo.TransactionCreateDictItem(ctx, tx, &model.SystemDictItem{
 			DictID:      dict.ID,
@@ -465,7 +463,7 @@ func (d *DictService) CreateItem(ctx context.Context, param *DictItemParam) (int
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典item创建失败: %+v err: %v", param, err)
-			return errors.WithMessage(err, "字典item创建失败")
+			return fmt.Errorf("字典item创建失败: %w", err)
 		}
 
 		// 创建操作日志
@@ -485,7 +483,7 @@ func (d *DictService) CreateItem(ctx context.Context, param *DictItemParam) (int
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", param, err)
-			return errors.WithMessage(err, "操作日志创建失败")
+			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 		return nil
 
@@ -521,14 +519,14 @@ func (d *DictService) UpdateItem(ctx context.Context, param *DictItemParam) (int
 			return 0, ErrDictCodeItemNotFound
 		}
 		xlogger.ErrorfCtx(ctx, "获取字典item(%d)信息异常: %v", param.ID, err)
-		return 0, errors.WithMessage(err, "字典item信息查询失败")
+		return 0, fmt.Errorf("字典item信息查询失败: %w", err)
 	}
 
 	// 检查item code是否存在
 	isDuplicate, err := d.dictRepo.IsCodeItemDuplicate(ctx, oldItem.DictID, param.ItemCode, oldItem.ID)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "查询code是否存在异常: %v", err)
-		return 0, errors.WithMessage(err, "查询字典编码是否存在异常")
+		return 0, fmt.Errorf("查询字典编码是否存在异常: %w", err)
 	}
 	if isDuplicate {
 		return 0, ErrDictItemCodeExist
@@ -548,7 +546,7 @@ func (d *DictService) UpdateItem(ctx context.Context, param *DictItemParam) (int
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典item更新失败: %+v err: %v", param, err)
-			return errors.WithMessage(err, "字典item更新失败")
+			return fmt.Errorf("字典item更新失败: %w", err)
 		}
 
 		// 创建操作日志
@@ -568,7 +566,7 @@ func (d *DictService) UpdateItem(ctx context.Context, param *DictItemParam) (int
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", param, err)
-			return errors.WithMessage(err, "操作日志创建失败")
+			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 		return nil
 	})
@@ -603,7 +601,7 @@ func (d *DictService) DeleteItemById(ctx context.Context, id int32) error {
 			return ErrDictCodeItemNotFound
 		}
 		xlogger.ErrorfCtx(ctx, "获取字典item(%d)信息异常: %v", id, err)
-		return errors.WithMessage(err, "字典item信息查询失败")
+		return fmt.Errorf("字典item信息查询失败: %w", err)
 	}
 
 	// 删除字典item
@@ -612,7 +610,7 @@ func (d *DictService) DeleteItemById(ctx context.Context, id int32) error {
 		err = d.dictRepo.TransactionDeleteItemByID(ctx, tx, id)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典(%d)枚举删除失败:  err: %v", id, err)
-			return errors.WithMessage(err, "字典枚举删除失败")
+			return fmt.Errorf("字典枚举删除失败: %w", err)
 		}
 
 		// 创建操作日志
@@ -632,7 +630,7 @@ func (d *DictService) DeleteItemById(ctx context.Context, id int32) error {
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", id, err)
-			return errors.WithMessage(err, "操作日志创建失败")
+			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 		return nil
 	})

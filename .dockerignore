@@ -1,29 +1,54 @@
-.git
-logs
-deploy
+# Version control
+.git/
+
+# Runtime data
+data/
+logs/
+*.log
+
+# Docker runtime data (deploy directory)
+deploy/
+.github/
+
+# Documentation
+docs/
+assets/
+
+# AI agent files
+.claude/
+.agents/
+CLAUDE*.md
 
 # IDE / Editor files
 .idea/
 .vscode/
 *.iml
+*.sublime-*
 
 # temp files
 tmp/
 .cache/
-
-# Git files
-.git/
-.gitignore
 
 # Build outputs
 bin/
 dist/
 *.out
 *.test
+*.exe
+*.dll
+*.so
+*.dylib
 
 # OS system files
 .DS_Store
 Thumbs.db
 
-# Go module cache (避免意外复制宿主缓存)
+# Go module cache
 go.sum.tmp
+
+# Config secrets (prod/container configs excluded from image)
+config/*.prod.yaml
+config/*.container.yaml
+
+# Environment files with real credentials
+.env

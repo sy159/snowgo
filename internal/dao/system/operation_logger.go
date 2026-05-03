@@ -2,7 +2,6 @@ package system
 
 import (
 	"context"
-	"github.com/pkg/errors"
 	"gorm.io/gen"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
@@ -37,7 +36,7 @@ type OperationLogCondition struct {
 func (o *OperationLogDao) TransactionCreate(ctx context.Context, tx *query.Query, operationLog *model.OperationLog) (*model.OperationLog, error) {
 	err := tx.WithContext(ctx).OperationLog.Create(operationLog)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return operationLog, nil
 }
@@ -57,7 +56,7 @@ func (o *OperationLogDao) GetOperationLogList(ctx context.Context, condition *Op
 		).
 		FindByPage(int(condition.Offset), int(condition.Limit))
 	if err != nil {
-		return nil, 0, errors.WithStack(err)
+		return nil, 0, err
 	}
 	return userList, total, nil
 }

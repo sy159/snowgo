@@ -86,6 +86,12 @@ func TestRandShuffleStr(t *testing.T) {
 	if len(result) != 0 {
 		t.Errorf("RandShuffleStr(8, 0) should return empty string")
 	}
+
+	// 测试长度超过字符集大小时会被截断
+	result = xstr_tool.RandShuffleStr(1000, xstr_tool.DigitFlag) // digits only = 10 chars
+	if len(result) != 10 {
+		t.Errorf("RandShuffleStr(1000, DigitFlag) length should be capped at 10, got %d", len(result))
+	}
 }
 
 // 测试判断字符串是否无重复字符功能
@@ -108,5 +114,41 @@ func TestIsUniqueStr(t *testing.T) {
 				t.Errorf("IsUniqueStr(%s) = %t, want %t", tc.input, result, tc.output)
 			}
 		})
+	}
+}
+
+func BenchmarkRandStr(b *testing.B) {
+	b.Run("short", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			xstr_tool.RandStr(8, xstr_tool.LowerFlag|xstr_tool.UpperFlag|xstr_tool.DigitFlag)
+		}
+	})
+
+	b.Run("parallel", func(b *testing.B) {
+		b.RunParallel(func(pb *testing.PB) {
+			for pb.Next() {
+				xstr_tool.RandStr(8, xstr_tool.LowerFlag|xstr_tool.UpperFlag|xstr_tool.DigitFlag)
+			}
+		})
+	})
+}
+
+func BenchmarkRandShuffleStr(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		xstr_tool.RandShuffleStr(8, xstr_tool.LowerFlag|xstr_tool.UpperFlag|xstr_tool.DigitFlag)
+	}
+}
+
+func BenchmarkReverseStr(b *testing.B) {
+	s := "abcdefghijklmnopqrstuvwxyz"
+	for i := 0; i < b.N; i++ {
+		xstr_tool.ReverseStr(s)
+	}
+}
+
+func BenchmarkIsUniqueStr(b *testing.B) {
+	s := "abcdefghij"
+	for i := 0; i < b.N; i++ {
+		xstr_tool.IsUniqueStr(s)
 	}
 }

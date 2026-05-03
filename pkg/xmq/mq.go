@@ -47,10 +47,10 @@ const (
 
 // Message 消息结构体
 type Message struct {
-	Body      []byte                 // 业务数据
-	Headers   map[string]interface{} // 自定义 key/value（可用于存放 trace_id、业务字段等）
-	Timestamp time.Time              // 发送时间（在 Publish 前会默认填充）
-	MessageId string                 // 业务唯一 ID（用于幂等/追踪）
+	Body      []byte         // 业务数据
+	Headers   map[string]any // 自定义 key/value（可用于存放 trace_id、业务字段等）
+	Timestamp time.Time      // 发送时间（在 Publish 前会默认填充）
+	MessageId string         // 业务唯一 ID（用于幂等/追踪）
 }
 
 type Logger interface {
