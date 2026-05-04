@@ -11,8 +11,8 @@ import (
 	"snowgo/pkg/xresponse"
 )
 
-// RoleInfo 返回给前端的角色信息
-type RoleInfo struct {
+// RoleListInfo 角色列表项（不含 MenuIds）
+type RoleListInfo struct {
 	ID          int32  `json:"id"`
 	Name        string `json:"name"`
 	Code        string `json:"code"`
@@ -23,8 +23,8 @@ type RoleInfo struct {
 
 // RoleList 返回角色列表
 type RoleList struct {
-	List  []*RoleInfo `json:"list"`
-	Total int64       `json:"total"`
+	List  []*RoleListInfo `json:"list"`
+	Total int64           `json:"total"`
 }
 
 // CreateRole 创建角色
@@ -40,7 +40,7 @@ func CreateRole(c *gin.Context) {
 	roleID, err := container.RoleService.CreateRole(ctx, &param)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "create role is err: %v", err)
-		xresponse.FailByError(c, e.RoleCreateError)
+		xresponse.Fail(c, e.RoleCreateError.GetErrCode(), err.Error())
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": roleID})
@@ -59,7 +59,7 @@ func UpdateRole(c *gin.Context) {
 	err := container.RoleService.UpdateRole(ctx, &param)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "update role is err: %v", err)
-		xresponse.FailByError(c, e.RoleUpdateError)
+		xresponse.Fail(c, e.RoleUpdateError.GetErrCode(), err.Error())
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": param.ID})
@@ -68,10 +68,10 @@ func UpdateRole(c *gin.Context) {
 // DeleteRole 删除角色
 func DeleteRole(c *gin.Context) {
 	var param struct {
-		ID int32 `json:"id" uri:"id" form:"id" binding:"required"`
+		ID int32 `json:"id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&param); err != nil {
-		xresponse.FailByError(c, e.HttpBadRequest)
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
 	ctx := c.Request.Context()
@@ -112,9 +112,9 @@ func GetRoleList(c *gin.Context) {
 		xresponse.FailByError(c, e.RoleListError)
 		return
 	}
-	roleList := make([]*RoleInfo, 0, len(res.List))
+	roleList := make([]*RoleListInfo, 0, len(res.List))
 	for _, role := range res.List {
-		roleList = append(roleList, &RoleInfo{
+		roleList = append(roleList, &RoleListInfo{
 			ID:          role.ID,
 			Name:        role.Name,
 			Code:        role.Code,
@@ -132,7 +132,7 @@ func GetRoleList(c *gin.Context) {
 // GetRoleById 获取角色详情（带菜单权限）
 func GetRoleById(c *gin.Context) {
 	var param struct {
-		ID int32 `json:"id" uri:"id" form:"id" binding:"required"`
+		ID int32 `json:"id" form:"id" binding:"required"`
 	}
 	if err := c.ShouldBindQuery(&param); err != nil {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())

@@ -312,6 +312,14 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 	if id <= 0 {
 		return errors.New("角色ID无效")
 	}
+	// 查询被删除角色信息，用于操作日志记录
+	oldRole, err := s.roleDao.GetRoleById(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrRoleNotFound
+		}
+		return fmt.Errorf("获取角色信息失败: %w", err)
+	}
 
 	// 如果用户使用了角色，不能删除
 	isUsed, err := s.roleDao.IsUsedUserByIds(ctx, id)
@@ -346,10 +354,10 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 			ResourceID:   int64(id),
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionDelete,
-			BeforeData:   nil,
+			BeforeData:   oldRole,
 			AfterData:    nil,
-			Description: fmt.Sprintf("用户(%d-%s)删除了角色(%d)",
-				userContext.UserId, userContext.Username, id),
+			Description: fmt.Sprintf("用户(%d-%s)删除了角色(%d-%s)",
+				userContext.UserId, userContext.Username, id, oldRole.Code),
 			IP: userContext.IP,
 		})
 		if err != nil {

@@ -10,6 +10,7 @@ import (
 	"snowgo/internal/dal/query"
 	daoAccount "snowgo/internal/dao/admin/account"
 	"snowgo/internal/service/admin/system"
+	common "snowgo/pkg"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xcryption"
@@ -233,8 +234,34 @@ func TestGetUserById_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), got.ID)
 	assert.Equal(t, "Test User", got.Nickname)
+	assert.Equal(t, "test@example.com", got.Email)
 	assert.Len(t, got.RoleList, 1)
 	assert.Equal(t, "admin", got.RoleList[0].Code)
+}
+
+func TestGetUserById_WithNilFields(t *testing.T) {
+	status := constant.UserStatusActive
+	now := time.Now()
+	u := &model.SysUser{
+		ID:        2,
+		Username:  "nouser",
+		Password:  "$2a$10$hash",
+		Tel:       "13800000001",
+		Nickname:  nil,
+		Email:     nil,
+		Remark:    nil,
+		Status:    &status,
+		CreatedAt: &now,
+		UpdatedAt: &now,
+	}
+	svc := &UserService{userDao: &mockUserDao{user: u}}
+
+	got, err := svc.GetUserById(context.Background(), 2)
+	require.NoError(t, err)
+	assert.Equal(t, "", got.Nickname)
+	assert.Equal(t, "", got.Email)
+	assert.Equal(t, "", got.Remark)
+	assert.Equal(t, int8(1), got.Status)
 }
 
 func TestGetUserById_NotFound(t *testing.T) {
@@ -314,18 +341,22 @@ func TestCreateUser_InvalidRole(t *testing.T) {
 
 	_, err := svc.CreateUser(testCtx(), &UserParam{
 		Username: "newuser", Tel: "13800000000", Password: "pwd",
-		Nickname: "New", RoleIds: []int32{999},
+		Nickname: common.PtrIfNonZero("New"), Email: common.PtrIfNonZero("new@example.com"), Remark: common.PtrIfNonZero("测试备注"),
+		RoleIds: []int32{999},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "设置的角色不存在")
 }
 
+// ---- Tests: UpdateUser ----
+
 func TestUpdateUser_InvalidID(t *testing.T) {
 	logWriter := &mockLogWriter{}
-	svc := &UserService{userDao: &mockUserDao{}, logService: logWriter}
+	u := testUser()
+	svc := &UserService{userDao: &mockUserDao{user: u}, logService: logWriter}
 
 	_, err := svc.UpdateUser(testCtx(), &UserParam{
-		ID: -1, Username: "u", Tel: "13800000000", Nickname: "N",
+		ID: -1, Username: "u", Tel: "13800000000",
 	})
 	assert.True(t, errors.Is(err, ErrUserNotFound))
 }

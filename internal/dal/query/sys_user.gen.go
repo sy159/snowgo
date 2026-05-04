@@ -33,11 +33,9 @@ func newSysUser(db *gorm.DB, opts ...gen.DOOption) sysUser {
 	_sysUser.Password = field.NewString(tableName, "password")
 	_sysUser.Email = field.NewString(tableName, "email")
 	_sysUser.Remark = field.NewString(tableName, "remark")
-	_sysUser.Status = field.NewUint8(tableName, "status")
+	_sysUser.Status = field.NewInt8(tableName, "status")
 	_sysUser.CreatedBy = field.NewInt32(tableName, "created_by")
 	_sysUser.UpdatedBy = field.NewInt32(tableName, "updated_by")
-	_sysUser.IsDeleted = field.NewBool(tableName, "is_deleted")
-	_sysUser.DeletedAt = field.NewField(tableName, "deleted_at")
 	_sysUser.CreatedAt = field.NewTime(tableName, "created_at")
 	_sysUser.UpdatedAt = field.NewTime(tableName, "updated_at")
 
@@ -57,11 +55,9 @@ type sysUser struct {
 	Password  field.String // pwd
 	Email     field.String // 邮箱
 	Remark    field.String // 备注
-	Status    field.Uint8  // 用户状态：1 活跃, 2 禁用登录
+	Status    field.Int8   // 用户状态：1 活跃, 2 禁用登录
 	CreatedBy field.Int32  // 创建人 ID
 	UpdatedBy field.Int32  // 更新人 ID
-	IsDeleted field.Bool   // 是否删除：0=未删除，1=已删除
-	DeletedAt field.Field  // 删除时间（NULL=未删除）
 	CreatedAt field.Time
 	UpdatedAt field.Time
 
@@ -87,11 +83,9 @@ func (s *sysUser) updateTableName(table string) *sysUser {
 	s.Password = field.NewString(table, "password")
 	s.Email = field.NewString(table, "email")
 	s.Remark = field.NewString(table, "remark")
-	s.Status = field.NewUint8(table, "status")
+	s.Status = field.NewInt8(table, "status")
 	s.CreatedBy = field.NewInt32(table, "created_by")
 	s.UpdatedBy = field.NewInt32(table, "updated_by")
-	s.IsDeleted = field.NewBool(table, "is_deleted")
-	s.DeletedAt = field.NewField(table, "deleted_at")
 	s.CreatedAt = field.NewTime(table, "created_at")
 	s.UpdatedAt = field.NewTime(table, "updated_at")
 
@@ -118,7 +112,7 @@ func (s *sysUser) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (s *sysUser) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 14)
+	s.fieldMap = make(map[string]field.Expr, 12)
 	s.fieldMap["id"] = s.ID
 	s.fieldMap["username"] = s.Username
 	s.fieldMap["tel"] = s.Tel
@@ -129,8 +123,6 @@ func (s *sysUser) fillFieldMap() {
 	s.fieldMap["status"] = s.Status
 	s.fieldMap["created_by"] = s.CreatedBy
 	s.fieldMap["updated_by"] = s.UpdatedBy
-	s.fieldMap["is_deleted"] = s.IsDeleted
-	s.fieldMap["deleted_at"] = s.DeletedAt
 	s.fieldMap["created_at"] = s.CreatedAt
 	s.fieldMap["updated_at"] = s.UpdatedAt
 }

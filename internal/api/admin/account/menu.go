@@ -67,7 +67,7 @@ func GetMenuList(c *gin.Context) {
 	ctx := c.Request.Context()
 	res, err := container.MenuService.GetMenuTree(ctx)
 	if err != nil {
-		xlogger.ErrorfCtx(ctx, "get user list is err: %v", err)
+		xlogger.ErrorfCtx(ctx, "get menu list is err: %v", err)
 		xresponse.FailByError(c, e.MenuListError)
 		return
 	}
@@ -76,22 +76,24 @@ func GetMenuList(c *gin.Context) {
 
 // DeleteMenuById 菜单删除
 func DeleteMenuById(c *gin.Context) {
-	var menuParam account.MenuInfo
-	if err := c.ShouldBindJSON(&menuParam); err != nil {
+	var param struct {
+		ID int32 `json:"id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&param); err != nil {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	if menuParam.ID < 1 {
+	if param.ID < 1 {
 		xresponse.FailByError(c, e.MenuNotFound)
 		return
 	}
 	ctx := c.Request.Context()
 	container := di.GetAccountContainer(c)
-	err := container.MenuService.DeleteMenuById(ctx, menuParam.ID)
+	err := container.MenuService.DeleteMenuById(ctx, param.ID)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "delete menu is err: %v", err)
-		xresponse.FailByError(c, e.MenuDeleteError)
+		xresponse.Fail(c, e.MenuDeleteError.GetErrCode(), err.Error())
 		return
 	}
-	xresponse.Success(c, &gin.H{"id": menuParam.ID})
+	xresponse.Success(c, &gin.H{"id": param.ID})
 }

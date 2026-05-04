@@ -71,10 +71,10 @@ type DictInfo struct {
 }
 
 type DictParam struct {
-	ID          int32  `json:"id"`
-	Code        string `json:"code" binding:"required,max=64"`
-	Name        string `json:"name" binding:"required,max=128"`
-	Description string `json:"description"`
+	ID          int32   `json:"id"`
+	Code        string  `json:"code" binding:"required,max=64"`
+	Name        string  `json:"name" binding:"required,max=128"`
+	Description *string `json:"description"`
 }
 
 type DictList struct {
@@ -94,13 +94,13 @@ type ItemInfo struct {
 }
 
 type DictItemParam struct {
-	ID          int32  `json:"id"`
-	DictID      int32  `json:"dict_id"`
-	ItemName    string `json:"item_name" binding:"required,max=128"`
-	ItemCode    string `json:"item_code" binding:"required,max=64"`
-	Status      string `json:"status"`
-	SortOrder   int32  `json:"sort_order"`
-	Description string `json:"description"`
+	ID          int32   `json:"id"`
+	DictID      int32   `json:"dict_id" binding:"required"`
+	ItemName    string  `json:"item_name" binding:"required,max=128"`
+	ItemCode    string  `json:"item_code" binding:"required,max=64"`
+	Status      *string `json:"status"`
+	SortOrder   int32   `json:"sort_order"`
+	Description *string `json:"description"`
 }
 
 var (
@@ -178,7 +178,7 @@ func (d *DictService) CreateDict(ctx context.Context, param *DictParam) (int32, 
 		dict, err = d.dictRepo.TransactionCreateDict(ctx, tx, &model.SysDict{
 			Code:        param.Code,
 			Name:        param.Name,
-			Description: &param.Description,
+			Description: param.Description,
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典创建失败: %+v err: %v", param, err)
@@ -252,7 +252,7 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 			ID:          param.ID,
 			Code:        param.Code,
 			Name:        param.Name,
-			Description: &param.Description,
+			Description: param.Description,
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典更新失败: %+v err: %v", param, err)
@@ -267,13 +267,6 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 				return fmt.Errorf("字典枚举更新失败: %w", err)
 			}
 
-			// 清除code对应item缓存
-			oldCacheKey := fmt.Sprintf("%s%s", constant.SystemDictPrefix, oldDict.Code)
-			newCacheKey := fmt.Sprintf("%s%s", constant.SystemDictPrefix, param.Code)
-			if _, err := d.cache.Delete(ctx, oldCacheKey, newCacheKey); err != nil {
-				xlogger.ErrorfCtx(ctx, "清除code对应item列表数据缓存失败: %v", err)
-
-			}
 		}
 
 		// 创建操作日志
@@ -299,6 +292,14 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 	})
 	if err != nil {
 		return 0, err
+	}
+	// 事务提交后清除缓存
+	if oldDict.Code != param.Code {
+		oldCacheKey := fmt.Sprintf("%s%s", constant.SystemDictPrefix, oldDict.Code)
+		newCacheKey := fmt.Sprintf("%s%s", constant.SystemDictPrefix, param.Code)
+		if _, err := d.cache.Delete(ctx, oldCacheKey, newCacheKey); err != nil {
+			xlogger.ErrorfCtx(ctx, "清除code对应item列表数据缓存失败: %v", err)
+		}
 	}
 	xlogger.InfofCtx(ctx, "用户(%d)更新字典成功: old=%+v new=%+v", userContext.UserId, oldDict, param)
 	return param.ID, nil
@@ -459,7 +460,7 @@ func (d *DictService) CreateItem(ctx context.Context, param *DictItemParam) (int
 			ItemCode:    param.ItemCode,
 			ItemName:    param.ItemName,
 			SortOrder:   param.SortOrder,
-			Description: &param.Description,
+			Description: param.Description,
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典item创建失败: %+v err: %v", param, err)
@@ -541,8 +542,8 @@ func (d *DictService) UpdateItem(ctx context.Context, param *DictItemParam) (int
 			DictCode:    oldItem.DictCode,
 			ItemCode:    param.ItemCode,
 			ItemName:    param.ItemName,
-			Status:      &param.Status,
-			Description: &param.Description,
+			Status:      param.Status,
+			Description: param.Description,
 		})
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典item更新失败: %+v err: %v", param, err)

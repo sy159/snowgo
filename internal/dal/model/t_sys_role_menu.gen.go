@@ -13,7 +13,7 @@ const TableNameSysRoleMenu = "sys_role_menu"
 // SysRoleMenu 角色-菜单权限表
 type SysRoleMenu struct {
 	ID        int64      `gorm:"column:id;type:bigint(20);primaryKey;autoIncrement:true" json:"id"`
-	RoleID    int32      `gorm:"column:role_id;type:int(11);not null;uniqueIndex:uk_role_menu,priority:1;index:idx_role_id,priority:1;comment:角色ID" json:"role_id"`    // 角色ID
+	RoleID    int32      `gorm:"column:role_id;type:int(11);not null;uniqueIndex:uk_role_menu,priority:1;comment:角色ID" json:"role_id"`                                 // 角色ID
 	MenuID    int32      `gorm:"column:menu_id;type:int(11);not null;uniqueIndex:uk_role_menu,priority:2;index:idx_menu_id,priority:1;comment:菜单或按钮ID" json:"menu_id"` // 菜单或按钮ID
 	CreatedAt *time.Time `gorm:"column:created_at;type:datetime(6);not null;default:CURRENT_TIMESTAMP(6)" json:"created_at"`
 	UpdatedAt *time.Time `gorm:"column:updated_at;type:datetime(6);not null;default:CURRENT_TIMESTAMP(6)" json:"updated_at"`

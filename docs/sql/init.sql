@@ -13,14 +13,12 @@ CREATE TABLE `sys_user`
     `status`     TINYINT(4)   NOT NULL DEFAULT 1 COMMENT '用户状态：1 活跃, 2 禁用登录',
     `created_by` INT(11)               DEFAULT NULL COMMENT '创建人 ID',
     `updated_by` INT(11)               DEFAULT NULL COMMENT '更新人 ID',
-    `is_deleted` TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '是否删除：0=未删除，1=已删除',
-    `deleted_at` DATETIME(6)           DEFAULT NULL COMMENT '删除时间（NULL=未删除）',
     `created_at` DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at` DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_username_deleted` (`username`, `is_deleted`),
-    UNIQUE KEY `uk_tel_deleted` (`tel`, `is_deleted`),
-    KEY `idx_created_by` (`created_by`),
+    UNIQUE KEY uk_username (username),
+    UNIQUE KEY uk_tel (tel),
+    INDEX idx_created_at (created_at),
     KEY `idx_status` (`status`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
@@ -56,7 +54,9 @@ CREATE TABLE `sys_menu`
     `sort_order` INT                       NOT NULL DEFAULT 0 COMMENT '排序号',
     `created_at` DATETIME(6)               NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at` DATETIME(6)               NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_perms` (`perms`),
+    UNIQUE KEY `uk_path` (`path`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='菜单权限表';
@@ -71,7 +71,6 @@ CREATE TABLE `sys_user_role`
     `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`id`),
-    KEY `idx_user_id` (`user_id`),
     KEY `idx_role_id` (`role_id`),
     UNIQUE KEY uk_user_role (user_id, role_id)
 ) ENGINE = InnoDB
@@ -88,7 +87,6 @@ CREATE TABLE `sys_role_menu`
     `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`id`),
-    KEY `idx_role_id` (`role_id`),
     KEY `idx_menu_id` (`menu_id`),
     UNIQUE KEY uk_role_menu (role_id, menu_id)
 ) ENGINE = InnoDB

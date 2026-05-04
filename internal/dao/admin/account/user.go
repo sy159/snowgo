@@ -9,8 +9,6 @@ import (
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
-	"strconv"
-	"time"
 )
 
 // UserDao UserRepo接口实现
@@ -29,7 +27,7 @@ type UserListCondition struct {
 	Username string  `json:"username"`
 	Tel      string  `json:"tel"`
 	Nickname string  `json:"nickname"`
-	Status   string  `json:"status"`
+	Status   int8    `json:"status"`
 	Offset   int32   `json:"offset"`
 	Limit    int32   `json:"limit"`
 }
@@ -73,7 +71,7 @@ func (u *UserDao) TransactionUpdateUser(ctx context.Context, tx *query.Query, us
 		clauses = append(clauses, tx.SysUser.Remark.Value(*user.Remark))
 	}
 	if user.Status != nil {
-		clauses = append(clauses, tx.SysUser.Status.Value(uint8(*user.Status)))
+		clauses = append(clauses, tx.SysUser.Status.Value(*user.Status))
 	}
 	if user.UpdatedBy != nil {
 		clauses = append(clauses, tx.SysUser.UpdatedBy.Value(*user.UpdatedBy))
@@ -112,17 +110,12 @@ func (u *UserDao) TransactionDeleteUserRole(ctx context.Context, tx *query.Query
 	return nil
 }
 
-// TransactionDeleteById 删除用户（事务内）
-// 软删除：设置 is_deleted = true 并记录 deleted_at
+// TransactionDeleteById 删除用户（事务内硬删除）
 func (u *UserDao) TransactionDeleteById(ctx context.Context, tx *query.Query, userId int32) error {
 	if userId <= 0 {
 		return errors.New("用户id不存在")
 	}
-	deletedAt := gorm.DeletedAt{Time: time.Now(), Valid: true}
-	_, err := tx.SysUser.WithContext(ctx).Where(tx.SysUser.ID.Eq(userId)).UpdateSimple(
-		tx.SysUser.IsDeleted.Value(true),
-		tx.SysUser.DeletedAt.Value(deletedAt),
-	)
+	_, err := tx.SysUser.WithContext(ctx).Where(tx.SysUser.ID.Eq(userId)).Delete()
 	if err != nil {
 		return err
 	}
@@ -160,12 +153,11 @@ func (u *UserDao) GetRoleIdsByUserId(ctx context.Context, userId int32) ([]int32
 	return roleIds, nil
 }
 
-// IsNameTelDuplicate 用户名或者电话是否存在了,如果有用户id应该排除
+// IsNameTelDuplicate 用户名或者电话是否存在,如果有用户id应该排除
 func (u *UserDao) IsNameTelDuplicate(ctx context.Context, username, tel string, userId int32) (bool, error) {
 	m := u.repo.Query().SysUser
 	userQuery := m.WithContext(ctx).
 		Select(m.ID).
-		Where(m.IsDeleted.Is(false)).
 		Where(m.WithContext(ctx).Or(m.Username.Eq(username)).Or(m.Tel.Eq(tel)))
 	if userId > 0 {
 		userQuery = userQuery.Where(m.ID.Neq(userId))
@@ -208,7 +200,7 @@ func (u *UserDao) GetUserById(ctx context.Context, userId int32) (*model.SysUser
 		return nil, errors.New("用户id不存在")
 	}
 	m := u.repo.Query().SysUser
-	user, err := m.WithContext(ctx).Where(m.ID.Eq(userId), m.IsDeleted.Is(false)).First()
+	user, err := m.WithContext(ctx).Where(m.ID.Eq(userId)).First()
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +213,7 @@ func (u *UserDao) GetUserByUsername(ctx context.Context, username string) (*mode
 		return nil, errors.New("用户username不存在")
 	}
 	m := u.repo.Query().SysUser
-	user, err := m.WithContext(ctx).Where(m.Username.Eq(username), m.IsDeleted.Is(false)).First()
+	user, err := m.WithContext(ctx).Where(m.Username.Eq(username)).First()
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +224,6 @@ func (u *UserDao) GetUserByUsername(ctx context.Context, username string) (*mode
 func (u *UserDao) GetUserList(ctx context.Context, condition *UserListCondition) ([]*model.SysUser, int64, error) {
 	m := u.repo.Query().SysUser
 	userList, total, err := m.WithContext(ctx).
-		Where(m.IsDeleted.Is(false)).
 		Scopes(
 			u.UserIdsScope(condition.Ids),
 			u.UserNameScope(condition.Username),
@@ -280,17 +271,10 @@ func (u *UserDao) TelScope(tel string) func(tx gen.Dao) gen.Dao {
 	}
 }
 
-func (u *UserDao) StatusScope(status string) func(tx gen.Dao) gen.Dao {
+func (u *UserDao) StatusScope(status int8) func(tx gen.Dao) gen.Dao {
 	return func(tx gen.Dao) gen.Dao {
-		if len(status) == 0 {
-			return tx
-		}
 		m := u.repo.Query().SysUser
-		statusVal, err := strconv.ParseUint(status, 10, 8)
-		if err != nil {
-			return tx // 非法值直接返回
-		}
-		tx = tx.Where(m.Status.Eq(uint8(statusVal)))
+		tx = tx.Where(m.Status.Eq(status))
 		return tx
 	}
 }
@@ -306,18 +290,13 @@ func (u *UserDao) NickNameScope(nickname string) func(tx gen.Dao) gen.Dao {
 	}
 }
 
-// DeleteById 删除用户by id（软删除）
-// 设置 is_deleted = true 并记录 deleted_at
+// DeleteById 删除用户by id（硬删除）
 func (u *UserDao) DeleteById(ctx context.Context, userId int32) error {
 	if userId <= 0 {
 		return errors.New("用户id不存在")
 	}
 	m := u.repo.Query().SysUser
-	deletedAt := gorm.DeletedAt{Time: time.Now(), Valid: true}
-	_, err := m.WithContext(ctx).Where(m.ID.Eq(userId)).UpdateSimple(
-		m.IsDeleted.Value(true),
-		m.DeletedAt.Value(deletedAt),
-	)
+	_, err := m.WithContext(ctx).Where(m.ID.Eq(userId)).Delete()
 	if err != nil {
 		return err
 	}

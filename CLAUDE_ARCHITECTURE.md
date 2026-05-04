@@ -34,16 +34,18 @@ Design principle: drive schema by query patterns, avoid over-engineering, choose
 | Primary key | BIGINT default. INT for small/config tables |
 | NOT NULL | Default. Avoid nullable unless truly optional |
 | Boolean | TINYINT(1) DEFAULT 0. 0 = false, 1 = true |
-| Status/enum | VARCHAR with allowed values in column comments. Strings, not numbers |
+| Status/enum | 大表用 TINYINT 追求效率，小表/配置表用 VARCHAR 追求可读性。在 column comment 中注明取值 |
 | Money | DECIMAL. Semi-structured: JSON |
 | Strings | VARCHAR(n) — set n based on actual business limits, avoid blanket VARCHAR(255) |
 
 ### 2.2 Soft Delete
 
-USE: audit/compliance, referential integrity, user undo.
-SKIP: high-volume logs, junction tables.
+Non-mandatory. Decide per business need:
 
-Column: `is_deleted TINYINT(1) NOT NULL DEFAULT 0`. Index only if querying both states. Use `UpdateSimple`.
+- **USE**: audit/compliance, referential integrity, user undo (e.g., orders, payments)
+- **SKIP**: high-volume logs, junction tables, simple config tables
+
+Column: `is_deleted TINYINT(1) NOT NULL DEFAULT 0` + `deleted_at DATETIME(6) DEFAULT NULL`. Index only if querying both states. Use `UpdateSimple`.
 
 ### 2.3 Index Design
 

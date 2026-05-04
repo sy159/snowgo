@@ -9,7 +9,7 @@ import (
 
 // 系统相关路由
 func systemRouters(r *gin.RouterGroup) {
-	systemGroup := r.Group("/system", middleware.JWTAuth())
+	systemGroup := r.Group("/system")
 
 	logGroup := systemGroup.Group("/log")
 	{

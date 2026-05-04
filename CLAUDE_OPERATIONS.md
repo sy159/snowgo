@@ -54,7 +54,7 @@ Conventional commits: `<type>(<scope>): <desc>`. Types: feat, fix, docs, refacto
 - DO NOT use `fmt.Printf` / `log.Println` in production code
 - DO NOT call `container.SomeService.Method()` inside a transaction
 - DO NOT expose internal error details in API responses
-- Always add `is_deleted = 0` filter for soft-delete tables
+- Add `is_deleted = 0` filter only for tables that implement soft delete
 - DO NOT commit secrets or .env files
 - DO NOT skip tests or fabricate results
 

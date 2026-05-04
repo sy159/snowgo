@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
@@ -68,9 +69,9 @@ type UserParam struct {
 	Username string  `json:"username" binding:"required,max=64"`
 	Password string  `json:"password"`
 	Tel      string  `json:"tel" binding:"required"`
-	Nickname string  `json:"nickname"`
-	Email    string  `json:"email"`
-	Remark   string  `json:"remark"`
+	Nickname *string `json:"nickname"`
+	Email    *string `json:"email"`
+	Remark   *string `json:"remark"`
 	Status   *int8   `json:"status"`
 	RoleIds  []int32 `json:"role_ids"`
 }
@@ -125,7 +126,7 @@ type UserListCondition struct {
 	Username string  `json:"username" form:"username"`
 	Tel      string  `json:"tel" form:"tel"`
 	Nickname string  `json:"nickname" form:"nickname"`
-	Status   string  `json:"status" form:"status"`
+	Status   int8    `json:"status" form:"status"`
 	Offset   int32   `json:"offset" form:"offset"`
 	Limit    int32   `json:"limit" form:"limit"`
 }
@@ -135,6 +136,15 @@ var (
 	ErrUserNotFound     = errors.New(e.UserNotFound.GetErrMsg())
 	ErrAuth             = errors.New(e.AuthError.GetErrMsg())
 )
+
+// isDuplicateKeyErr 判断是否为 MySQL 唯一索引冲突错误
+func isDuplicateKeyErr(err error) bool {
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) {
+		return mysqlErr.Number == 1062
+	}
+	return false
+}
 
 // CreateUser 创建用户
 func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int32, error) {
@@ -176,28 +186,21 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		}
 
 		// 创建用户
-		var emailPtr, nicknamePtr, remarkPtr *string
-		if userParam.Email != "" {
-			emailPtr = &userParam.Email
-		}
-		if userParam.Nickname != "" {
-			nicknamePtr = &userParam.Nickname
-		}
-		if userParam.Remark != "" {
-			remarkPtr = &userParam.Remark
-		}
 		userObj, err = u.userDao.TransactionCreateUser(ctx, tx, &model.SysUser{
 			Username:  userParam.Username,
 			Password:  pwd,
 			Tel:       userParam.Tel,
-			Nickname:  nicknamePtr,
-			Email:     emailPtr,
-			Remark:    remarkPtr,
+			Nickname:  userParam.Nickname,
+			Email:     userParam.Email,
+			Remark:    userParam.Remark,
 			Status:    &activeStatus,
-			IsDeleted: false,
 			CreatedBy: &userContext.UserId,
 		})
 		if err != nil {
+			// 唯一索引冲突兜底
+			if isDuplicateKeyErr(err) {
+				return ErrUserNameTelExist
+			}
 			xlogger.ErrorfCtx(ctx, "用户创建失败: %+v err: %v", userParam, err)
 			return fmt.Errorf("用户创建失败: %w", err)
 		}
@@ -291,27 +294,21 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 更新用户（指针字段仅在非空时传入）
-		var nicknamePtr, emailPtr, remarkPtr *string
-		if userParam.Nickname != "" {
-			nicknamePtr = &userParam.Nickname
-		}
-		if userParam.Email != "" {
-			emailPtr = &userParam.Email
-		}
-		if userParam.Remark != "" {
-			remarkPtr = &userParam.Remark
-		}
 		err = u.userDao.TransactionUpdateUser(ctx, tx, &model.SysUser{
 			ID:        userParam.ID,
 			Username:  userParam.Username,
 			Tel:       userParam.Tel,
-			Nickname:  nicknamePtr,
-			Email:     emailPtr,
-			Remark:    remarkPtr,
+			Nickname:  userParam.Nickname,
+			Email:     userParam.Email,
+			Remark:    userParam.Remark,
 			Status:    userParam.Status,
 			UpdatedBy: &userContext.UserId,
 		})
 		if err != nil {
+			// 唯一索引冲突兜底
+			if isDuplicateKeyErr(err) {
+				return ErrUserNameTelExist
+			}
 			xlogger.ErrorfCtx(ctx, "用户更新失败: %+v err: %v", userParam, err)
 			return fmt.Errorf("用户更新失败: %w", err)
 		}
@@ -452,7 +449,7 @@ func (u *UserService) GetUserList(ctx context.Context, condition *UserListCondit
 	return &UserList{List: userInfoList, Total: total}, nil
 }
 
-// DeleteById 删除用户（软删除：设置 is_deleted 和 deleted_at）
+// DeleteById 删除用户（硬删除）
 func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 	// 获取登录ctx
 	userContext, err := xauth.GetUserContext(ctx)
@@ -463,8 +460,17 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 	if userId <= 0 {
 		return ErrUserNotFound
 	}
+	// 查询被删除用户信息，用于操作日志记录
+	oldUser, err := u.userDao.GetUserById(ctx, userId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrUserNotFound
+		}
+		xlogger.ErrorfCtx(ctx, "获取用户(%d)信息异常: %v", userId, err)
+		return fmt.Errorf("用户信息查询失败: %w", err)
+	}
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
-		// 软删除用户
+		// 删除用户
 		err := u.userDao.TransactionDeleteById(ctx, tx, userId)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "用户删除异常: %v", err)
@@ -487,10 +493,10 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 			ResourceID:   int64(userId),
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionDelete,
-			BeforeData:   nil,
+			BeforeData:   oldUser,
 			AfterData:    nil,
-			Description: fmt.Sprintf("用户(%d-%s)删除了用户(%d)",
-				userContext.UserId, userContext.Username, userId),
+			Description: fmt.Sprintf("用户(%d-%s)删除了用户(%d-%s)",
+				userContext.UserId, userContext.Username, userId, oldUser.Username),
 			IP: userContext.IP,
 		})
 		if err != nil {

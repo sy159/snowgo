@@ -31,7 +31,7 @@ func newSysOperationLog(db *gorm.DB, opts ...gen.DOOption) sysOperationLog {
 	_sysOperationLog.OperatorName = field.NewString(tableName, "operator_name")
 	_sysOperationLog.OperatorType = field.NewString(tableName, "operator_type")
 	_sysOperationLog.Resource = field.NewString(tableName, "resource")
-	_sysOperationLog.ResourceID = field.NewInt32(tableName, "resource_id")
+	_sysOperationLog.ResourceID = field.NewInt64(tableName, "resource_id")
 	_sysOperationLog.Action = field.NewString(tableName, "action")
 	_sysOperationLog.TraceID = field.NewString(tableName, "trace_id")
 	_sysOperationLog.BeforeData = field.NewString(tableName, "before_data")
@@ -54,7 +54,7 @@ type sysOperationLog struct {
 	OperatorName field.String // 操作人用户名
 	OperatorType field.String // 操作来源类型，如 User/System/Job/Api
 	Resource     field.String // 操作资源类型，如 user/role/menu
-	ResourceID   field.Int32  // 资源ID，如 user 表的主键 ID
+	ResourceID   field.Int64  // 资源ID，如 user 表的主键 ID
 	Action       field.String // 操作类型：Create/Update/Delete，默认 Create
 	TraceID      field.String // 链路id
 	BeforeData   field.String // 修改前数据快照（仅 update/delete 时填）
@@ -83,7 +83,7 @@ func (s *sysOperationLog) updateTableName(table string) *sysOperationLog {
 	s.OperatorName = field.NewString(table, "operator_name")
 	s.OperatorType = field.NewString(table, "operator_type")
 	s.Resource = field.NewString(table, "resource")
-	s.ResourceID = field.NewInt32(table, "resource_id")
+	s.ResourceID = field.NewInt64(table, "resource_id")
 	s.Action = field.NewString(table, "action")
 	s.TraceID = field.NewString(table, "trace_id")
 	s.BeforeData = field.NewString(table, "before_data")

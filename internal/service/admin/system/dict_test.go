@@ -9,6 +9,7 @@ import (
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	daoSystem "snowgo/internal/dao/admin/system"
+	common "snowgo/pkg"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"testing"
@@ -212,7 +213,7 @@ func TestUpdateDict_InvalidID(t *testing.T) {
 	svc := &DictService{}
 
 	_, err := svc.UpdateDict(testCtx(), &DictParam{
-		ID: -1, Code: "x", Name: "N", Description: "D",
+		ID: -1, Code: "x", Name: "N", Description: common.PtrIfNonZero("D"),
 	})
 	assert.True(t, errors.Is(err, ErrDictCodeNotFound))
 }
@@ -221,7 +222,7 @@ func TestUpdateDict_NotFound(t *testing.T) {
 	svc := &DictService{dictRepo: &mockDictRepo{dict: nil}}
 
 	_, err := svc.UpdateDict(testCtx(), &DictParam{
-		ID: 1, Code: "x", Name: "N", Description: "D",
+		ID: 1, Code: "x", Name: "N", Description: common.PtrIfNonZero("D"),
 	})
 	assert.True(t, errors.Is(err, ErrDictCodeNotFound))
 }
@@ -236,7 +237,7 @@ func TestUpdateDict_DuplicateCode(t *testing.T) {
 	}
 
 	_, err := svc.UpdateDict(testCtx(), &DictParam{
-		ID: 1, Code: "dup", Name: "New", Description: "D",
+		ID: 1, Code: "dup", Name: "New", Description: common.PtrIfNonZero("D"),
 	})
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, ErrDictCodeExist))
@@ -333,7 +334,7 @@ func TestCreateItem_DictNotFound(t *testing.T) {
 	svc := &DictService{dictRepo: &mockDictRepo{dict: nil}, logService: logWriter}
 
 	_, err := svc.CreateItem(testCtx(), &DictItemParam{
-		DictID: 1, ItemCode: "x", ItemName: "N", Status: "A",
+		DictID: 1, ItemCode: "x", ItemName: "N", Status: common.PtrIfNonZero("A"),
 	})
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, ErrDictCodeNotFound))
@@ -348,7 +349,7 @@ func TestUpdateItem_InvalidID(t *testing.T) {
 	svc := &DictService{}
 
 	_, err := svc.UpdateItem(testCtx(), &DictItemParam{
-		ID: -1, ItemCode: "x", ItemName: "N", Status: "A",
+		ID: -1, ItemCode: "x", ItemName: "N", Status: common.PtrIfNonZero("A"),
 	})
 	assert.True(t, errors.Is(err, ErrDictCodeItemNotFound))
 }
@@ -357,7 +358,7 @@ func TestUpdateItem_ItemNotFound(t *testing.T) {
 	svc := &DictService{dictRepo: &mockDictRepo{dictItem: nil}}
 
 	_, err := svc.UpdateItem(testCtx(), &DictItemParam{
-		ID: 1, ItemCode: "x", ItemName: "N", Status: "A",
+		ID: 1, ItemCode: "x", ItemName: "N", Status: common.PtrIfNonZero("A"),
 	})
 	assert.Error(t, err)
 	assert.True(t, errors.Is(err, ErrDictCodeItemNotFound))

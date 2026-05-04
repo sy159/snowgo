@@ -218,7 +218,7 @@ func TestCreateMenu_InvalidParent(t *testing.T) {
 
 	_, err := svc.CreateMenu(testCtx(), &MenuParam{
 		ParentID: 999, MenuType: constant.MenuTypeMenu, Name: "Child",
-		Path: "/child", Icon: "", Perms: "", SortOrder: 1,
+		SortOrder: 1,
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "父级菜单不存在")
@@ -231,7 +231,7 @@ func TestUpdateMenu_InvalidID(t *testing.T) {
 	svc := &MenuService{}
 	err := svc.UpdateMenu(testCtx(), &MenuParam{
 		ID: -1, MenuType: constant.MenuTypeMenu, Name: "X",
-		Path: "/x", Icon: "", Perms: "", SortOrder: 1,
+		SortOrder: 1,
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "菜单ID无效")
@@ -247,7 +247,7 @@ func TestUpdateMenu_ParentIsSelf(t *testing.T) {
 	}
 	err := svc.UpdateMenu(testCtx(), &MenuParam{
 		ID: 1, ParentID: 1, MenuType: constant.MenuTypeMenu, Name: "X",
-		Path: "/x", Icon: "", Perms: "", SortOrder: 1,
+		SortOrder: 1,
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "父级菜单不能是自己")
@@ -259,7 +259,7 @@ func TestUpdateMenu_NotFound(t *testing.T) {
 	}
 	err := svc.UpdateMenu(testCtx(), &MenuParam{
 		ID: 1, MenuType: constant.MenuTypeMenu, Name: "X",
-		Path: "/x", Icon: "", Perms: "", SortOrder: 1,
+		SortOrder: 1,
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "菜单不存在")

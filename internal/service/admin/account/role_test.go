@@ -238,7 +238,7 @@ func TestDeleteRole_InvalidID(t *testing.T) {
 
 func TestDeleteRole_UsedByUser(t *testing.T) {
 	svc := &RoleService{
-		roleDao: &mockRoleDao{isUsed: true},
+		roleDao: &mockRoleDao{role: &model.SysRole{ID: 1, Code: "test"}, isUsed: true},
 	}
 	err := svc.DeleteRole(testCtx(), 1)
 	assert.Error(t, err)

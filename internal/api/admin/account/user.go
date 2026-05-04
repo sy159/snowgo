@@ -133,6 +133,11 @@ func UpdateUser(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
+	// 额外校验
+	if user.Username == "" || user.Tel == "" {
+		xresponse.FailByError(c, e.UserNameTelEmptyError)
+		return
+	}
 	ctx := c.Request.Context()
 
 	container := di.GetContainer(c)
@@ -152,7 +157,7 @@ func UpdateUser(c *gin.Context) {
 // GetUserInfo 用户信息
 func GetUserInfo(c *gin.Context) {
 	var param struct {
-		ID int32 `json:"id" uri:"id" form:"id" binding:"required"`
+		ID int32 `json:"id" form:"id" binding:"required"`
 	}
 	if err := c.ShouldBindQuery(&param); err != nil {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())

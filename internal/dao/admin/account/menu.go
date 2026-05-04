@@ -139,6 +139,46 @@ func (d *MenuDao) IsUsedMenuByIds(ctx context.Context, menuIds []int32) (bool, e
 	return true, nil
 }
 
+// IsPermsExists 检查 perms 是否已存在，excludeId 用于排除自身（更新场景）
+func (d *MenuDao) IsPermsExists(ctx context.Context, perms string, excludeId int32) (bool, error) {
+	if len(perms) == 0 {
+		return false, nil
+	}
+	m := d.repo.Query().SysMenu
+	query := m.WithContext(ctx).Select(m.ID).Where(m.Perms.Eq(perms))
+	if excludeId > 0 {
+		query = query.Where(m.ID.Neq(excludeId))
+	}
+	_, err := query.First()
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return true, err
+	}
+	return true, nil
+}
+
+// IsPathExists 检查 path 是否已存在，excludeId 用于排除自身（更新场景）
+func (d *MenuDao) IsPathExists(ctx context.Context, path string, excludeId int32) (bool, error) {
+	if len(path) == 0 {
+		return false, nil
+	}
+	m := d.repo.Query().SysMenu
+	query := m.WithContext(ctx).Select(m.ID).Where(m.Path.Eq(path))
+	if excludeId > 0 {
+		query = query.Where(m.ID.Neq(excludeId))
+	}
+	_, err := query.First()
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return true, err
+	}
+	return true, nil
+}
+
 // GetRoleIdsByIds 根据menuId拿到所有的role
 func (d *MenuDao) GetRoleIdsByIds(ctx context.Context, menuId int32) ([]int32, error) {
 	var roleIds []int32

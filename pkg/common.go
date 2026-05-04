@@ -148,3 +148,12 @@ func DerefOrZero[T any](v *T) T {
 	}
 	return *v
 }
+
+// PtrIfNonZero 将非零值转为指针，零值返回 nil。仅用于值类型 DTO 字段转 model 可空指针字段
+func PtrIfNonZero[T comparable](v T) *T {
+	var zero T
+	if v == zero {
+		return nil
+	}
+	return &v
+}

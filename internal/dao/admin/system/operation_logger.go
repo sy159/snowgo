@@ -100,7 +100,7 @@ func (o *OperationLogDao) ResourceIDScope(resourceID int64) func(tx gen.Dao) gen
 			return tx
 		}
 		m := o.repo.Query().SysOperationLog
-		tx = tx.Where(m.ResourceID.Eq(int32(resourceID)))
+		tx = tx.Where(m.ResourceID.Eq(resourceID))
 		return tx
 	}
 }
