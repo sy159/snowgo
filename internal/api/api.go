@@ -27,6 +27,10 @@ func Index(c *gin.Context) {
 // PublishMessage 发送消息
 func PublishMessage(c *gin.Context) {
 	container := di.GetContainer(c)
+	if container.Producer == nil {
+		xresponse.FailByError(c, xerror.HttpServiceUnavailable)
+		return
+	}
 	delayMs, _ := strconv.ParseInt(c.Query("delay"), 10, 64)
 
 	body := struct {
@@ -75,19 +79,19 @@ func Readiness(c *gin.Context) {
 	container := di.GetContainer(c)
 	// mysql检查
 	if _, err := container.GetMyDB().CheckDBAlive(ctx); err != nil {
-		xlogger.ErrorfCtx(c, "db check err: %v", err.Error())
+		xlogger.ErrorfCtx(c.Request.Context(), "db check err: %v", err)
 		c.JSON(503, gin.H{
 			"status": "not ready",
-			"error":  err.Error(),
+			"error":  "mysql not ready",
 		})
 		return
 	}
 	// redis检查
 	if _, err := container.GetRDB().Ping(ctx).Result(); err != nil {
-		xlogger.ErrorfCtx(c, "redis check err: %v", err.Error())
+		xlogger.ErrorfCtx(c.Request.Context(), "redis check err: %v", err)
 		c.JSON(503, gin.H{
 			"status": "not ready",
-			"error":  err.Error(),
+			"error":  "redis not ready",
 		})
 		return
 	}
