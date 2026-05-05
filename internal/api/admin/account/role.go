@@ -39,8 +39,13 @@ func CreateRole(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	roleID, err := container.RoleService.CreateRole(ctx, &param)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "create role is err: %v", err)
-		xresponse.Fail(c, e.RoleCreateError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.RoleCreateError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": roleID})
@@ -58,8 +63,13 @@ func UpdateRole(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	err := container.RoleService.UpdateRole(ctx, &param)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "update role is err: %v", err)
-		xresponse.Fail(c, e.RoleUpdateError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.RoleUpdateError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": param.ID})
@@ -79,6 +89,11 @@ func DeleteRole(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	err := container.RoleService.DeleteRole(ctx, param.ID)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "delete role is err: %v", err)
 		xresponse.FailByError(c, e.RoleDeleteError)
 		return
@@ -108,6 +123,11 @@ func GetRoleList(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	res, err := container.RoleService.ListRoles(ctx, &cond)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "get role list is err: %v", err)
 		xresponse.FailByError(c, e.RoleListError)
 		return
@@ -143,8 +163,9 @@ func GetRoleById(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	role, err := container.RoleService.GetRoleById(ctx, param.ID)
 	if err != nil {
-		if errors.Is(err, account.ErrRoleNotFound) {
-			xresponse.FailByError(c, e.RoleNotFound)
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "get role by id is err: %v", err)

@@ -189,7 +189,7 @@ func TestGetDictList_InvalidStartTime(t *testing.T) {
 		StartTime: "invalid-date",
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "start_time格式错误")
+	assert.True(t, errors.Is(err, ErrDictTimeFormat))
 }
 
 func TestGetDictList_InvalidEndTime(t *testing.T) {
@@ -199,13 +199,20 @@ func TestGetDictList_InvalidEndTime(t *testing.T) {
 		EndTime: "invalid-date",
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "end_time格式错误")
+	assert.True(t, errors.Is(err, ErrDictTimeFormat))
 }
 
 // ---- Tests: CreateDict ----
 
-// TestCreateDict_DuplicateCode removed — uniqueness check is now inside a transaction,
-// which cannot be mocked. Deferred to API integration tests.
+func TestCreateDict_DuplicateCode(t *testing.T) {
+	svc := &DictService{dictRepo: &mockDictRepo{isDictDup: true}}
+
+	_, err := svc.CreateDict(testCtx(), &DictParam{
+		Code: "dup", Name: "New", Description: common.PtrIfNonZero("D"),
+	})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrDictCodeExist))
+}
 
 // ---- Tests: UpdateDict ----
 
@@ -340,8 +347,22 @@ func TestCreateItem_DictNotFound(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrDictCodeNotFound))
 }
 
-// TestCreateItem_DuplicateCode removed — uniqueness check is now inside a transaction,
-// which cannot be mocked. Deferred to API integration tests.
+func TestCreateItem_DuplicateCode(t *testing.T) {
+	logWriter := &mockLogWriter{}
+	svc := &DictService{
+		dictRepo: &mockDictRepo{
+			dict:      &model.SysDict{ID: 1, Code: "test", Name: "Test"},
+			isItemDup: true,
+		},
+		logService: logWriter,
+	}
+
+	_, err := svc.CreateItem(testCtx(), &DictItemParam{
+		DictID: 1, ItemCode: "dup", ItemName: "N", Status: common.PtrIfNonZero("A"),
+	})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrDictItemCodeExist))
+}
 
 // ---- Tests: UpdateItem ----
 

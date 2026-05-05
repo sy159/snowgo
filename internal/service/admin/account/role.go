@@ -97,7 +97,11 @@ type RoleListCondition struct {
 }
 
 var (
-	ErrRoleNotFound = errors.New(e.RoleListError.GetErrMsg())
+	ErrRoleNotFound     = e.NewBizError(e.RoleNotFound)
+	ErrRoleCodeUsed     = e.NewBizError(e.RoleCodeExist)
+	ErrRoleUsed         = e.NewBizError(e.RoleUsed)
+	ErrRoleIDInvalid    = e.NewBizError(e.RoleIDInvalid)
+	ErrRoleMenuNotExist = e.NewBizError(e.RoleMenuNotExist)
 )
 
 // CreateRole 创建角色
@@ -108,16 +112,13 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 		return 0, err
 	}
 
-	// 校验 菜单id是否都存在
-	if len(param.MenuIds) > 0 {
-		menuLen, err := s.roleDao.CountMenuByIds(ctx, param.MenuIds)
-		if err != nil {
-			xlogger.ErrorfCtx(ctx, "获取菜单数量异常: %v", err)
-			return 0, fmt.Errorf("校验设置的菜单失败: %w", err)
-		}
-		if menuLen != int64(len(param.MenuIds)) {
-			return 0, errors.New("设置的菜单不存在")
-		}
+	// 校验 code 是否已存在（事务外快速失败，避免白开事务）
+	exists, err := s.roleDao.IsCodeExists(ctx, param.Code, 0)
+	if err != nil {
+		return 0, fmt.Errorf("校验角色编码失败: %w", err)
+	}
+	if exists {
+		return 0, ErrRoleCodeUsed
 	}
 
 	role := &model.SysRole{
@@ -129,18 +130,25 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 	var roleObj *model.SysRole
 	// 事务创建角色，以及关联菜单权限
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
-		// 校验 code 是否存在（事务内防止并发竞争）
-		exists, err := s.roleDao.IsCodeExists(ctx, param.Code, 0)
-		if err != nil {
-			return fmt.Errorf("校验角色编码失败: %w", err)
-		}
-		if exists {
-			return errors.New("角色编码已存在")
+		// 校验 菜单id是否都存在（事务内防止并发删除）
+		if len(param.MenuIds) > 0 {
+			menuLen, err := s.roleDao.CountMenuByIds(ctx, param.MenuIds)
+			if err != nil {
+				xlogger.ErrorfCtx(ctx, "获取菜单数量异常: %v", err)
+				return fmt.Errorf("校验设置的菜单失败: %w", err)
+			}
+			if menuLen != int64(len(param.MenuIds)) {
+				return ErrRoleMenuNotExist
+			}
 		}
 
 		// 创建角色
 		roleObj, err = s.roleDao.TransactionCreateRole(ctx, tx, role)
 		if err != nil {
+			// 唯一索引冲突兜底
+			if common.IsDuplicateKeyErr(err) {
+				return ErrRoleCodeUsed
+			}
 			xlogger.ErrorfCtx(ctx, "角色创建失败: %v", err)
 			return fmt.Errorf("角色创建失败: %w", err)
 		}
@@ -199,37 +207,37 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 	}
 
 	if param.ID <= 0 {
-		return errors.New("角色ID无效")
+		return ErrRoleIDInvalid
 	}
-	// 校验 code 是否重复（排除当前 role.ID）
+	// 校验 code 是否重复（事务外快速失败，排除当前 role.ID）
 	isDuplicate, err := s.roleDao.IsCodeExists(ctx, param.Code, param.ID)
 	if err != nil {
 		return fmt.Errorf("查询角色 code 是否存在异常: %w", err)
 	}
 	if isDuplicate {
-		return errors.New("角色编码已存在")
+		return ErrRoleCodeUsed
 	}
-	// 获取原始角色信息（可选）
+	// 获取原始角色信息
 	oldRole, err := s.roleDao.GetRoleById(ctx, param.ID)
 	if err != nil {
-		return fmt.Errorf("角色不存在: %w", err)
-	}
-
-	// 校验 菜单id是否都存在
-	if len(param.MenuIds) > 0 {
-		menuLen, err := s.roleDao.CountMenuByIds(ctx, param.MenuIds)
-		if err != nil {
-			xlogger.ErrorfCtx(ctx, "获取菜单数量异常: %v", err)
-			return fmt.Errorf("校验设置的菜单失败: %w", err)
-		}
-		if menuLen != int64(len(param.MenuIds)) {
-			return errors.New("设置的菜单不存在")
-		}
+		return ErrRoleNotFound
 	}
 
 	// 事务内更新角色，以及关联菜单权限
 	var ruleObj *model.SysRole
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 校验 菜单id是否都存在（事务内防止并发删除）
+		if len(param.MenuIds) > 0 {
+			menuLen, err := s.roleDao.CountMenuByIds(ctx, param.MenuIds)
+			if err != nil {
+				xlogger.ErrorfCtx(ctx, "获取菜单数量异常: %v", err)
+				return fmt.Errorf("校验设置的菜单失败: %w", err)
+			}
+			if menuLen != int64(len(param.MenuIds)) {
+				return ErrRoleMenuNotExist
+			}
+		}
+
 		// 更新字段
 		ruleObj, err = s.roleDao.TransactionUpdateRole(ctx, tx, &model.SysRole{
 			ID:          param.ID,
@@ -238,6 +246,10 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 			Description: &param.Description,
 		})
 		if err != nil {
+			// 唯一索引冲突兜底
+			if common.IsDuplicateKeyErr(err) {
+				return ErrRoleCodeUsed
+			}
 			return fmt.Errorf("更新角色失败: %w", err)
 		}
 
@@ -310,7 +322,7 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 	}
 
 	if id <= 0 {
-		return errors.New("角色ID无效")
+		return ErrRoleIDInvalid
 	}
 	// 查询被删除角色信息，用于操作日志记录
 	oldRole, err := s.roleDao.GetRoleById(ctx, id)
@@ -327,7 +339,7 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 		return fmt.Errorf("检查角色使用情况失败: %w", err)
 	}
 	if isUsed {
-		return errors.New("该角色已被使用，无法删除")
+		return ErrRoleUsed
 	}
 
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
@@ -384,7 +396,7 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 // GetRoleById 获取角色详情
 func (s *RoleService) GetRoleById(ctx context.Context, id int32) (*RoleInfo, error) {
 	if id <= 0 {
-		return nil, errors.New("角色ID无效")
+		return nil, ErrRoleIDInvalid
 	}
 	// 获取role信息
 	r, err := s.roleDao.GetRoleById(ctx, id)
@@ -466,7 +478,7 @@ func (s *RoleService) GetRolePermsListByRuleID(ctx context.Context, roleId int32
 	//
 	//return menuPermsList, nil
 	if roleId <= 0 {
-		return nil, errors.New("角色ID无效")
+		return nil, ErrRoleIDInvalid
 	}
 	menuList, err := s.GetRoleMenuListByRuleID(ctx, roleId)
 	if err != nil {

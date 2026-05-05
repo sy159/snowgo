@@ -58,6 +58,11 @@ func GetDictList(c *gin.Context) {
 	container := di.GetSystemContainer(c)
 	res, err := container.DictService.GetDictList(ctx, &dictListReq)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "get system dict list is err: %v", err)
 		xresponse.FailByError(c, e.DictListError)
 		return
@@ -92,8 +97,9 @@ func CreateDict(c *gin.Context) {
 	container := di.GetSystemContainer(c)
 	dictId, err := container.DictService.CreateDict(ctx, &dict)
 	if err != nil {
-		if errors.Is(err, system.ErrDictCodeExist) {
-			xresponse.FailByError(c, e.DictCodeExistError)
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "create system dict is err: %v", err)
@@ -116,12 +122,9 @@ func UpdateDict(c *gin.Context) {
 	container := di.GetSystemContainer(c)
 	dictId, err := container.DictService.UpdateDict(ctx, &dict)
 	if err != nil {
-		if errors.Is(err, system.ErrDictCodeNotFound) {
-			xresponse.FailByError(c, e.DictNotFound)
-			return
-		}
-		if errors.Is(err, system.ErrDictCodeExist) {
-			xresponse.FailByError(c, e.DictCodeExistError)
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "update system dict is err: %v", err)
@@ -148,8 +151,9 @@ func DeleteDictById(c *gin.Context) {
 	container := di.GetSystemContainer(c)
 	err := container.DictService.DeleteById(ctx, param.ID)
 	if err != nil {
-		if errors.Is(err, system.ErrDictCodeNotFound) {
-			xresponse.FailByError(c, e.DictNotFound)
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "delete dict is err: %v", err)
@@ -173,6 +177,11 @@ func GetItemListByDictCode(c *gin.Context) {
 	container := di.GetSystemContainer(c)
 	itemList, err := container.DictService.GetItemListByCode(ctx, param.Code)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "get system item list is err: %v", err)
 		xresponse.FailByError(c, e.DictItemListError)
 		return
@@ -212,14 +221,9 @@ func CreateItem(c *gin.Context) {
 	container := di.GetSystemContainer(c)
 	itemId, err := container.DictService.CreateItem(ctx, &item)
 	if err != nil {
-		// dict不存在
-		if errors.Is(err, system.ErrDictCodeNotFound) {
-			xresponse.FailByError(c, e.DictNotFound)
-			return
-		}
-		// dict item code重复
-		if errors.Is(err, system.ErrDictItemCodeExist) {
-			xresponse.FailByError(c, e.DictCodeItemExistError)
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "create system dict is err: %v", err)
@@ -247,12 +251,9 @@ func UpdateDictItem(c *gin.Context) {
 	container := di.GetSystemContainer(c)
 	itemId, err := container.DictService.UpdateItem(ctx, &item)
 	if err != nil {
-		if errors.Is(err, system.ErrDictCodeItemNotFound) {
-			xresponse.FailByError(c, e.DictItemNotFound)
-			return
-		}
-		if errors.Is(err, system.ErrDictItemCodeExist) {
-			xresponse.FailByError(c, e.DictCodeItemExistError)
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "update system dict item is err: %v", err)
@@ -279,8 +280,9 @@ func DeleteDictItem(c *gin.Context) {
 	container := di.GetSystemContainer(c)
 	err := container.DictService.DeleteItemById(ctx, param.ID)
 	if err != nil {
-		if errors.Is(err, system.ErrDictCodeItemNotFound) {
-			xresponse.FailByError(c, e.DictItemNotFound)
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "delete dict item is err: %v", err)

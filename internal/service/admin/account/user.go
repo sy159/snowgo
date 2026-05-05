@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
@@ -126,25 +125,17 @@ type UserListCondition struct {
 	Username string  `json:"username" form:"username"`
 	Tel      string  `json:"tel" form:"tel"`
 	Nickname string  `json:"nickname" form:"nickname"`
-	Status   int8    `json:"status" form:"status"`
+	Status   *int8   `json:"status" form:"status"`
 	Offset   int32   `json:"offset" form:"offset"`
 	Limit    int32   `json:"limit" form:"limit"`
 }
 
 var (
-	ErrUserNameTelExist = errors.New(e.UserNameTelExistError.GetErrMsg())
-	ErrUserNotFound     = errors.New(e.UserNotFound.GetErrMsg())
-	ErrAuth             = errors.New(e.AuthError.GetErrMsg())
+	ErrUserNameTelExist = e.NewBizError(e.UserNameTelExistError)
+	ErrUserNotFound     = e.NewBizError(e.UserNotFound)
+	ErrAuth             = e.NewBizError(e.AuthError)
+	ErrRoleNotExist     = e.NewBizError(e.UserRoleNotExist)
 )
-
-// isDuplicateKeyErr 判断是否为 MySQL 唯一索引冲突错误
-func isDuplicateKeyErr(err error) bool {
-	var mysqlErr *mysql.MySQLError
-	if errors.As(err, &mysqlErr) {
-		return mysqlErr.Number == 1062
-	}
-	return false
-}
 
 // CreateUser 创建用户
 func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int32, error) {
@@ -154,17 +145,13 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		return 0, err
 	}
 
-	// 检查设置的角色id是否存在
-	if len(userParam.RoleIds) > 0 {
-		//isExist, err := u.userDao.IsExistByRoleId(ctx, userParam.RoleIds)
-		roleLen, err := u.userDao.CountRoleByIds(ctx, userParam.RoleIds)
-		if err != nil {
-			xlogger.ErrorfCtx(ctx, "查询角色数量存在异常: %v", err)
-			return 0, fmt.Errorf("查询角色数量存在异常: %w", err)
-		}
-		if roleLen != int64(len(userParam.RoleIds)) {
-			return 0, errors.New("设置的角色不存在")
-		}
+	// 检查用户名或电话是否重复（事务外快速失败）
+	isDuplicate, err := u.userDao.IsNameTelDuplicate(ctx, userParam.Username, userParam.Tel, 0)
+	if err != nil {
+		return 0, fmt.Errorf("查询用户名或电话是否存在异常: %w", err)
+	}
+	if isDuplicate {
+		return 0, ErrUserNameTelExist
 	}
 
 	// 加密密码
@@ -176,13 +163,16 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 	activeStatus := constant.UserStatusActive
 	var userObj *model.SysUser
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
-		// 检查用户名或电话是否重复（事务内防止并发竞争）
-		isDuplicate, err := u.userDao.IsNameTelDuplicate(ctx, userParam.Username, userParam.Tel, 0)
-		if err != nil {
-			return fmt.Errorf("查询用户名或电话是否存在异常: %w", err)
-		}
-		if isDuplicate {
-			return ErrUserNameTelExist
+		// 检查设置的角色id是否存在（事务内防止并发删除）
+		if len(userParam.RoleIds) > 0 {
+			roleLen, err := u.userDao.CountRoleByIds(ctx, userParam.RoleIds)
+			if err != nil {
+				xlogger.ErrorfCtx(ctx, "查询角色数量存在异常: %v", err)
+				return fmt.Errorf("查询角色数量存在异常: %w", err)
+			}
+			if roleLen != int64(len(userParam.RoleIds)) {
+				return ErrRoleNotExist
+			}
 		}
 
 		// 创建用户
@@ -198,7 +188,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		})
 		if err != nil {
 			// 唯一索引冲突兜底
-			if isDuplicateKeyErr(err) {
+			if common.IsDuplicateKeyErr(err) {
 				return ErrUserNameTelExist
 			}
 			xlogger.ErrorfCtx(ctx, "用户创建失败: %+v err: %v", userParam, err)
@@ -279,20 +269,19 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		return 0, ErrUserNameTelExist
 	}
 
-	// 检查设置的角色id是否存在
-	if len(userParam.RoleIds) > 0 {
-		//isExist, err := u.userDao.IsExistByRoleId(ctx, userParam.RoleIds)
-		roleLen, err := u.userDao.CountRoleByIds(ctx, userParam.RoleIds)
-		if err != nil {
-			xlogger.ErrorfCtx(ctx, "查询角色数量存在异常: %v", err)
-			return 0, fmt.Errorf("查询角色数量存在异常: %w", err)
-		}
-		if roleLen != int64(len(userParam.RoleIds)) {
-			return 0, errors.New("设置的角色不存在")
-		}
-	}
-
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 检查设置的角色id是否存在（事务内防止并发删除）
+		if len(userParam.RoleIds) > 0 {
+			roleLen, err := u.userDao.CountRoleByIds(ctx, userParam.RoleIds)
+			if err != nil {
+				xlogger.ErrorfCtx(ctx, "查询角色数量存在异常: %v", err)
+				return fmt.Errorf("查询角色数量存在异常: %w", err)
+			}
+			if roleLen != int64(len(userParam.RoleIds)) {
+				return ErrRoleNotExist
+			}
+		}
+
 		// 更新用户（指针字段仅在非空时传入）
 		err = u.userDao.TransactionUpdateUser(ctx, tx, &model.SysUser{
 			ID:        userParam.ID,
@@ -306,7 +295,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		})
 		if err != nil {
 			// 唯一索引冲突兜底
-			if isDuplicateKeyErr(err) {
+			if common.IsDuplicateKeyErr(err) {
 				return ErrUserNameTelExist
 			}
 			xlogger.ErrorfCtx(ctx, "用户更新失败: %+v err: %v", userParam, err)

@@ -115,8 +115,9 @@ func CreateUser(c *gin.Context) {
 	container := di.GetContainer(c)
 	userId, err := container.UserService.CreateUser(ctx, &user)
 	if err != nil {
-		if errors.Is(err, account.ErrUserNameTelExist) {
-			xresponse.FailByError(c, e.UserNameTelExistError)
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "create user info is err: %v", err)
@@ -143,8 +144,9 @@ func UpdateUser(c *gin.Context) {
 	container := di.GetContainer(c)
 	userId, err := container.UserService.UpdateUser(ctx, &user)
 	if err != nil {
-		if errors.Is(err, account.ErrUserNameTelExist) {
-			xresponse.FailByError(c, e.UserNameTelExistError)
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "update user info is err: %v", err)
@@ -168,8 +170,9 @@ func GetUserInfo(c *gin.Context) {
 	container := di.GetContainer(c)
 	user, err := container.UserService.GetUserById(ctx, param.ID)
 	if err != nil {
-		if errors.Is(err, account.ErrUserNotFound) {
-			xresponse.FailByError(c, e.UserNotFound)
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "get user info is err: %v", err)
@@ -225,6 +228,11 @@ func GetUserList(c *gin.Context) {
 	container := di.GetContainer(c)
 	res, err := container.UserService.GetUserList(ctx, &userListReq)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "get user list is err: %v", err)
 		xresponse.FailByError(c, e.UserListError)
 		return
@@ -268,6 +276,11 @@ func DeleteUserById(c *gin.Context) {
 	container := di.GetContainer(c)
 	err := container.UserService.DeleteById(ctx, param.ID)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "delete user is err: %v", err)
 		xresponse.FailByError(c, e.UserDeleteError)
 		return
@@ -297,6 +310,11 @@ func ResetPwdById(c *gin.Context) {
 	container := di.GetContainer(c)
 	err := container.UserService.ResetPwdById(ctx, param.ID, param.Password)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "reset user pwd is err: %v", err)
 		xresponse.FailByError(c, e.ResetPwdError)
 		return
@@ -316,6 +334,11 @@ func GetUserPermission(c *gin.Context) {
 	container := di.GetContainer(c)
 	user, err := container.UserService.GetUserPermissionById(ctx, userContext.UserId)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "get user permission is err: %v", err)
 		xresponse.FailByError(c, e.UserPermissionError)
 		return

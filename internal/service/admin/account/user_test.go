@@ -10,7 +10,6 @@ import (
 	"snowgo/internal/dal/query"
 	daoAccount "snowgo/internal/dao/admin/account"
 	"snowgo/internal/service/admin/system"
-	common "snowgo/pkg"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xcryption"
@@ -329,24 +328,23 @@ func TestGetRoleIdsByUserId_InvalidID(t *testing.T) {
 
 // ---- Tests: CreateUser ----
 
-// TestCreateUser_DuplicateName removed — uniqueness check is now inside a transaction,
-// which cannot be mocked. Deferred to API integration tests.
-
-func TestCreateUser_InvalidRole(t *testing.T) {
+func TestCreateUser_DuplicateName(t *testing.T) {
 	logWriter := &mockLogWriter{}
 	svc := &UserService{
-		userDao:    &mockUserDao{countRoles: 0},
+		userDao:    &mockUserDao{isDuplicate: true},
 		logService: logWriter,
 	}
 
 	_, err := svc.CreateUser(testCtx(), &UserParam{
-		Username: "newuser", Tel: "13800000000", Password: "pwd",
-		Nickname: common.PtrIfNonZero("New"), Email: common.PtrIfNonZero("new@example.com"), Remark: common.PtrIfNonZero("测试备注"),
-		RoleIds: []int32{999},
+		Username: "dup_user", Tel: "13800000000", Password: "pwd",
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "设置的角色不存在")
+	assert.True(t, errors.Is(err, ErrUserNameTelExist))
+	assert.Equal(t, 0, logWriter.callCount)
 }
+
+// TestCreateUser_InvalidRole removed — CountRoleByIds check is now inside a transaction,
+// which requires a real DB. Deferred to API integration tests.
 
 // ---- Tests: UpdateUser ----
 

@@ -54,6 +54,12 @@ func Login(c *gin.Context) {
 	// 验证用户名密码
 	user, err := container.UserService.Authenticate(ctx, req.Username, req.Password)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
+		xlogger.ErrorfCtx(ctx, "authenticate err: %v", err)
 		xresponse.FailByError(c, e.AuthError)
 		return
 	}

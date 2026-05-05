@@ -1,6 +1,7 @@
 package account
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
 	"snowgo/internal/di"
 	"snowgo/internal/service/admin/account"
@@ -35,6 +36,11 @@ func CreateMenu(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	menuId, err := container.MenuService.CreateMenu(ctx, &menuParam)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "create menu is err: %v", err)
 		xresponse.FailByError(c, e.MenuCreateError)
 		return
@@ -54,6 +60,11 @@ func UpdateMenu(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	err := container.MenuService.UpdateMenu(ctx, &menuParam)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "update menu is err: %v", err)
 		xresponse.FailByError(c, e.MenuUpdateError)
 		return
@@ -67,6 +78,11 @@ func GetMenuList(c *gin.Context) {
 	ctx := c.Request.Context()
 	res, err := container.MenuService.GetMenuTree(ctx)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "get menu list is err: %v", err)
 		xresponse.FailByError(c, e.MenuListError)
 		return
@@ -91,8 +107,13 @@ func DeleteMenuById(c *gin.Context) {
 	container := di.GetAccountContainer(c)
 	err := container.MenuService.DeleteMenuById(ctx, param.ID)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "delete menu is err: %v", err)
-		xresponse.Fail(c, e.MenuDeleteError.GetErrCode(), err.Error())
+		xresponse.FailByError(c, e.MenuDeleteError)
 		return
 	}
 	xresponse.Success(c, &gin.H{"id": param.ID})

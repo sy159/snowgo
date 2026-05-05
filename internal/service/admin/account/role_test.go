@@ -124,7 +124,7 @@ func TestGetRoleById_InvalidID(t *testing.T) {
 	svc := &RoleService{}
 	_, err := svc.GetRoleById(context.Background(), -1)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "角色ID无效")
+	assert.True(t, errors.Is(err, ErrRoleIDInvalid))
 }
 
 func TestGetRoleById_NotFound(t *testing.T) {
@@ -168,22 +168,23 @@ func TestListRoles_Empty(t *testing.T) {
 
 // ---- Tests: CreateRole ----
 
-// TestCreateRole_DuplicateCode removed — uniqueness check is now inside a transaction,
-// which cannot be mocked. Deferred to API integration tests.
-
-func TestCreateRole_InvalidMenu(t *testing.T) {
+func TestCreateRole_DuplicateCode(t *testing.T) {
 	logWriter := &mockLogWriter{}
 	svc := &RoleService{
-		roleDao:    &mockRoleDao{countMenus: 0},
+		roleDao:    &mockRoleDao{codeExists: true},
 		logService: logWriter,
 	}
 
 	_, err := svc.CreateRole(testCtx(), &RoleParam{
-		Code: "new_role", Name: "New", Description: "Test", MenuIds: []int32{999},
+		Code: "dup", Name: "New", Description: "Test", MenuIds: []int32{1},
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "设置的菜单不存在")
+	assert.True(t, errors.Is(err, ErrRoleCodeUsed))
+	assert.Equal(t, 0, logWriter.callCount)
 }
+
+// TestCreateRole_InvalidMenu removed — CountMenuByIds check is now inside a transaction,
+// which requires a real DB. Deferred to API integration tests.
 
 // ---- Tests: UpdateRole ----
 
@@ -195,7 +196,7 @@ func TestUpdateRole_InvalidID(t *testing.T) {
 		ID: -1, Code: "x", Name: "N", Description: "D",
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "角色ID无效")
+	assert.True(t, errors.Is(err, ErrRoleIDInvalid))
 }
 
 func TestUpdateRole_DuplicateCode(t *testing.T) {
@@ -210,7 +211,7 @@ func TestUpdateRole_DuplicateCode(t *testing.T) {
 		ID: 1, Code: "dup", Name: "New", Description: "D",
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "角色编码已存在")
+	assert.True(t, errors.Is(err, ErrRoleCodeUsed))
 }
 
 func TestUpdateRole_NotFound(t *testing.T) {
@@ -224,7 +225,7 @@ func TestUpdateRole_NotFound(t *testing.T) {
 		ID: 1, Code: "x", Name: "N", Description: "D",
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "角色不存在")
+	assert.True(t, errors.Is(err, ErrRoleNotFound))
 }
 
 // ---- Tests: DeleteRole ----
@@ -233,7 +234,7 @@ func TestDeleteRole_InvalidID(t *testing.T) {
 	svc := &RoleService{}
 	err := svc.DeleteRole(testCtx(), -1)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "角色ID无效")
+	assert.True(t, errors.Is(err, ErrRoleIDInvalid))
 }
 
 func TestDeleteRole_UsedByUser(t *testing.T) {
@@ -242,7 +243,7 @@ func TestDeleteRole_UsedByUser(t *testing.T) {
 	}
 	err := svc.DeleteRole(testCtx(), 1)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "该角色已被使用")
+	assert.True(t, errors.Is(err, ErrRoleUsed))
 }
 
 // ---- Tests: GetRoleMenuListByRuleID ----
@@ -299,7 +300,7 @@ func TestGetRolePermsListByRuleID_InvalidID(t *testing.T) {
 	svc := &RoleService{}
 	_, err := svc.GetRolePermsListByRuleID(context.Background(), -1)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "角色ID无效")
+	assert.True(t, errors.Is(err, ErrRoleIDInvalid))
 }
 
 func TestGetRolePermsListByRuleID_FiltersButtonsOnly(t *testing.T) {

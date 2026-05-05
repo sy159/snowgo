@@ -76,21 +76,33 @@ var (
 	UserInfoError         = NewCode(CategoryUser, 10209, "用户信息获取失败")
 	ResetPwdError         = NewCode(CategoryUser, 10210, "重置密码失败")
 	UserPermissionError   = NewCode(CategoryUser, 10211, "用户权限获取失败")
+	UserRoleNotExist      = NewCode(CategoryUser, 10212, "设置的角色不存在")
 
 	// MenuNotFound 菜单权限相关  102 21 - 102 39
-	MenuNotFound    = NewCode(CategoryMenu, 10221, "菜单不存在")
-	MenuCreateError = NewCode(CategoryMenu, 10222, "菜单创建失败")
-	MenuUpdateError = NewCode(CategoryMenu, 10223, "菜单更新失败")
-	MenuDeleteError = NewCode(CategoryMenu, 10224, "菜单删除失败")
-	MenuListError   = NewCode(CategoryMenu, 10225, "菜单列表获取失败")
+	MenuNotFound      = NewCode(CategoryMenu, 10221, "菜单不存在")
+	MenuCreateError   = NewCode(CategoryMenu, 10222, "菜单创建失败")
+	MenuUpdateError   = NewCode(CategoryMenu, 10223, "菜单更新失败")
+	MenuDeleteError   = NewCode(CategoryMenu, 10224, "菜单删除失败")
+	MenuListError     = NewCode(CategoryMenu, 10225, "菜单列表获取失败")
+	MenuPermsExist    = NewCode(CategoryMenu, 10226, "权限标识已存在")
+	MenuPathExist     = NewCode(CategoryMenu, 10227, "菜单路径已存在")
+	MenuParentInvalid = NewCode(CategoryMenu, 10228, "父级菜单不存在")
+	MenuParentSelf    = NewCode(CategoryMenu, 10229, "父级菜单不能是自己")
+	MenuHasChildren   = NewCode(CategoryMenu, 10230, "存在子菜单，无法删除")
+	MenuUsedByRole    = NewCode(CategoryMenu, 10231, "该菜单权限已被使用，无法删除")
+	MenuIDInvalid     = NewCode(CategoryMenu, 10232, "菜单ID无效")
 
 	// RoleNotFound 角色相关 102 41 - 102 59
-	RoleNotFound    = NewCode(CategoryRole, 10241, "角色不存在")
-	RoleCreateError = NewCode(CategoryRole, 10242, "角色创建失败")
-	RoleUpdateError = NewCode(CategoryRole, 10243, "角色更新失败")
-	RoleDeleteError = NewCode(CategoryRole, 10244, "角色删除失败")
-	RoleListError   = NewCode(CategoryRole, 10245, "角色列表获取失败")
-	RoleInfoError   = NewCode(CategoryRole, 10246, "角色获取失败")
+	RoleNotFound     = NewCode(CategoryRole, 10241, "角色不存在")
+	RoleCreateError  = NewCode(CategoryRole, 10242, "角色创建失败")
+	RoleUpdateError  = NewCode(CategoryRole, 10243, "角色更新失败")
+	RoleDeleteError  = NewCode(CategoryRole, 10244, "角色删除失败")
+	RoleListError    = NewCode(CategoryRole, 10245, "角色列表获取失败")
+	RoleInfoError    = NewCode(CategoryRole, 10246, "角色获取失败")
+	RoleCodeExist    = NewCode(CategoryRole, 10247, "角色编码已存在")
+	RoleUsed         = NewCode(CategoryRole, 10248, "该角色已被使用，无法删除")
+	RoleIDInvalid    = NewCode(CategoryRole, 10249, "角色ID无效")
+	RoleMenuNotExist = NewCode(CategoryRole, 10250, "设置的菜单不存在")
 )
 
 // 业务system相关 103开头
@@ -111,6 +123,7 @@ var (
 	DictItemCreateError    = NewCode(CategorySystem, 10320, "字典枚举创建失败")
 	DictItemUpdateError    = NewCode(CategorySystem, 10321, "字典枚举更新失败")
 	DictItemDeleteError    = NewCode(CategorySystem, 10322, "字典枚举删除失败")
+	DictTimeFormatError    = NewCode(CategorySystem, 10323, "时间格式错误，应为yyyy-MM-dd HH:mm:ss")
 )
 
 // Code 错误码接口，错误码一旦创建即为不可变常量
@@ -193,4 +206,32 @@ func (c *code) ToString() string {
 		return fmt.Sprintf(`{"code":%d,"msg":%q,"category":%q}`, c.ErrCode, c.ErrMsg, c.Category)
 	}
 	return string(raw)
+}
+
+// BizError 携带 xerror Code 的业务错误，Service 层用 NewBizError 定义 sentinel
+// API 层用 errors.As 提取 Code 统一响应，无需逐个 errors.Is 映射
+type BizError struct {
+	Code  Code
+	cause error
+}
+
+// NewBizError 创建携带 xerror Code 的业务错误
+func NewBizError(code Code) *BizError {
+	return &BizError{Code: code}
+}
+
+// WrapBizError 创建携带 xerror Code 并包装底层错误的业务错误
+func WrapBizError(code Code, cause error) *BizError {
+	return &BizError{Code: code, cause: cause}
+}
+
+func (e *BizError) Error() string {
+	if e.cause != nil {
+		return e.Code.GetErrMsg() + ": " + e.cause.Error()
+	}
+	return e.Code.GetErrMsg()
+}
+
+func (e *BizError) Unwrap() error {
+	return e.cause
 }

@@ -3,7 +3,6 @@ package account
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
@@ -13,6 +12,7 @@ import (
 	common "snowgo/pkg"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
+	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"sort"
 	"time"
@@ -90,6 +90,17 @@ type MenuData struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+var (
+	ErrMenuNotFound      = e.NewBizError(e.MenuNotFound)
+	ErrMenuPermsExist    = e.NewBizError(e.MenuPermsExist)
+	ErrMenuPathExist     = e.NewBizError(e.MenuPathExist)
+	ErrMenuParentInvalid = e.NewBizError(e.MenuParentInvalid)
+	ErrMenuParentSelf    = e.NewBizError(e.MenuParentSelf)
+	ErrMenuHasChildren   = e.NewBizError(e.MenuHasChildren)
+	ErrMenuUsedByRole    = e.NewBizError(e.MenuUsedByRole)
+	ErrMenuIDInvalid     = e.NewBizError(e.MenuIDInvalid)
+)
+
 // CreateMenu 创建菜单权限
 func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, error) {
 	// 获取登录ctx
@@ -101,7 +112,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 	// 校验父节点
 	if p.ParentID > 0 {
 		if _, err := s.menuDao.GetById(ctx, p.ParentID); err != nil {
-			return 0, errors.New("父级菜单不存在")
+			return 0, ErrMenuParentInvalid
 		}
 	}
 
@@ -117,7 +128,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 	var menuObj *model.SysMenu
 
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
-		// 校验 perms 唯一性
+		// 校验 perms 唯一性（事务内，menu 表无唯一索引，事务是唯一防线）
 		permsVal := common.DerefOrZero(p.Perms)
 		if permsVal != "" {
 			exists, err := s.menuDao.IsPermsExists(ctx, permsVal, 0)
@@ -125,10 +136,10 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 				return fmt.Errorf("校验权限标识失败: %w", err)
 			}
 			if exists {
-				return errors.New("权限标识已存在")
+				return ErrMenuPermsExist
 			}
 		}
-		// 校验 path 唯一性
+		// 校验 path 唯一性（事务内，menu 表无唯一索引，事务是唯一防线）
 		pathVal := common.DerefOrZero(p.Path)
 		if pathVal != "" {
 			exists, err := s.menuDao.IsPathExists(ctx, pathVal, 0)
@@ -136,7 +147,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 				return fmt.Errorf("校验菜单路径失败: %w", err)
 			}
 			if exists {
-				return errors.New("菜单路径已存在")
+				return ErrMenuPathExist
 			}
 		}
 
@@ -191,24 +202,25 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 	}
 
 	if p.ID <= 0 {
-		return errors.New("菜单ID无效")
+		return ErrMenuIDInvalid
 	}
 
 	// 获取原始角色信息（可选）
 	oldMenu, err := s.menuDao.GetById(ctx, p.ID)
 	if err != nil {
-		return fmt.Errorf("菜单不存在: %w", err)
+		return ErrMenuNotFound
 	}
 
 	// 校验父节点
 	if p.ParentID > 0 {
 		if p.ParentID == p.ID {
-			return errors.New("父级菜单不能是自己")
+			return ErrMenuParentSelf
 		}
 		if _, err := s.menuDao.GetById(ctx, p.ParentID); err != nil {
-			return errors.New("父级菜单不存在")
+			return ErrMenuParentInvalid
 		}
 	}
+
 	// 更新
 	mn := &model.SysMenu{
 		ID:        p.ID,
@@ -222,7 +234,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 	}
 
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
-		// 校验 perms 唯一性（排除自身）
+		// 校验 perms 唯一性（事务内，menu 表无唯一索引，事务是唯一防线）
 		permsVal := common.DerefOrZero(p.Perms)
 		if permsVal != "" {
 			exists, err := s.menuDao.IsPermsExists(ctx, permsVal, p.ID)
@@ -230,10 +242,10 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 				return fmt.Errorf("校验权限标识失败: %w", err)
 			}
 			if exists {
-				return errors.New("权限标识已存在")
+				return ErrMenuPermsExist
 			}
 		}
-		// 校验 path 唯一性（排除自身）
+		// 校验 path 唯一性（事务内，menu 表无唯一索引，事务是唯一防线）
 		pathVal := common.DerefOrZero(p.Path)
 		if pathVal != "" {
 			exists, err := s.menuDao.IsPathExists(ctx, pathVal, p.ID)
@@ -241,7 +253,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 				return fmt.Errorf("校验菜单路径失败: %w", err)
 			}
 			if exists {
-				return errors.New("菜单路径已存在")
+				return ErrMenuPathExist
 			}
 		}
 
@@ -312,18 +324,18 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 	}
 
 	if id <= 0 {
-		return errors.New("菜单ID无效")
+		return ErrMenuIDInvalid
 	}
 	// 查询被删除菜单信息，用于操作日志记录
 	oldMenu, err := s.menuDao.GetById(ctx, id)
 	if err != nil {
-		return fmt.Errorf("菜单不存在: %w", err)
+		return ErrMenuNotFound
 	}
 
 	// 可以在此处校验是否存在子节点，若存在可拒绝删除(也可以改为递归删除)
 	subMenus, _ := s.menuDao.GetByParentId(ctx, id)
 	if len(subMenus) > 0 {
-		return errors.New("存在子菜单，无法删除")
+		return ErrMenuHasChildren
 	}
 
 	// 如果被角色使用，也不能删除
@@ -332,7 +344,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 		return fmt.Errorf("查询角色是否被使用失败: %w", err)
 	}
 	if isUsed {
-		return errors.New("该菜单权限已被使用，无法删除")
+		return ErrMenuUsedByRole
 	}
 
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {

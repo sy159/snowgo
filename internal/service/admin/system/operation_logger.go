@@ -3,7 +3,6 @@ package system
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
@@ -127,14 +126,14 @@ func (o *OperationLogService) GetOperationLogList(ctx context.Context, condition
 	if condition.StartTime != "" {
 		t, err := time.ParseInLocation(constant.TimeFmtWithS, condition.StartTime, time.Local)
 		if err != nil {
-			return nil, errors.New("start_time格式错误，应为yyyy-MM-dd HH:mm:ss")
+			return nil, ErrDictTimeFormat
 		}
 		startTimePtr = &t
 	}
 	if condition.EndTime != "" {
 		t, err := time.ParseInLocation(constant.TimeFmtWithS, condition.EndTime, time.Local)
 		if err != nil {
-			return nil, errors.New("end_time格式错误，应为yyyy-MM-dd HH:mm:ss")
+			return nil, ErrDictTimeFormat
 		}
 		endTimePtr = &t
 	}

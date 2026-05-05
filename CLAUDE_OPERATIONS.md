@@ -69,7 +69,7 @@ Conventional commits: `<type>(<scope>): <desc>`. Types: feat, fix, docs, refacto
 - [ ] Operation log within transaction (sync, consistency guaranteed)
 - [ ] Admin endpoints: JWTAuth + PermissionAuth
 - [ ] Input validation at API layer
-- [ ] Errors use xerror constants; sentinel errors in Service; `errors.Is` comparison
+- [ ] Errors use `e.NewBizError(e.Code)` sentinels in Service; API uses `errors.As` + `FailByError`; no `Fail(c, code, err.Error())` leaking internals
 - [ ] Logs use `*Ctx` variants
 - [ ] Cache invalidation after DB commit, not inside transaction
 - [ ] Sensitive data masked

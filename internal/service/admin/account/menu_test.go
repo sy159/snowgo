@@ -22,6 +22,8 @@ type mockMenuDao struct {
 	parentMenus []*model.SysMenu
 	roleIds     []int32
 	isUsed      bool
+	permsExists bool
+	pathExists  bool
 	err         error
 }
 
@@ -46,6 +48,14 @@ func (m *mockMenuDao) IsUsedMenuByIds(_ context.Context, _ []int32) (bool, error
 
 func (m *mockMenuDao) GetRoleIdsByIds(_ context.Context, _ int32) ([]int32, error) {
 	return m.roleIds, m.err
+}
+
+func (m *mockMenuDao) IsPermsExists(_ context.Context, _ string, _ int32) (bool, error) {
+	return m.permsExists, m.err
+}
+
+func (m *mockMenuDao) IsPathExists(_ context.Context, _ string, _ int32) (bool, error) {
+	return m.pathExists, m.err
 }
 
 func (m *mockMenuDao) TransactionCreateMenu(_ context.Context, _ *query.Query, menu *model.SysMenu) (*model.SysMenu, error) {
@@ -221,7 +231,7 @@ func TestCreateMenu_InvalidParent(t *testing.T) {
 		SortOrder: 1,
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "父级菜单不存在")
+	assert.True(t, errors.Is(err, ErrMenuParentInvalid))
 	assert.Equal(t, 0, logWriter.callCount)
 }
 
@@ -234,7 +244,7 @@ func TestUpdateMenu_InvalidID(t *testing.T) {
 		SortOrder: 1,
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "菜单ID无效")
+	assert.True(t, errors.Is(err, ErrMenuIDInvalid))
 }
 
 func TestUpdateMenu_ParentIsSelf(t *testing.T) {
@@ -250,7 +260,7 @@ func TestUpdateMenu_ParentIsSelf(t *testing.T) {
 		SortOrder: 1,
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "父级菜单不能是自己")
+	assert.True(t, errors.Is(err, ErrMenuParentSelf))
 }
 
 func TestUpdateMenu_NotFound(t *testing.T) {
@@ -262,7 +272,7 @@ func TestUpdateMenu_NotFound(t *testing.T) {
 		SortOrder: 1,
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "菜单不存在")
+	assert.True(t, errors.Is(err, ErrMenuNotFound))
 }
 
 // ---- Tests: DeleteMenuById ----
@@ -271,7 +281,7 @@ func TestDeleteMenuById_InvalidID(t *testing.T) {
 	svc := &MenuService{}
 	err := svc.DeleteMenuById(testCtx(), -1)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "菜单ID无效")
+	assert.True(t, errors.Is(err, ErrMenuIDInvalid))
 }
 
 func TestDeleteMenuById_HasChildren(t *testing.T) {
@@ -284,7 +294,7 @@ func TestDeleteMenuById_HasChildren(t *testing.T) {
 	}
 	err := svc.DeleteMenuById(testCtx(), 1)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "存在子菜单")
+	assert.True(t, errors.Is(err, ErrMenuHasChildren))
 }
 
 func TestDeleteMenuById_UsedByRole(t *testing.T) {
@@ -299,5 +309,11 @@ func TestDeleteMenuById_UsedByRole(t *testing.T) {
 	}
 	err := svc.DeleteMenuById(testCtx(), 1)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "该菜单权限已被使用")
+	assert.True(t, errors.Is(err, ErrMenuUsedByRole))
 }
+
+// ---- Tests: CreateMenu perms/path uniqueness ----
+// perms/path 唯一性校验已移入事务内，无法 mock，延迟到 API 集成测试
+
+// ---- Tests: UpdateMenu perms/path uniqueness ----
+// perms/path 唯一性校验已移入事务内，无法 mock，延迟到 API 集成测试

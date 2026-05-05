@@ -1,6 +1,7 @@
 package system
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
 	"snowgo/internal/constant"
 	"snowgo/internal/di"
@@ -58,6 +59,11 @@ func GetOperationLogList(c *gin.Context) {
 	container := di.GetSystemContainer(c)
 	res, err := container.OperationLogService.GetOperationLogList(ctx, &logListReq)
 	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
 		xlogger.ErrorfCtx(ctx, "get operation log list is err: %v", err)
 		xresponse.FailByError(c, e.LogListError)
 		return

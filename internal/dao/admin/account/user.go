@@ -27,7 +27,7 @@ type UserListCondition struct {
 	Username string  `json:"username"`
 	Tel      string  `json:"tel"`
 	Nickname string  `json:"nickname"`
-	Status   int8    `json:"status"`
+	Status   *int8   `json:"status"`
 	Offset   int32   `json:"offset"`
 	Limit    int32   `json:"limit"`
 }
@@ -271,10 +271,13 @@ func (u *UserDao) TelScope(tel string) func(tx gen.Dao) gen.Dao {
 	}
 }
 
-func (u *UserDao) StatusScope(status int8) func(tx gen.Dao) gen.Dao {
+func (u *UserDao) StatusScope(status *int8) func(tx gen.Dao) gen.Dao {
 	return func(tx gen.Dao) gen.Dao {
+		if status == nil {
+			return tx
+		}
 		m := u.repo.Query().SysUser
-		tx = tx.Where(m.Status.Eq(status))
+		tx = tx.Where(m.Status.Eq(*status))
 		return tx
 	}
 }

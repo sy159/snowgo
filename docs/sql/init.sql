@@ -44,19 +44,17 @@ CREATE TABLE `sys_role`
 DROP TABLE IF EXISTS `sys_menu`;
 CREATE TABLE `sys_menu`
 (
-    `id`         INT(11)                   NOT NULL AUTO_INCREMENT,
-    `parent_id`  INT(11)                   NOT NULL DEFAULT 0 COMMENT '父级菜单，0=根节点',
-    `menu_type`  ENUM ('Dir','Menu','Btn') NOT NULL COMMENT '类型：Dir/菜单目录, Menu/页面菜单, Btn/按钮操作',
-    `name`       VARCHAR(64)               NOT NULL COMMENT '节点名称（前端显示）',
-    `path`       VARCHAR(128)              NULL COMMENT '前端路由路径，仅 Dir/Menu 生效',
-    `icon`       VARCHAR(64)               NULL COMMENT '节点图标，仅 Dir/Menu 生效',
-    `perms`      VARCHAR(100)              NULL COMMENT '权限标识，如 system:user:add，仅 Btn生效',
-    `sort_order` INT                       NOT NULL DEFAULT 0 COMMENT '排序号',
-    `created_at` DATETIME(6)               NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    `updated_at` DATETIME(6)               NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_perms` (`perms`),
-    UNIQUE KEY `uk_path` (`path`)
+    `id`         INT(11)                     NOT NULL AUTO_INCREMENT,
+    `parent_id`  INT(11)                     NOT NULL DEFAULT 0 COMMENT '父级菜单，0=根节点',
+    `menu_type`  ENUM ('Dir', 'Menu', 'Btn') NOT NULL COMMENT '类型：Dir/菜单目录, Menu/页面菜单, Btn/按钮操作',
+    `name`       VARCHAR(64)                 NOT NULL COMMENT '节点名称（前端显示）',
+    `path`       VARCHAR(128)                NULL COMMENT '前端路由路径，仅 Dir/Menu 生效',
+    `icon`       VARCHAR(64)                 NULL COMMENT '节点图标，仅 Dir/Menu 生效',
+    `perms`      VARCHAR(100)                NULL COMMENT '权限标识，如 system:user:add，仅 Btn生效',
+    `sort_order` INT                         NOT NULL DEFAULT 0 COMMENT '排序号',
+    `created_at` DATETIME(6)                 NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `updated_at` DATETIME(6)                 NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (`id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='菜单权限表';
@@ -164,59 +162,59 @@ VALUES ('admin', '18712345678', '如何好听', '$2a$10$XqU5GKb6wbGXjckKxQtMF.b8
 
 # 菜单数据
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (1, 0, 'Dir', '账号管理', '', '', '', 1);
+VALUES (1, 0, 'Dir', '账号管理', NULL, NULL, NULL, 1);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (2, 1, 'Menu', '用户管理', '/account/user', 'fa fa-user-o', '', 1);
+VALUES (2, 1, 'Menu', '用户管理', '/account/user', 'fa fa-user-o', NULL, 1);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (3, 2, 'Btn', '用户列表', '', '', 'account:user:list', 1);
+VALUES (3, 2, 'Btn', '用户列表', NULL, NULL, 'account:user:list', 1);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (4, 2, 'Btn', '用户详情', '', '', 'account:user:detail', 2);
+VALUES (4, 2, 'Btn', '用户详情', NULL, NULL, 'account:user:detail', 2);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (5, 2, 'Btn', '添加用户', '', '', 'account:user:create', 3);
+VALUES (5, 2, 'Btn', '添加用户', NULL, NULL, 'account:user:create', 3);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (6, 2, 'Btn', '更新用户', '', '', 'account:user:update', 4);
+VALUES (6, 2, 'Btn', '更新用户', NULL, NULL, 'account:user:update', 4);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (7, 2, 'Btn', '删除用户', '', '', 'account:user:delete', 5);
+VALUES (7, 2, 'Btn', '删除用户', NULL, NULL, 'account:user:delete', 5);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (8, 2, 'Btn', '重置密码', '', '', 'account:user:reset_pwd', 6);
+VALUES (8, 2, 'Btn', '重置密码', NULL, NULL, 'account:user:reset_pwd', 6);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (9, 1, 'Menu', '角色管理', '/account/role', 'fa fa-user-secret', '', 2);
+VALUES (9, 1, 'Menu', '角色管理', '/account/role', 'fa fa-user-secret', NULL, 2);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (10, 9, 'Btn', '角色列表', '', '', 'account:role:list', 1);
+VALUES (10, 9, 'Btn', '角色列表', NULL, NULL, 'account:role:list', 1);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (11, 9, 'Btn', '角色详情', '', '', 'account:role:detail', 2);
+VALUES (11, 9, 'Btn', '角色详情', NULL, NULL, 'account:role:detail', 2);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (12, 9, 'Btn', '添加角色', '', '', 'account:role:create', 3);
+VALUES (12, 9, 'Btn', '添加角色', NULL, NULL, 'account:role:create', 3);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (13, 9, 'Btn', '更新角色', '', '', 'account:role:update', 4);
+VALUES (13, 9, 'Btn', '更新角色', NULL, NULL, 'account:role:update', 4);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (14, 9, 'Btn', '删除角色', '', '', 'account:role:delete', 5);
+VALUES (14, 9, 'Btn', '删除角色', NULL, NULL, 'account:role:delete', 5);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (15, 1, 'Menu', '菜单管理', '/account/menu', 'fa fa-th-list', '', 3);
+VALUES (15, 1, 'Menu', '菜单管理', '/account/menu', 'fa fa-th-list', NULL, 3);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (16, 15, 'Btn', '菜单列表', '', '', 'account:menu:list', 1);
+VALUES (16, 15, 'Btn', '菜单列表', NULL, NULL, 'account:menu:list', 1);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (17, 15, 'Btn', '添加菜单', '', '', 'account:menu:create', 2);
+VALUES (17, 15, 'Btn', '添加菜单', NULL, NULL, 'account:menu:create', 2);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (18, 15, 'Btn', '更新菜单', '', '', 'account:menu:update', 3);
+VALUES (18, 15, 'Btn', '更新菜单', NULL, NULL, 'account:menu:update', 3);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (19, 15, 'Btn', '删除菜单', '', '', 'account:menu:delete', 4);
+VALUES (19, 15, 'Btn', '删除菜单', NULL, NULL, 'account:menu:delete', 4);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (20, 0, 'Dir', '系统管理', '', '', '', 2);
+VALUES (20, 0, 'Dir', '系统管理', NULL, NULL, NULL, 2);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (21, 20, 'Menu', '操作日志管理', '/system/operation-log', 'fa fa-pencil-square-o', '', 1);
+VALUES (21, 20, 'Menu', '操作日志管理', '/system/operation-log', 'fa fa-pencil-square-o', NULL, 1);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (22, 21, 'Btn', '操作日志列表', '', '', 'system:operation-log:list', 1);
+VALUES (22, 21, 'Btn', '操作日志列表', NULL, NULL, 'system:operation-log:list', 1);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (23, 20, 'Menu', '字典管理', '/system/dict', 'fa fa-bookmark-o', '', 2);
+VALUES (23, 20, 'Menu', '字典管理', '/system/dict', 'fa fa-bookmark-o', NULL, 2);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (24, 23, 'Btn', '字典列表', '', '', 'system:dict:list', 1);
+VALUES (24, 23, 'Btn', '字典列表', NULL, NULL, 'system:dict:list', 1);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (25, 23, 'Btn', '添加字典', '', '', 'system:dict:create', 2);
+VALUES (25, 23, 'Btn', '添加字典', NULL, NULL, 'system:dict:create', 2);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (26, 23, 'Btn', '更新字典', '', '', 'system:dict:update', 3);
+VALUES (26, 23, 'Btn', '更新字典', NULL, NULL, 'system:dict:update', 3);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (27, 23, 'Btn', '删除字典', '', '', 'system:dict:delete', 3);
+VALUES (27, 23, 'Btn', '删除字典', NULL, NULL, 'system:dict:delete', 3);
 
 # 角色数据
 INSERT INTO `sys_role` (`id`, `code`, `name`, `description`)

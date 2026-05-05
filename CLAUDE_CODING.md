@@ -41,10 +41,34 @@ Error codes: `pkg/xerror/` (5-digit scheme, separate registry).
 
 | Layer | Rule |
 |-------|------|
-| API | `xresponse.FailByError` (business), `xresponse.Fail` (validation) |
-| Service | Sentinel errors via `pkg/xerror/` codes. `errors.Is` comparison. Wrap infra errors: `fmt.Errorf("%w", err)` |
+| API | `errors.As` 提取 `e.BizError`，用 `FailByError(c, bizErr.Code)` 响应。仅 binding 错误用 `Fail`。禁止 `Fail(c, code, err.Error())` 用于 service 错误 |
+| Service | `e.NewBizError(e.Code)` 定义 sentinel。禁止 `errors.New` 用于业务逻辑错误。基础设施错误用 `fmt.Errorf("%w", err)` |
 | DAO | Return directly — `errors.New` for validation, raw GORM for DB |
 | Global | Never `panic()` in API/Service/DAO. Only `xlogger.Panic` for fatal init |
+
+### BizError Pattern
+
+Service 层用 `xerror.BizError` 携带 `xerror.Code`，API 层统一提取：
+
+```go
+// Service: 定义 sentinel
+var ErrUserNotFound = e.NewBizError(e.UserNotFound)
+
+// API: 提取并响应
+var bizErr *e.BizError
+if errors.As(err, &bizErr) {
+    xresponse.FailByError(c, bizErr.Code)
+    return
+}
+xlogger.ErrorfCtx(ctx, "...: %v", err)
+xresponse.FailByError(c, e.FallbackCode)
+```
+
+新增业务错误只需：
+1. 在 `pkg/xerror/error.go` 添加 Code
+2. 在 Service 添加 BizError sentinel
+
+（API handler 无需修改，`errors.As` 自动处理）
 
 ### Error Code Scheme
 
