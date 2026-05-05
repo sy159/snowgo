@@ -16,6 +16,7 @@ import (
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
 	"snowgo/pkg/xcryption"
+	"snowgo/pkg/xdatabase/mysql"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"sort"
@@ -188,7 +189,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		})
 		if err != nil {
 			// 唯一索引冲突兜底
-			if common.IsDuplicateKeyErr(err) {
+			if mysql.IsDuplicateKeyErr(err) {
 				return ErrUserNameTelExist
 			}
 			xlogger.ErrorfCtx(ctx, "用户创建失败: %+v err: %v", userParam, err)
@@ -295,7 +296,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		})
 		if err != nil {
 			// 唯一索引冲突兜底
-			if common.IsDuplicateKeyErr(err) {
+			if mysql.IsDuplicateKeyErr(err) {
 				return ErrUserNameTelExist
 			}
 			xlogger.ErrorfCtx(ctx, "用户更新失败: %+v err: %v", userParam, err)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	mysqlDriver "github.com/go-sql-driver/mysql"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -258,4 +259,14 @@ func (m *MyDB) GetDB(name string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("db %s not found", name)
 	}
 	return db, nil
+}
+
+// IsDuplicateKeyErr 判断是否为 MySQL 唯一索引冲突错误（Error 1062）
+// 用于事务内 INSERT/UPDATE 的兜底校验，捕获并发竞争导致的事务外检查遗漏
+func IsDuplicateKeyErr(err error) bool {
+	var mysqlErr *mysqlDriver.MySQLError
+	if errors.As(err, &mysqlErr) {
+		return mysqlErr.Number == 1062
+	}
+	return false
 }

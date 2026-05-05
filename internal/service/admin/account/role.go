@@ -15,6 +15,7 @@ import (
 	common "snowgo/pkg"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
+	"snowgo/pkg/xdatabase/mysql"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"time"
@@ -146,7 +147,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 		roleObj, err = s.roleDao.TransactionCreateRole(ctx, tx, role)
 		if err != nil {
 			// 唯一索引冲突兜底
-			if common.IsDuplicateKeyErr(err) {
+			if mysql.IsDuplicateKeyErr(err) {
 				return ErrRoleCodeUsed
 			}
 			xlogger.ErrorfCtx(ctx, "角色创建失败: %v", err)
@@ -247,7 +248,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 		})
 		if err != nil {
 			// 唯一索引冲突兜底
-			if common.IsDuplicateKeyErr(err) {
+			if mysql.IsDuplicateKeyErr(err) {
 				return ErrRoleCodeUsed
 			}
 			return fmt.Errorf("更新角色失败: %w", err)

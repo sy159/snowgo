@@ -2,10 +2,8 @@ package common
 
 import (
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"github.com/bwmarrin/snowflake"
-	"github.com/go-sql-driver/mysql"
 	"math/big"
 	mrand "math/rand"
 	"os"
@@ -158,14 +156,4 @@ func PtrIfNonZero[T comparable](v T) *T {
 		return nil
 	}
 	return &v
-}
-
-// IsDuplicateKeyErr 判断是否为 MySQL 唯一索引冲突错误（Error 1062）
-// 用于事务内 INSERT/UPDATE 的兜底校验，捕获并发竞争导致的事务外检查遗漏
-func IsDuplicateKeyErr(err error) bool {
-	var mysqlErr *mysql.MySQLError
-	if errors.As(err, &mysqlErr) {
-		return mysqlErr.Number == 1062
-	}
-	return false
 }

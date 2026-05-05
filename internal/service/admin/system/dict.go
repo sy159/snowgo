@@ -11,9 +11,9 @@ import (
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
 	daoSystem "snowgo/internal/dao/admin/system"
-	common "snowgo/pkg"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
+	"snowgo/pkg/xdatabase/mysql"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"time"
@@ -184,7 +184,7 @@ func (d *DictService) CreateDict(ctx context.Context, param *DictParam) (int32, 
 		})
 		if err != nil {
 			// 唯一索引冲突兜底
-			if common.IsDuplicateKeyErr(err) {
+			if mysql.IsDuplicateKeyErr(err) {
 				return ErrDictCodeExist
 			}
 			xlogger.ErrorfCtx(ctx, "字典创建失败: %+v err: %v", param, err)
@@ -262,7 +262,7 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 		})
 		if err != nil {
 			// 唯一索引冲突兜底
-			if common.IsDuplicateKeyErr(err) {
+			if mysql.IsDuplicateKeyErr(err) {
 				return ErrDictCodeExist
 			}
 			xlogger.ErrorfCtx(ctx, "字典更新失败: %+v err: %v", param, err)
@@ -474,7 +474,7 @@ func (d *DictService) CreateItem(ctx context.Context, param *DictItemParam) (int
 		})
 		if err != nil {
 			// 唯一索引冲突兜底
-			if common.IsDuplicateKeyErr(err) {
+			if mysql.IsDuplicateKeyErr(err) {
 				return ErrDictItemCodeExist
 			}
 			xlogger.ErrorfCtx(ctx, "字典item创建失败: %+v err: %v", param, err)
@@ -561,7 +561,7 @@ func (d *DictService) UpdateItem(ctx context.Context, param *DictItemParam) (int
 		})
 		if err != nil {
 			// 唯一索引冲突兜底
-			if common.IsDuplicateKeyErr(err) {
+			if mysql.IsDuplicateKeyErr(err) {
 				return ErrDictItemCodeExist
 			}
 			xlogger.ErrorfCtx(ctx, "字典item更新失败: %+v err: %v", param, err)
