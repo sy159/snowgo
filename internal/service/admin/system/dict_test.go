@@ -189,7 +189,7 @@ func TestGetDictList_InvalidStartTime(t *testing.T) {
 		StartTime: "invalid-date",
 	})
 	assert.Error(t, err)
-	assert.True(t, errors.Is(err, ErrDictTimeFormat))
+	assert.True(t, errors.Is(err, ErrTimeFormat))
 }
 
 func TestGetDictList_InvalidEndTime(t *testing.T) {
@@ -199,7 +199,7 @@ func TestGetDictList_InvalidEndTime(t *testing.T) {
 		EndTime: "invalid-date",
 	})
 	assert.Error(t, err)
-	assert.True(t, errors.Is(err, ErrDictTimeFormat))
+	assert.True(t, errors.Is(err, ErrTimeFormat))
 }
 
 // ---- Tests: CreateDict ----

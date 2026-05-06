@@ -126,14 +126,14 @@ func (o *OperationLogService) GetOperationLogList(ctx context.Context, condition
 	if condition.StartTime != "" {
 		t, err := time.ParseInLocation(constant.TimeFmtWithS, condition.StartTime, time.Local)
 		if err != nil {
-			return nil, ErrDictTimeFormat
+			return nil, ErrTimeFormat
 		}
 		startTimePtr = &t
 	}
 	if condition.EndTime != "" {
 		t, err := time.ParseInLocation(constant.TimeFmtWithS, condition.EndTime, time.Local)
 		if err != nil {
-			return nil, ErrDictTimeFormat
+			return nil, ErrTimeFormat
 		}
 		endTimePtr = &t
 	}

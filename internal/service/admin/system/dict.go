@@ -109,7 +109,7 @@ var (
 	ErrDictCodeNotFound     = e.NewBizError(e.DictNotFound)
 	ErrDictItemCodeExist    = e.NewBizError(e.DictCodeItemExistError)
 	ErrDictCodeItemNotFound = e.NewBizError(e.DictItemNotFound)
-	ErrDictTimeFormat       = e.NewBizError(e.DictTimeFormatError)
+	ErrTimeFormat           = e.NewBizError(e.TimeFormatError)
 )
 
 // GetDictList 获取字典列表数据
@@ -119,14 +119,14 @@ func (d *DictService) GetDictList(ctx context.Context, condition *DictListCondit
 	if condition.StartTime != "" {
 		t, err := time.ParseInLocation(constant.TimeFmtWithS, condition.StartTime, time.Local)
 		if err != nil {
-			return nil, ErrDictTimeFormat
+			return nil, ErrTimeFormat
 		}
 		startTimePtr = &t
 	}
 	if condition.EndTime != "" {
 		t, err := time.ParseInLocation(constant.TimeFmtWithS, condition.EndTime, time.Local)
 		if err != nil {
-			return nil, ErrDictTimeFormat
+			return nil, ErrTimeFormat
 		}
 		endTimePtr = &t
 	}

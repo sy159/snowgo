@@ -27,7 +27,7 @@
 
 ### 2.2 Service Test Pattern
 
-Use **interface mocking**. Reference: `internal/service/account/user_test.go`.
+Use **interface mocking**. Reference: `internal/service/admin/account/user_test.go`.
 
 - **Mock DAO**: Embed DAO interface, override methods via struct fields.
 - **Mock Cache**: In-memory `map[string]string` implementing `xcache.Cache`.

@@ -7,12 +7,14 @@ import (
 )
 
 const (
-	CategoryHttp   = "http"
-	CategorySystem = "system"
-	CategoryAuth   = "auth"
-	CategoryUser   = "user"
-	CategoryRole   = "role"
-	CategoryMenu   = "menu"
+	CategoryHttp      = "http"       // HTTP 协议级状态
+	CategorySystem    = "system"     // 基础设施级错误（限流、参数越权等）
+	CategoryAuth      = "admin_auth" // Admin 认证相关
+	CategoryAdminUser = "admin_user" // Admin 用户相关
+	CategoryAdminMenu = "admin_menu" // Admin 菜单相关
+	CategoryAdminRole = "admin_role" // Admin 角色相关
+	CategoryAdminDict = "admin_dict" // Admin 字典相关
+	CategoryAdminLog  = "admin_log"  // Admin 操作日志相关
 )
 
 var (
@@ -47,6 +49,7 @@ var (
 	KeyTooManyRequests  = NewCode(CategorySystem, 20102, "因为访问频繁，你已经被限制访问，稍后重试")
 	OffsetErrorRequests = NewCode(CategorySystem, 20103, "offset必须大于等于0")
 	LimitErrorRequests  = NewCode(CategorySystem, 20104, "limit必须大于0")
+	TimeFormatError     = NewCode(CategorySystem, 20105, "时间格式错误，应为yyyy-MM-dd HH:mm:ss")
 )
 
 // auth相关  认证相关为101开头
@@ -65,65 +68,64 @@ var (
 // account相关 102开头
 var (
 	// UserNotFound 用户相关 102 01 - 102 19
-	UserNotFound          = NewCode(CategoryUser, 10201, "用户不存在")
-	UserCreateError       = NewCode(CategoryUser, 10202, "用户创建失败")
-	UserUpdateError       = NewCode(CategoryUser, 10203, "用户更新失败")
-	UserDeleteError       = NewCode(CategoryUser, 10204, "用户删除失败")
-	UserNameTelEmptyError = NewCode(CategoryUser, 10205, "用户名或电话不能为空")
-	UserNameTelExistError = NewCode(CategoryUser, 10206, "用户名或电话不能重复")
-	PwdError              = NewCode(CategoryUser, 10207, "密码须为 6–32 位，并至少包含数字、字母、特殊符号（.!@#$%^&*?_~-）中的两种类型")
-	UserListError         = NewCode(CategoryUser, 10208, "用户列表获取失败")
-	UserInfoError         = NewCode(CategoryUser, 10209, "用户信息获取失败")
-	ResetPwdError         = NewCode(CategoryUser, 10210, "重置密码失败")
-	UserPermissionError   = NewCode(CategoryUser, 10211, "用户权限获取失败")
-	UserRoleNotExist      = NewCode(CategoryUser, 10212, "设置的角色不存在")
+	UserNotFound          = NewCode(CategoryAdminUser, 10201, "用户不存在")
+	UserCreateError       = NewCode(CategoryAdminUser, 10202, "用户创建失败")
+	UserUpdateError       = NewCode(CategoryAdminUser, 10203, "用户更新失败")
+	UserDeleteError       = NewCode(CategoryAdminUser, 10204, "用户删除失败")
+	UserNameTelEmptyError = NewCode(CategoryAdminUser, 10205, "用户名或电话不能为空")
+	UserNameTelExistError = NewCode(CategoryAdminUser, 10206, "用户名或电话不能重复")
+	PwdError              = NewCode(CategoryAdminUser, 10207, "密码须为 6–32 位，并至少包含数字、字母、特殊符号（.!@#$%^&*?_~-）中的两种类型")
+	UserListError         = NewCode(CategoryAdminUser, 10208, "用户列表获取失败")
+	UserInfoError         = NewCode(CategoryAdminUser, 10209, "用户信息获取失败")
+	ResetPwdError         = NewCode(CategoryAdminUser, 10210, "重置密码失败")
+	UserPermissionError   = NewCode(CategoryAdminUser, 10211, "用户权限获取失败")
+	UserRoleNotExist      = NewCode(CategoryAdminUser, 10212, "设置的角色不存在")
 
 	// MenuNotFound 菜单权限相关  102 21 - 102 39
-	MenuNotFound      = NewCode(CategoryMenu, 10221, "菜单不存在")
-	MenuCreateError   = NewCode(CategoryMenu, 10222, "菜单创建失败")
-	MenuUpdateError   = NewCode(CategoryMenu, 10223, "菜单更新失败")
-	MenuDeleteError   = NewCode(CategoryMenu, 10224, "菜单删除失败")
-	MenuListError     = NewCode(CategoryMenu, 10225, "菜单列表获取失败")
-	MenuPermsExist    = NewCode(CategoryMenu, 10226, "权限标识已存在")
-	MenuPathExist     = NewCode(CategoryMenu, 10227, "菜单路径已存在")
-	MenuParentInvalid = NewCode(CategoryMenu, 10228, "父级菜单不存在")
-	MenuParentSelf    = NewCode(CategoryMenu, 10229, "父级菜单不能是自己")
-	MenuHasChildren   = NewCode(CategoryMenu, 10230, "存在子菜单，无法删除")
-	MenuUsedByRole    = NewCode(CategoryMenu, 10231, "该菜单权限已被使用，无法删除")
-	MenuIDInvalid     = NewCode(CategoryMenu, 10232, "菜单ID无效")
+	MenuNotFound      = NewCode(CategoryAdminMenu, 10221, "菜单不存在")
+	MenuCreateError   = NewCode(CategoryAdminMenu, 10222, "菜单创建失败")
+	MenuUpdateError   = NewCode(CategoryAdminMenu, 10223, "菜单更新失败")
+	MenuDeleteError   = NewCode(CategoryAdminMenu, 10224, "菜单删除失败")
+	MenuListError     = NewCode(CategoryAdminMenu, 10225, "菜单列表获取失败")
+	MenuPermsExist    = NewCode(CategoryAdminMenu, 10226, "权限标识已存在")
+	MenuPathExist     = NewCode(CategoryAdminMenu, 10227, "菜单路径已存在")
+	MenuParentInvalid = NewCode(CategoryAdminMenu, 10228, "父级菜单不存在")
+	MenuParentSelf    = NewCode(CategoryAdminMenu, 10229, "父级菜单不能是自己")
+	MenuHasChildren   = NewCode(CategoryAdminMenu, 10230, "存在子菜单，无法删除")
+	MenuUsedByRole    = NewCode(CategoryAdminMenu, 10231, "该菜单权限已被使用，无法删除")
+	MenuIDInvalid     = NewCode(CategoryAdminMenu, 10232, "菜单ID无效")
 
 	// RoleNotFound 角色相关 102 41 - 102 59
-	RoleNotFound     = NewCode(CategoryRole, 10241, "角色不存在")
-	RoleCreateError  = NewCode(CategoryRole, 10242, "角色创建失败")
-	RoleUpdateError  = NewCode(CategoryRole, 10243, "角色更新失败")
-	RoleDeleteError  = NewCode(CategoryRole, 10244, "角色删除失败")
-	RoleListError    = NewCode(CategoryRole, 10245, "角色列表获取失败")
-	RoleInfoError    = NewCode(CategoryRole, 10246, "角色获取失败")
-	RoleCodeExist    = NewCode(CategoryRole, 10247, "角色编码已存在")
-	RoleUsed         = NewCode(CategoryRole, 10248, "该角色已被使用，无法删除")
-	RoleIDInvalid    = NewCode(CategoryRole, 10249, "角色ID无效")
-	RoleMenuNotExist = NewCode(CategoryRole, 10250, "设置的菜单不存在")
+	RoleNotFound     = NewCode(CategoryAdminRole, 10241, "角色不存在")
+	RoleCreateError  = NewCode(CategoryAdminRole, 10242, "角色创建失败")
+	RoleUpdateError  = NewCode(CategoryAdminRole, 10243, "角色更新失败")
+	RoleDeleteError  = NewCode(CategoryAdminRole, 10244, "角色删除失败")
+	RoleListError    = NewCode(CategoryAdminRole, 10245, "角色列表获取失败")
+	RoleInfoError    = NewCode(CategoryAdminRole, 10246, "角色获取失败")
+	RoleCodeExist    = NewCode(CategoryAdminRole, 10247, "角色编码已存在")
+	RoleUsed         = NewCode(CategoryAdminRole, 10248, "该角色已被使用，无法删除")
+	RoleIDInvalid    = NewCode(CategoryAdminRole, 10249, "角色ID无效")
+	RoleMenuNotExist = NewCode(CategoryAdminRole, 10250, "设置的菜单不存在")
 )
 
 // 业务system相关 103开头
 var (
 	// LogListError 日志相关 103 01 - 103 10
-	LogListError = NewCode(CategorySystem, 10301, "操作日志列表获取失败")
+	LogListError = NewCode(CategoryAdminLog, 10301, "操作日志列表获取失败")
 
 	// DictNotFound 字典相关 103 11 - 103 30
-	DictNotFound           = NewCode(CategorySystem, 10311, "字典不存在")
-	DictListError          = NewCode(CategorySystem, 10312, "字典列表获取失败")
-	DictCodeExistError     = NewCode(CategorySystem, 10313, "字典编码已存在")
-	DictCreateError        = NewCode(CategorySystem, 10314, "字典创建失败")
-	DictUpdateError        = NewCode(CategorySystem, 10315, "字典更新失败")
-	DictDeleteError        = NewCode(CategorySystem, 10316, "字典删除失败")
-	DictItemListError      = NewCode(CategorySystem, 10317, "字典枚举列表获取失败")
-	DictCodeItemExistError = NewCode(CategorySystem, 10318, "字典枚举编码已存在")
-	DictItemNotFound       = NewCode(CategorySystem, 10319, "字典枚举不存在")
-	DictItemCreateError    = NewCode(CategorySystem, 10320, "字典枚举创建失败")
-	DictItemUpdateError    = NewCode(CategorySystem, 10321, "字典枚举更新失败")
-	DictItemDeleteError    = NewCode(CategorySystem, 10322, "字典枚举删除失败")
-	DictTimeFormatError    = NewCode(CategorySystem, 10323, "时间格式错误，应为yyyy-MM-dd HH:mm:ss")
+	DictNotFound           = NewCode(CategoryAdminDict, 10311, "字典不存在")
+	DictListError          = NewCode(CategoryAdminDict, 10312, "字典列表获取失败")
+	DictCodeExistError     = NewCode(CategoryAdminDict, 10313, "字典编码已存在")
+	DictCreateError        = NewCode(CategoryAdminDict, 10314, "字典创建失败")
+	DictUpdateError        = NewCode(CategoryAdminDict, 10315, "字典更新失败")
+	DictDeleteError        = NewCode(CategoryAdminDict, 10316, "字典删除失败")
+	DictItemListError      = NewCode(CategoryAdminDict, 10317, "字典枚举列表获取失败")
+	DictCodeItemExistError = NewCode(CategoryAdminDict, 10318, "字典枚举编码已存在")
+	DictItemNotFound       = NewCode(CategoryAdminDict, 10319, "字典枚举不存在")
+	DictItemCreateError    = NewCode(CategoryAdminDict, 10320, "字典枚举创建失败")
+	DictItemUpdateError    = NewCode(CategoryAdminDict, 10321, "字典枚举更新失败")
+	DictItemDeleteError    = NewCode(CategoryAdminDict, 10322, "字典枚举删除失败")
 )
 
 // Code 错误码接口，错误码一旦创建即为不可变常量
