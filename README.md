@@ -134,6 +134,7 @@ snowgo
 │   ├── xcryption/            # 加密工具（bcrypt 哈希、AES-GCM 加解密、SHA256、ID 编码）
 │   ├── xdatabase/            # 数据库连接管理
 │   ├── xerror/               # 业务错误码
+│   ├── xgin/                 # Gin 工具（URL path 参数解析）
 │   ├── xlimiter/             # 限流器（Fixed Window + Token Bucket）
 │   ├── xlock/                # Redis 分布式锁（基于 redsync，支持自动续期）
 │   ├── xlogger/              # Zap 日志封装（敏感字段脱敏）

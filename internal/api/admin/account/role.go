@@ -7,6 +7,7 @@ import (
 	"snowgo/internal/di"
 	"snowgo/internal/service/admin/account"
 	e "snowgo/pkg/xerror"
+	"snowgo/pkg/xgin"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
 )
@@ -77,17 +78,15 @@ func UpdateRole(c *gin.Context) {
 
 // DeleteRole 删除角色
 func DeleteRole(c *gin.Context) {
-	var param struct {
-		ID int32 `json:"id" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&param); err != nil {
-		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
+	id := xgin.ParsePathID(c)
+	if id < 1 {
+		xresponse.FailByError(c, e.RoleNotFound)
 		return
 	}
 	ctx := c.Request.Context()
 
 	container := di.GetAccountContainer(c)
-	err := container.RoleService.DeleteRole(ctx, param.ID)
+	err := container.RoleService.DeleteRole(ctx, int32(id))
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {
@@ -98,7 +97,7 @@ func DeleteRole(c *gin.Context) {
 		xresponse.FailByError(c, e.RoleDeleteError)
 		return
 	}
-	xresponse.Success(c, &gin.H{"id": param.ID})
+	xresponse.Success(c, &gin.H{"id": id})
 }
 
 // GetRoleList 获取角色列表
@@ -151,17 +150,15 @@ func GetRoleList(c *gin.Context) {
 
 // GetRoleById 获取角色详情（带菜单权限）
 func GetRoleById(c *gin.Context) {
-	var param struct {
-		ID int32 `json:"id" form:"id" binding:"required"`
-	}
-	if err := c.ShouldBindQuery(&param); err != nil {
-		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
+	id := xgin.ParsePathID(c)
+	if id < 1 {
+		xresponse.FailByError(c, e.RoleNotFound)
 		return
 	}
 	ctx := c.Request.Context()
 
 	container := di.GetAccountContainer(c)
-	role, err := container.RoleService.GetRoleById(ctx, param.ID)
+	role, err := container.RoleService.GetRoleById(ctx, int32(id))
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {

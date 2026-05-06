@@ -6,6 +6,7 @@ import (
 	"snowgo/internal/di"
 	"snowgo/internal/service/admin/account"
 	e "snowgo/pkg/xerror"
+	"snowgo/pkg/xgin"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
 )
@@ -92,20 +93,14 @@ func GetMenuList(c *gin.Context) {
 
 // DeleteMenuById 菜单删除
 func DeleteMenuById(c *gin.Context) {
-	var param struct {
-		ID int32 `json:"id" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&param); err != nil {
-		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
-		return
-	}
-	if param.ID < 1 {
+	id := xgin.ParsePathID(c)
+	if id < 1 {
 		xresponse.FailByError(c, e.MenuNotFound)
 		return
 	}
 	ctx := c.Request.Context()
 	container := di.GetAccountContainer(c)
-	err := container.MenuService.DeleteMenuById(ctx, param.ID)
+	err := container.MenuService.DeleteMenuById(ctx, int32(id))
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {
@@ -116,5 +111,5 @@ func DeleteMenuById(c *gin.Context) {
 		xresponse.FailByError(c, e.MenuDeleteError)
 		return
 	}
-	xresponse.Success(c, &gin.H{"id": param.ID})
+	xresponse.Success(c, &gin.H{"id": id})
 }

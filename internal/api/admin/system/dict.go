@@ -8,6 +8,7 @@ import (
 	"snowgo/internal/service/admin/system"
 	common "snowgo/pkg"
 	e "snowgo/pkg/xerror"
+	"snowgo/pkg/xgin"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
 )
@@ -136,20 +137,14 @@ func UpdateDict(c *gin.Context) {
 
 // DeleteDictById 字典删除
 func DeleteDictById(c *gin.Context) {
-	var param struct {
-		ID int32 `json:"id" uri:"id" form:"id" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&param); err != nil {
-		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
-		return
-	}
-	if param.ID < 1 {
+	id := xgin.ParsePathID(c)
+	if id < 1 {
 		xresponse.FailByError(c, e.DictNotFound)
 		return
 	}
 	ctx := c.Request.Context()
 	container := di.GetSystemContainer(c)
-	err := container.DictService.DeleteById(ctx, param.ID)
+	err := container.DictService.DeleteById(ctx, int32(id))
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {
@@ -160,22 +155,20 @@ func DeleteDictById(c *gin.Context) {
 		xresponse.FailByError(c, e.DictDeleteError)
 		return
 	}
-	xresponse.Success(c, &gin.H{"id": param.ID})
+	xresponse.Success(c, &gin.H{"id": id})
 }
 
 // GetItemListByDictCode 根据字典code获取item列表
 func GetItemListByDictCode(c *gin.Context) {
-	var param struct {
-		Code string `json:"code" uri:"code" form:"code" binding:"required"`
-	}
-	if err := c.ShouldBindQuery(&param); err != nil {
-		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
+	code := c.Param("code")
+	if code == "" {
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), "字典编码不能为空")
 		return
 	}
 	ctx := c.Request.Context()
 
 	container := di.GetSystemContainer(c)
-	itemList, err := container.DictService.GetItemListByCode(ctx, param.Code)
+	itemList, err := container.DictService.GetItemListByCode(ctx, code)
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {
@@ -265,20 +258,14 @@ func UpdateDictItem(c *gin.Context) {
 
 // DeleteDictItem 字典item删除
 func DeleteDictItem(c *gin.Context) {
-	var param struct {
-		ID int32 `json:"id" uri:"id" form:"id" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&param); err != nil {
-		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
-		return
-	}
-	if param.ID < 1 {
+	id := xgin.ParsePathID(c)
+	if id < 1 {
 		xresponse.FailByError(c, e.DictItemNotFound)
 		return
 	}
 	ctx := c.Request.Context()
 	container := di.GetSystemContainer(c)
-	err := container.DictService.DeleteItemById(ctx, param.ID)
+	err := container.DictService.DeleteItemById(ctx, int32(id))
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {
@@ -289,5 +276,5 @@ func DeleteDictItem(c *gin.Context) {
 		xresponse.FailByError(c, e.DictItemDeleteError)
 		return
 	}
-	xresponse.Success(c, &gin.H{"id": param.ID})
+	xresponse.Success(c, &gin.H{"id": id})
 }

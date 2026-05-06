@@ -20,14 +20,14 @@ func systemRouters(r *gin.RouterGroup) {
 	dictGroup := systemGroup.Group("/dict")
 	{
 		// 字典管理
-		dictGroup.GET("/", middleware.PermissionAuth(constant.PermSystemDictList), system.GetDictList)
-		dictGroup.POST("/", middleware.PermissionAuth(constant.PermSystemDictCreate), system.CreateDict)
-		dictGroup.PUT("/", middleware.PermissionAuth(constant.PermSystemDictUpdate), system.UpdateDict)
-		dictGroup.DELETE("/", middleware.PermissionAuth(constant.PermSystemDictDelete), system.DeleteDictById)
+		dictGroup.GET("", middleware.PermissionAuth(constant.PermSystemDictList), system.GetDictList)
+		dictGroup.POST("", middleware.PermissionAuth(constant.PermSystemDictCreate), system.CreateDict)
+		dictGroup.PUT("", middleware.PermissionAuth(constant.PermSystemDictUpdate), system.UpdateDict)
+		dictGroup.DELETE("/:id", middleware.PermissionAuth(constant.PermSystemDictDelete), system.DeleteDictById)
 		// 字典枚举信息，// 创建字典item，权限应该跟创建字典相同
-		dictGroup.GET("/item", system.GetItemListByDictCode)
 		dictGroup.POST("/item", middleware.PermissionAuth(constant.PermSystemDictCreate), system.CreateItem)
 		dictGroup.PUT("/item", middleware.PermissionAuth(constant.PermSystemDictUpdate), system.UpdateDictItem)
-		dictGroup.DELETE("/item", middleware.PermissionAuth(constant.PermSystemDictDelete), system.DeleteDictItem)
+		dictGroup.GET("/item/:code", system.GetItemListByDictCode)
+		dictGroup.DELETE("/item/:id", middleware.PermissionAuth(constant.PermSystemDictDelete), system.DeleteDictItem)
 	}
 }

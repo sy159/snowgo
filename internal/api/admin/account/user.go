@@ -9,6 +9,7 @@ import (
 	"snowgo/internal/service/admin/account"
 	"snowgo/pkg/xauth"
 	e "snowgo/pkg/xerror"
+	"snowgo/pkg/xgin"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
 	"strings"
@@ -158,17 +159,15 @@ func UpdateUser(c *gin.Context) {
 
 // GetUserInfo 用户信息
 func GetUserInfo(c *gin.Context) {
-	var param struct {
-		ID int32 `json:"id" form:"id" binding:"required"`
-	}
-	if err := c.ShouldBindQuery(&param); err != nil {
-		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
+	id := xgin.ParsePathID(c)
+	if id < 1 {
+		xresponse.FailByError(c, e.UserNotFound)
 		return
 	}
 	ctx := c.Request.Context()
 
 	container := di.GetContainer(c)
-	user, err := container.UserService.GetUserById(ctx, param.ID)
+	user, err := container.UserService.GetUserById(ctx, int32(id))
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {
@@ -261,20 +260,14 @@ func GetUserList(c *gin.Context) {
 
 // DeleteUserById 用户删除
 func DeleteUserById(c *gin.Context) {
-	var param struct {
-		ID int32 `json:"id" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&param); err != nil {
-		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
-		return
-	}
-	if param.ID < 1 {
+	id := xgin.ParsePathID(c)
+	if id < 1 {
 		xresponse.FailByError(c, e.UserNotFound)
 		return
 	}
 	ctx := c.Request.Context()
 	container := di.GetContainer(c)
-	err := container.UserService.DeleteById(ctx, param.ID)
+	err := container.UserService.DeleteById(ctx, int32(id))
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {
@@ -285,7 +278,7 @@ func DeleteUserById(c *gin.Context) {
 		xresponse.FailByError(c, e.UserDeleteError)
 		return
 	}
-	xresponse.Success(c, &gin.H{"id": param.ID})
+	xresponse.Success(c, &gin.H{"id": id})
 }
 
 func ResetPwdById(c *gin.Context) {
