@@ -26,6 +26,10 @@ Thumbs.db
 *.swo
 *.bak
 
+# AI agent files
+.claude/
+.agents/
+
 # Go build artifacts
 *.exe
 *.dll
