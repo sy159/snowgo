@@ -68,7 +68,7 @@ type LoginLogList struct {
 	Total int64           `json:"total"`
 }
 
-// CreateLoginLog 创建登录日志（异步调用，独立写入）
+// CreateLoginLog 创建登录日志
 func (l *LoginLogService) CreateLoginLog(ctx context.Context, input *LoginLogInput) {
 	log := &model.SysLoginLog{
 		UserID:   input.UserID,

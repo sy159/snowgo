@@ -1,7 +1,6 @@
 package account
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -15,21 +14,6 @@ import (
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
 )
-
-// recordLoginLog 异步记录登录日志
-func recordLoginLog(c *gin.Context, userID int32, username string, status bool, message string) {
-	go func() {
-		container := di.GetSystemContainer(c)
-		container.LoginLogService.CreateLoginLog(context.Background(), &systemService.LoginLogInput{
-			UserID:    userID,
-			Username:  username,
-			IP:        c.ClientIP(),
-			Status:    status,
-			Message:   message,
-			UserAgent: c.GetHeader("User-Agent"),
-		})
-	}()
-}
 
 // Login 登录
 func Login(c *gin.Context) {
@@ -64,7 +48,16 @@ func Login(c *gin.Context) {
 
 	// 如果不允许，直接返回锁定信息
 	if !allowed {
-		recordLoginLog(c, 0, req.Username, false, fmt.Sprintf("登录失败次数过多，请等待%d秒后再试", int(ttl.Seconds())))
+		// 记录登录日志
+		msg := fmt.Sprintf("登录失败次数过多，请等待%d秒后再试", int(ttl.Seconds()))
+		container.LoginLogService.CreateLoginLog(ctx,
+			&systemService.LoginLogInput{
+				Username:  req.Username,
+				IP:        c.ClientIP(),
+				Status:    false,
+				Message:   msg,
+				UserAgent: c.GetHeader("User-Agent"),
+			})
 		xresponse.FailByError(c, e.LoginLocked)
 		return
 	}
@@ -74,12 +67,19 @@ func Login(c *gin.Context) {
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {
-			recordLoginLog(c, 0, req.Username, false, bizErr.Code.GetErrMsg())
+			// 记录登录日志
+			container.LoginLogService.CreateLoginLog(ctx,
+				&systemService.LoginLogInput{
+					Username:  req.Username,
+					IP:        c.ClientIP(),
+					Status:    false,
+					Message:   bizErr.Code.GetErrMsg(),
+					UserAgent: c.GetHeader("User-Agent"),
+				})
 			xresponse.FailByError(c, bizErr.Code)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "authenticate err: %v", err)
-		recordLoginLog(c, 0, req.Username, false, e.AuthError.GetErrMsg())
 		xresponse.FailByError(c, e.AuthError)
 		return
 	}
@@ -91,7 +91,6 @@ func Login(c *gin.Context) {
 	token, err := jwtMgr.GenerateTokens(user.ID, user.Username)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "jwt generate tokens err: %v", err)
-		recordLoginLog(c, user.ID, user.Username, false, e.TokenError.GetErrMsg())
 		xresponse.FailByError(c, e.TokenError)
 		return
 	}
@@ -99,11 +98,23 @@ func Login(c *gin.Context) {
 	// 保存 refresh token 的 jti，设置过期时间（防止重放攻击、每个refresh token只能使用一次）
 	if claims, err := jwtMgr.ParseToken(token.RefreshToken); err == nil {
 		jtiKey := constant.CacheRefreshJtiPrefix + claims.ID
-		_ = container.Cache.Set(ctx, jtiKey, "1", claims.ExpiresAt.Sub(claims.IssuedAt.Time))
+		err = container.Cache.Set(ctx, jtiKey, "1", claims.ExpiresAt.Sub(claims.IssuedAt.Time))
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "save refresh token jti err: %v", err)
+			xresponse.FailByError(c, e.HttpInternalServerError)
+			return
+		}
 	}
 
-	// 异步写入登录成功日志
-	recordLoginLog(c, user.ID, user.Username, true, "")
+	// 记录登录成功日志
+	container.LoginLogService.CreateLoginLog(ctx,
+		&systemService.LoginLogInput{
+			UserID:    user.ID,
+			Username:  user.Username,
+			IP:        c.ClientIP(),
+			Status:    true,
+			UserAgent: c.GetHeader("User-Agent"),
+		})
 
 	xresponse.Success(c, gin.H{
 		"access_token":             token.AccessToken,
@@ -139,14 +150,7 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
-	// 生成新的token（先生成，再删除旧 JTI，确保生成失败时旧 token 仍可用）
-	token, err := jwtMgr.RefreshTokens(req.RefreshToken)
-	if err != nil {
-		xlogger.ErrorfCtx(ctx, "refresh access token err: %s", err.Error())
-		xresponse.FailByError(c, e.HttpInternalServerError)
-		return
-	}
-
+	// 先删除旧 JTI，再生成新的token，宁愿用户重新登录，也不允许 refresh token 被并发重复使用，并且生成新token理论上不应该失败
 	// 删除旧 jti（防止重放）
 	jtiKey := constant.CacheRefreshJtiPrefix + claims.ID
 	if del, _ := container.Cache.Delete(ctx, jtiKey); del == 0 {
@@ -155,10 +159,23 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
+	// 生成新的token
+	token, err := jwtMgr.RefreshTokens(req.RefreshToken)
+	if err != nil {
+		xlogger.ErrorfCtx(ctx, "refresh access token err: %s", err.Error())
+		xresponse.FailByError(c, e.HttpInternalServerError)
+		return
+	}
+
 	// 保存 refresh token 的 jti，设置过期时间（防止重放攻击、每个refresh token只能使用一次）
 	if newClaims, err := jwtMgr.ParseToken(token.RefreshToken); err == nil {
 		jtiKey = constant.CacheRefreshJtiPrefix + newClaims.ID
-		_ = container.Cache.Set(ctx, jtiKey, "1", newClaims.ExpiresAt.Sub(newClaims.IssuedAt.Time))
+		err = container.Cache.Set(ctx, jtiKey, "1", newClaims.ExpiresAt.Sub(newClaims.IssuedAt.Time))
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "save refresh token jti err: %v", err)
+			xresponse.FailByError(c, e.HttpInternalServerError)
+			return
+		}
 	}
 
 	xresponse.Success(c, gin.H{
