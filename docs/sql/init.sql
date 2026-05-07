@@ -117,6 +117,27 @@ CREATE TABLE `sys_operation_log`
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='操作日志表';
 
+# 创建登录日志表
+DROP TABLE IF EXISTS `sys_login_log`;
+CREATE TABLE `sys_login_log`
+(
+    `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '日志主键',
+    `user_id`    INT(11)      NOT NULL COMMENT '用户 ID',
+    `username`   VARCHAR(64)  NOT NULL COMMENT '登录用户名',
+    `ip`         VARCHAR(64)  NOT NULL COMMENT '登录 IP',
+    `status`     TINYINT(1)   NOT NULL COMMENT '登录状态：1 成功，2 失败',
+    `message`    VARCHAR(255) NULL COMMENT '失败原因（成功时为空）',
+    `user_agent` VARCHAR(512) NULL COMMENT '浏览器/设备信息',
+    `created_at` DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_username` (`username`),
+    KEY `idx_status` (`status`),
+    KEY `idx_created_at` (`created_at`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='登录日志表';
+
 # 创建系统字典表
 DROP TABLE IF EXISTS `sys_dict`;
 CREATE TABLE `sys_dict`
@@ -206,15 +227,19 @@ VALUES (21, 20, 'Menu', '操作日志管理', '/system/operation-log', 'fa fa-pe
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
 VALUES (22, 21, 'Btn', '操作日志列表', NULL, NULL, 'system:operation-log:list', 1);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (23, 20, 'Menu', '字典管理', '/system/dict', 'fa fa-bookmark-o', NULL, 2);
+VALUES (23, 20, 'Menu', '登录日志管理', '/system/login-log', 'fa fa-sign-in', NULL, 2);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (24, 23, 'Btn', '字典列表', NULL, NULL, 'system:dict:list', 1);
+VALUES (24, 23, 'Btn', '登录日志列表', NULL, NULL, 'system:login-log:list', 1);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (25, 23, 'Btn', '添加字典', NULL, NULL, 'system:dict:create', 2);
+VALUES (25, 20, 'Menu', '字典管理', '/system/dict', 'fa fa-bookmark-o', NULL, 3);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (26, 23, 'Btn', '更新字典', NULL, NULL, 'system:dict:update', 3);
+VALUES (26, 25, 'Btn', '字典列表', NULL, NULL, 'system:dict:list', 1);
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
-VALUES (27, 23, 'Btn', '删除字典', NULL, NULL, 'system:dict:delete', 3);
+VALUES (27, 25, 'Btn', '添加字典', NULL, NULL, 'system:dict:create', 2);
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
+VALUES (28, 25, 'Btn', '更新字典', NULL, NULL, 'system:dict:update', 3);
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_type`, `name`, `path`, `icon`, `perms`, `sort_order`)
+VALUES (29, 25, 'Btn', '删除字典', NULL, NULL, 'system:dict:delete', 3);
 
 # 角色数据
 INSERT INTO `sys_role` (`id`, `code`, `name`, `description`)
@@ -250,6 +275,8 @@ VALUES (1, 1),
        (1, 25),
        (1, 26),
        (1, 27),
+       (1, 28),
+       (1, 29),
        # 只读
        (2, 1),
        (2, 2),
@@ -264,7 +291,9 @@ VALUES (1, 1),
        (2, 21),
        (2, 22),
        (2, 23),
-       (2, 24);
+       (2, 24),
+       (2, 25),
+       (2, 26);
 
 # 用户角色关联数据
 INSERT INTO `sys_user_role` (`user_id`, `role_id`)

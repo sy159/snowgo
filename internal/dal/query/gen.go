@@ -20,6 +20,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		db:              db,
 		SysDict:         newSysDict(db, opts...),
 		SysDictItem:     newSysDictItem(db, opts...),
+		SysLoginLog:     newSysLoginLog(db, opts...),
 		SysMenu:         newSysMenu(db, opts...),
 		SysOperationLog: newSysOperationLog(db, opts...),
 		SysRole:         newSysRole(db, opts...),
@@ -34,6 +35,7 @@ type Query struct {
 
 	SysDict         sysDict
 	SysDictItem     sysDictItem
+	SysLoginLog     sysLoginLog
 	SysMenu         sysMenu
 	SysOperationLog sysOperationLog
 	SysRole         sysRole
@@ -49,6 +51,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		db:              db,
 		SysDict:         q.SysDict.clone(db),
 		SysDictItem:     q.SysDictItem.clone(db),
+		SysLoginLog:     q.SysLoginLog.clone(db),
 		SysMenu:         q.SysMenu.clone(db),
 		SysOperationLog: q.SysOperationLog.clone(db),
 		SysRole:         q.SysRole.clone(db),
@@ -71,6 +74,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		db:              db,
 		SysDict:         q.SysDict.replaceDB(db),
 		SysDictItem:     q.SysDictItem.replaceDB(db),
+		SysLoginLog:     q.SysLoginLog.replaceDB(db),
 		SysMenu:         q.SysMenu.replaceDB(db),
 		SysOperationLog: q.SysOperationLog.replaceDB(db),
 		SysRole:         q.SysRole.replaceDB(db),
@@ -83,6 +87,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 type queryCtx struct {
 	SysDict         *sysDictDo
 	SysDictItem     *sysDictItemDo
+	SysLoginLog     *sysLoginLogDo
 	SysMenu         *sysMenuDo
 	SysOperationLog *sysOperationLogDo
 	SysRole         *sysRoleDo
@@ -95,6 +100,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
 		SysDict:         q.SysDict.WithContext(ctx),
 		SysDictItem:     q.SysDictItem.WithContext(ctx),
+		SysLoginLog:     q.SysLoginLog.WithContext(ctx),
 		SysMenu:         q.SysMenu.WithContext(ctx),
 		SysOperationLog: q.SysOperationLog.WithContext(ctx),
 		SysRole:         q.SysRole.WithContext(ctx),

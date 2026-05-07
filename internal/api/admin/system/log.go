@@ -91,3 +91,79 @@ func GetOperationLogList(c *gin.Context) {
 		List:  logList,
 	})
 }
+
+type LoginLogInfo struct {
+	ID        int32  `json:"id"`
+	UserID    int32  `json:"user_id"`
+	Username  string `json:"username"`
+	IP        string `json:"ip"`
+	Status    bool   `json:"status"`
+	Message   string `json:"message"`
+	UserAgent string `json:"user_agent"`
+	CreatedAt string `json:"created_at"`
+}
+
+type LoginLogList struct {
+	List  []*LoginLogInfo `json:"list"`
+	Total int64           `json:"total"`
+}
+
+// GetLoginLogList 登录日志列表
+func GetLoginLogList(c *gin.Context) {
+	var logListReq system.LoginLogCondition
+	if err := c.ShouldBindQuery(&logListReq); err != nil {
+		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
+		return
+	}
+	ctx := c.Request.Context()
+
+	if logListReq.Offset < 0 {
+		xresponse.FailByError(c, e.OffsetErrorRequests)
+		return
+	}
+	if logListReq.Limit < 0 {
+		xresponse.FailByError(c, e.LimitErrorRequests)
+		return
+	} else if logListReq.Limit == 0 {
+		logListReq.Limit = constant.DefaultLimit
+	} else if logListReq.Limit > constant.MaxLimit {
+		logListReq.Limit = constant.MaxLimit
+	}
+
+	container := di.GetSystemContainer(c)
+	res, err := container.LoginLogService.GetLoginLogList(ctx, &logListReq)
+	if err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
+		xlogger.ErrorfCtx(ctx, "get login log list is err: %v", err)
+		xresponse.FailByError(c, e.LoginLogListError)
+		return
+	}
+	logList := make([]*LoginLogInfo, 0, len(res.List))
+	for _, loginLog := range res.List {
+		info := &LoginLogInfo{
+			ID:       int32(loginLog.ID),
+			UserID:   loginLog.UserID,
+			Username: loginLog.Username,
+			IP:       loginLog.IP,
+			Status:   loginLog.Status,
+		}
+		if loginLog.Message != nil {
+			info.Message = *loginLog.Message
+		}
+		if loginLog.UserAgent != nil {
+			info.UserAgent = *loginLog.UserAgent
+		}
+		if loginLog.CreatedAt != nil {
+			info.CreatedAt = loginLog.CreatedAt.Format(constant.TimeFmtWithMS)
+		}
+		logList = append(logList, info)
+	}
+	xresponse.Success(c, &LoginLogList{
+		Total: res.Total,
+		List:  logList,
+	})
+}

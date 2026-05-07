@@ -59,6 +59,7 @@ type AccountContainer struct {
 type SystemContainer struct {
 	OperationLogService *systemService.OperationLogService
 	DictService         *systemService.DictService
+	LoginLogService     *systemService.LoginLogService
 }
 
 // BuildJwtManager 构建jwt操作
@@ -199,10 +200,12 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 	roleDao := accountDao.NewRoleDao(repository)
 	operationLogDao := systemDao.NewOperationLogDao(repository)
 	dictDao := systemDao.NewDictDao(repository)
+	loginLogDao := systemDao.NewLoginLogDao(repository)
 
 	// 构造Service依赖
 	operationLogService := systemService.NewOperationLogService(repository, operationLogDao)
 	dictService := systemService.NewDictService(repository, redisCache, dictDao, operationLogService)
+	loginLogService := systemService.NewLoginLogService(repository, loginLogDao)
 	menuService := accountService.NewMenuService(repository, redisCache, menuDao, operationLogService)
 	roleService := accountService.NewRoleService(repository, roleDao, redisCache, operationLogService)
 	userService := accountService.NewUserService(repository, userDao, redisCache, roleService, operationLogService)
@@ -217,6 +220,7 @@ func NewContainer(opts ...Option) (container *Container, err error) {
 	container.SystemContainer = SystemContainer{
 		OperationLogService: operationLogService,
 		DictService:         dictService,
+		LoginLogService:     loginLogService,
 	}
 	return container, nil
 }

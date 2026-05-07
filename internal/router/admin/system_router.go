@@ -15,6 +15,8 @@ func systemRouters(r *gin.RouterGroup) {
 	{
 		// 操作日志
 		logGroup.GET("/operation", middleware.PermissionAuth(constant.PermSystemOperationLogList), system.GetOperationLogList)
+		// 登录日志
+		logGroup.GET("/login", middleware.PermissionAuth(constant.PermSystemLoginLogList), system.GetLoginLogList)
 	}
 
 	dictGroup := systemGroup.Group("/dict")

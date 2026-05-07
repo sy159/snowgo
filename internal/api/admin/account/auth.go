@@ -1,11 +1,13 @@
 package account
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"snowgo/internal/constant"
 	"snowgo/internal/di"
+	systemService "snowgo/internal/service/admin/system"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xauth/jwt"
 	e "snowgo/pkg/xerror"
@@ -13,6 +15,21 @@ import (
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
 )
+
+// recordLoginLog 异步记录登录日志
+func recordLoginLog(c *gin.Context, userID int32, username string, status bool, message string) {
+	go func() {
+		container := di.GetSystemContainer(c)
+		container.LoginLogService.CreateLoginLog(context.Background(), &systemService.LoginLogInput{
+			UserID:    userID,
+			Username:  username,
+			IP:        c.ClientIP(),
+			Status:    status,
+			Message:   message,
+			UserAgent: c.GetHeader("User-Agent"),
+		})
+	}()
+}
 
 // Login 登录
 func Login(c *gin.Context) {
@@ -47,7 +64,8 @@ func Login(c *gin.Context) {
 
 	// 如果不允许，直接返回锁定信息
 	if !allowed {
-		xresponse.Fail(c, e.LoginLocked.GetErrCode(), fmt.Sprintf("登录失败次数过多，请等待%d秒后再试", int(ttl.Seconds())))
+		recordLoginLog(c, 0, req.Username, false, fmt.Sprintf("登录失败次数过多，请等待%d秒后再试", int(ttl.Seconds())))
+		xresponse.FailByError(c, e.LoginLocked)
 		return
 	}
 
@@ -56,10 +74,12 @@ func Login(c *gin.Context) {
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {
+			recordLoginLog(c, 0, req.Username, false, bizErr.Code.GetErrMsg())
 			xresponse.FailByError(c, bizErr.Code)
 			return
 		}
 		xlogger.ErrorfCtx(ctx, "authenticate err: %v", err)
+		recordLoginLog(c, 0, req.Username, false, e.AuthError.GetErrMsg())
 		xresponse.FailByError(c, e.AuthError)
 		return
 	}
@@ -71,6 +91,7 @@ func Login(c *gin.Context) {
 	token, err := jwtMgr.GenerateTokens(user.ID, user.Username)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "jwt generate tokens err: %v", err)
+		recordLoginLog(c, user.ID, user.Username, false, e.TokenError.GetErrMsg())
 		xresponse.FailByError(c, e.TokenError)
 		return
 	}
@@ -80,6 +101,9 @@ func Login(c *gin.Context) {
 		jtiKey := constant.CacheRefreshJtiPrefix + claims.ID
 		_ = container.Cache.Set(ctx, jtiKey, "1", claims.ExpiresAt.Sub(claims.IssuedAt.Time))
 	}
+
+	// 异步写入登录成功日志
+	recordLoginLog(c, user.ID, user.Username, true, "")
 
 	xresponse.Success(c, gin.H{
 		"access_token":             token.AccessToken,

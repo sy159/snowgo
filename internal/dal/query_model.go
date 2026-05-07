@@ -6,6 +6,7 @@ func GetQueryModels() []interface{} {
 	return []interface{}{
 		&model.SysDictItem{},
 		&model.SysDict{},
+		&model.SysLoginLog{},
 		&model.SysMenu{},
 		&model.SysOperationLog{},
 		&model.SysRoleMenu{},

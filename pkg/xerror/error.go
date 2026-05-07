@@ -111,7 +111,8 @@ var (
 // 业务system相关 103开头
 var (
 	// LogListError 日志相关 103 01 - 103 10
-	LogListError = NewCode(CategoryAdminLog, 10301, "操作日志列表获取失败")
+	LogListError      = NewCode(CategoryAdminLog, 10301, "操作日志列表获取失败")
+	LoginLogListError = NewCode(CategoryAdminLog, 10302, "登录日志列表获取失败")
 
 	// DictNotFound 字典相关 103 11 - 103 30
 	DictNotFound           = NewCode(CategoryAdminDict, 10311, "字典不存在")

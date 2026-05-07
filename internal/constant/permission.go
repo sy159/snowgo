@@ -24,6 +24,8 @@ const (
 
 	// PermSystemOperationLogList 系统管理 - 操作日志管理
 	PermSystemOperationLogList = "system:operation-log:list" // 查看操作日志列表
+	// PermSystemLoginLogList 系统管理 - 登录日志管理
+	PermSystemLoginLogList = "system:login-log:list" // 查看登录日志列表
 
 	// PermSystemDictList 系统管理 - 字典管理
 	PermSystemDictList   = "system:dict:list"
