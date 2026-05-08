@@ -93,14 +93,14 @@ func GetMenuList(c *gin.Context) {
 
 // DeleteMenuById 菜单删除
 func DeleteMenuById(c *gin.Context) {
-	id := xgin.ParsePathID(c)
+	id := xgin.ParsePathID32(c)
 	if id < 1 {
 		xresponse.FailByError(c, e.MenuNotFound)
 		return
 	}
 	ctx := c.Request.Context()
 	container := di.GetAccountContainer(c)
-	err := container.MenuService.DeleteMenuById(ctx, int32(id))
+	err := container.MenuService.DeleteMenuById(ctx, id)
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {

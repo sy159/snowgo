@@ -159,7 +159,7 @@ func UpdateUser(c *gin.Context) {
 
 // GetUserInfo 用户信息
 func GetUserInfo(c *gin.Context) {
-	id := xgin.ParsePathID(c)
+	id := xgin.ParsePathID32(c)
 	if id < 1 {
 		xresponse.FailByError(c, e.UserNotFound)
 		return
@@ -167,7 +167,7 @@ func GetUserInfo(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	container := di.GetContainer(c)
-	user, err := container.UserService.GetUserById(ctx, int32(id))
+	user, err := container.UserService.GetUserById(ctx, id)
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {
@@ -260,14 +260,14 @@ func GetUserList(c *gin.Context) {
 
 // DeleteUserById 用户删除
 func DeleteUserById(c *gin.Context) {
-	id := xgin.ParsePathID(c)
+	id := xgin.ParsePathID32(c)
 	if id < 1 {
 		xresponse.FailByError(c, e.UserNotFound)
 		return
 	}
 	ctx := c.Request.Context()
 	container := di.GetContainer(c)
-	err := container.UserService.DeleteById(ctx, int32(id))
+	err := container.UserService.DeleteById(ctx, id)
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {

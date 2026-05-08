@@ -137,14 +137,14 @@ func UpdateDict(c *gin.Context) {
 
 // DeleteDictById 字典删除
 func DeleteDictById(c *gin.Context) {
-	id := xgin.ParsePathID(c)
+	id := xgin.ParsePathID32(c)
 	if id < 1 {
 		xresponse.FailByError(c, e.DictNotFound)
 		return
 	}
 	ctx := c.Request.Context()
 	container := di.GetSystemContainer(c)
-	err := container.DictService.DeleteById(ctx, int32(id))
+	err := container.DictService.DeleteById(ctx, id)
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {
@@ -258,14 +258,14 @@ func UpdateDictItem(c *gin.Context) {
 
 // DeleteDictItem 字典item删除
 func DeleteDictItem(c *gin.Context) {
-	id := xgin.ParsePathID(c)
+	id := xgin.ParsePathID32(c)
 	if id < 1 {
 		xresponse.FailByError(c, e.DictItemNotFound)
 		return
 	}
 	ctx := c.Request.Context()
 	container := di.GetSystemContainer(c)
-	err := container.DictService.DeleteItemById(ctx, int32(id))
+	err := container.DictService.DeleteItemById(ctx, id)
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {

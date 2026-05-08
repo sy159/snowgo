@@ -78,7 +78,7 @@ func UpdateRole(c *gin.Context) {
 
 // DeleteRole 删除角色
 func DeleteRole(c *gin.Context) {
-	id := xgin.ParsePathID(c)
+	id := xgin.ParsePathID32(c)
 	if id < 1 {
 		xresponse.FailByError(c, e.RoleNotFound)
 		return
@@ -86,7 +86,7 @@ func DeleteRole(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	container := di.GetAccountContainer(c)
-	err := container.RoleService.DeleteRole(ctx, int32(id))
+	err := container.RoleService.DeleteRole(ctx, id)
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {
@@ -150,7 +150,7 @@ func GetRoleList(c *gin.Context) {
 
 // GetRoleById 获取角色详情（带菜单权限）
 func GetRoleById(c *gin.Context) {
-	id := xgin.ParsePathID(c)
+	id := xgin.ParsePathID32(c)
 	if id < 1 {
 		xresponse.FailByError(c, e.RoleNotFound)
 		return
@@ -158,7 +158,7 @@ func GetRoleById(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	container := di.GetAccountContainer(c)
-	role, err := container.RoleService.GetRoleById(ctx, int32(id))
+	role, err := container.RoleService.GetRoleById(ctx, id)
 	if err != nil {
 		var bizErr *e.BizError
 		if errors.As(err, &bizErr) {
