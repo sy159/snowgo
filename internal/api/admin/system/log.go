@@ -93,7 +93,7 @@ func GetOperationLogList(c *gin.Context) {
 }
 
 type LoginLogInfo struct {
-	ID        int32  `json:"id"`
+	ID        int64  `json:"id"`
 	UserID    int32  `json:"user_id"`
 	Username  string `json:"username"`
 	IP        string `json:"ip"`
@@ -145,7 +145,7 @@ func GetLoginLogList(c *gin.Context) {
 	logList := make([]*LoginLogInfo, 0, len(res.List))
 	for _, loginLog := range res.List {
 		info := &LoginLogInfo{
-			ID:       int32(loginLog.ID),
+			ID:       loginLog.ID,
 			UserID:   loginLog.UserID,
 			Username: loginLog.Username,
 			IP:       loginLog.IP,

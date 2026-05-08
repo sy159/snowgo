@@ -101,8 +101,6 @@ func Login(c *gin.Context) {
 		err = container.Cache.Set(ctx, jtiKey, "1", claims.ExpiresAt.Sub(claims.IssuedAt.Time))
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "save refresh token jti err: %v", err)
-			xresponse.FailByError(c, e.HttpInternalServerError)
-			return
 		}
 	}
 
