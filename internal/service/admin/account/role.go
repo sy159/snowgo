@@ -361,18 +361,18 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 		return fmt.Errorf("获取角色信息失败: %w", err)
 	}
 
-	// 如果用户使用了角色，不能删除
-	isUsed, err := s.roleDao.IsUsedUserByIds(ctx, id)
-	if err != nil {
-		return fmt.Errorf("检查角色使用情况失败: %w", err)
-	}
-	if isUsed {
-		return ErrRoleUsed
-	}
-
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 检查角色是否被用户使用（事务内防止并发）
+		isUsed, err := s.roleDao.IsUsedUserByIds(ctx, id)
+		if err != nil {
+			return fmt.Errorf("检查角色使用情况失败: %w", err)
+		}
+		if isUsed {
+			return ErrRoleUsed
+		}
+
 		// 删除角色
-		err := s.roleDao.TransactionDeleteById(ctx, tx, id)
+		err = s.roleDao.TransactionDeleteById(ctx, tx, id)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "角色删除失败: %v", err)
 			return fmt.Errorf("角色删除失败: %w", err)

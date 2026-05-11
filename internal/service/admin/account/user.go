@@ -136,6 +136,7 @@ var (
 	ErrUserNotFound     = e.NewBizError(e.UserNotFound)
 	ErrAuth             = e.NewBizError(e.AuthError)
 	ErrRoleNotExist     = e.NewBizError(e.UserRoleNotExist)
+	ErrDeleteSelf       = e.NewBizError(e.UserDeleteSelfError)
 )
 
 // CreateUser 创建用户
@@ -449,6 +450,10 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 
 	if userId <= 0 {
 		return ErrUserNotFound
+	}
+	// 禁止删除当前登录用户
+	if userId == userContext.UserId {
+		return ErrDeleteSelf
 	}
 	// 查询被删除用户信息，用于操作日志记录
 	oldUser, err := u.userDao.GetUserById(ctx, userId)

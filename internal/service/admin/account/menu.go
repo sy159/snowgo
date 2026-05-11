@@ -109,11 +109,9 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		return 0, err
 	}
 
-	// 校验父节点
-	if p.ParentID > 0 {
-		if _, err := s.menuDao.GetById(ctx, p.ParentID); err != nil {
-			return 0, ErrMenuParentInvalid
-		}
+	// 校验父节点（基础校验，事务外快速失败）
+	if p.ParentID == p.ID {
+		return 0, ErrMenuParentSelf
 	}
 
 	menu := &model.SysMenu{
@@ -128,6 +126,13 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 	var menuObj *model.SysMenu
 
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 校验父节点存在（事务内，防止并发删除父菜单）
+		if p.ParentID > 0 {
+			if _, err := s.menuDao.GetById(ctx, p.ParentID); err != nil {
+				return ErrMenuParentInvalid
+			}
+		}
+
 		// 校验 perms 唯一性（事务内，menu 表无唯一索引，事务是唯一防线）
 		permsVal := common.DerefOrZero(p.Perms)
 		if permsVal != "" {
@@ -211,16 +216,6 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		return ErrMenuNotFound
 	}
 
-	// 校验父节点
-	if p.ParentID > 0 {
-		if p.ParentID == p.ID {
-			return ErrMenuParentSelf
-		}
-		if _, err := s.menuDao.GetById(ctx, p.ParentID); err != nil {
-			return ErrMenuParentInvalid
-		}
-	}
-
 	// 更新
 	mn := &model.SysMenu{
 		ID:        p.ID,
@@ -234,6 +229,16 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 	}
 
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 校验父节点（事务内，防止并发删除父菜单）
+		if p.ParentID > 0 {
+			if p.ParentID == p.ID {
+				return ErrMenuParentSelf
+			}
+			if _, err := s.menuDao.GetById(ctx, p.ParentID); err != nil {
+				return ErrMenuParentInvalid
+			}
+		}
+
 		// 校验 perms 唯一性（事务内，menu 表无唯一索引，事务是唯一防线）
 		permsVal := common.DerefOrZero(p.Perms)
 		if permsVal != "" {
@@ -332,22 +337,22 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 		return ErrMenuNotFound
 	}
 
-	// 可以在此处校验是否存在子节点，若存在可拒绝删除(也可以改为递归删除)
-	subMenus, _ := s.menuDao.GetByParentId(ctx, id)
-	if len(subMenus) > 0 {
-		return ErrMenuHasChildren
-	}
-
-	// 如果被角色使用，也不能删除
-	isUsed, err := s.menuDao.IsUsedMenuByIds(ctx, []int32{id})
-	if err != nil {
-		return fmt.Errorf("查询角色是否被使用失败: %w", err)
-	}
-	if isUsed {
-		return ErrMenuUsedByRole
-	}
-
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
+		// 检查是否有子菜单（事务内，防止并发创建子菜单）
+		subMenus, _ := s.menuDao.GetByParentId(ctx, id)
+		if len(subMenus) > 0 {
+			return ErrMenuHasChildren
+		}
+
+		// 检查是否被角色使用（事务内，防止并发绑定角色）
+		isUsed, err := s.menuDao.IsUsedMenuByIds(ctx, []int32{id})
+		if err != nil {
+			return fmt.Errorf("查询角色是否被使用失败: %w", err)
+		}
+		if isUsed {
+			return ErrMenuUsedByRole
+		}
+
 		// 删除菜单
 		err = s.menuDao.TransactionDeleteById(ctx, tx, id)
 		if err != nil {
