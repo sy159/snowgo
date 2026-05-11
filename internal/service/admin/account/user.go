@@ -503,10 +503,10 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 
 	// 清除用户对应角色缓存
 	cacheKey := fmt.Sprintf("%s%d", constant.CacheUserRolePrefix, userId)
-	if _, err := u.cache.Delete(ctx, cacheKey); err != nil {
-		xlogger.ErrorfCtx(ctx, "清除用户对应角色缓存失败: %v", err)
+	if _, cacheErr := u.cache.Delete(ctx, cacheKey); cacheErr != nil {
+		xlogger.ErrorfCtx(ctx, "清除用户对应角色缓存失败: %v", cacheErr)
 	}
-	return err
+	return nil
 }
 
 // ResetPwdById 重置用户密码

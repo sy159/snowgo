@@ -51,12 +51,20 @@ func fastMask(raw []byte) []byte {
 	for _, key := range sensitiveRoots {
 		// a) 脱敏顶层 key
 		if gjson.GetBytes(data, key).Exists() {
-			data, _ = sjson.SetBytes(data, key, "****")
+			if masked, err := sjson.SetBytes(data, key, "****"); err != nil {
+				xlogger.ErrorfCtx(context.Background(), "请求参数脱敏失败: %v", err)
+			} else {
+				data = masked
+			}
 		}
 		// b) 脱敏 data.key
 		prefixed := "data." + key
 		if gjson.GetBytes(data, prefixed).Exists() {
-			data, _ = sjson.SetBytes(data, prefixed, "****")
+			if masked, err := sjson.SetBytes(data, prefixed, "****"); err != nil {
+				xlogger.ErrorfCtx(context.Background(), "请求参数脱敏失败: %v", err)
+			} else {
+				data = masked
+			}
 		}
 	}
 
@@ -79,7 +87,11 @@ func fastMask(raw []byte) []byte {
 		for idx := range arr.Array() {
 			fullPath := fmt.Sprintf("%s.%d.%s", prefix, idx, field)
 			if gjson.GetBytes(data, fullPath).Exists() {
-				data, _ = sjson.SetBytes(data, fullPath, "****")
+				if masked, err := sjson.SetBytes(data, fullPath, "****"); err != nil {
+					xlogger.ErrorfCtx(context.Background(), "请求参数脱敏失败: %v", err)
+				} else {
+					data = masked
+				}
 			}
 		}
 	}
@@ -96,7 +108,7 @@ type responseWriter struct {
 // Write 复制一份出来
 func (w *responseWriter) Write(b []byte) (int, error) {
 	//向一个bytes.buffer中写一份数据来为获取body使用
-	w.body.Write(b)
+	_, _ = w.body.Write(b)
 	return w.ResponseWriter.Write(b)
 }
 
@@ -281,22 +293,23 @@ func Recovery() gin.HandlerFunc {
 func Cors() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		method := c.Request.Method
-		origin := c.Request.Header.Get("Origin") //请求头部
-		if origin != "" {
-			// 服务端允许的地址
-			c.Header("Access-Control-Allow-Origin", "*")
-			// 服务端支持的所有跨域请求的方法
-			c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE,UPDATE")
-			//允许跨域设置可以返回其他子段(可根据需求添加)
-			c.Header("Access-Control-Allow-Headers", "Authorization, Content-Length, X-CSRF-Token, Token, Session, X_Requested_With ,Accept, Origin, Host, Connection, Accept-Encoding, Accept-Language, DNT, X-CustomHeader, Keep-Alive, User-Agent, X-Requested-With, If-Modified-Since, Cache-Control, Content-Type, Pragma")
-			// 允许浏览器（客户端）可以解析的头部
-			c.Header("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type")
-			//允许客户端传递校验信息比如 cookie
-			c.Header("Access-Control-Allow-Credentials", "true")
-
+		origin := c.Request.Header.Get("Origin")
+		if origin == "" {
+			c.Next()
+			return
 		}
 
-		//允许类型校验 放行所有OPTIONS方法，因为有的模板是要请求两次的
+		// 服务端允许的地址
+		c.Header("Access-Control-Allow-Origin", origin)
+		// 服务端支持的所有跨域请求的方法
+		c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE, PUT, PATCH")
+		//允许跨域设置可以返回其他子段(可根据需求添加)
+		c.Header("Access-Control-Allow-Headers", "Authorization, Content-Length, X-CSRF-Token, Token, Session, X_Requested_With, Accept, Origin, Host, Connection, Accept-Encoding, Accept-Language, DNT, X-CustomHeader, Keep-Alive, User-Agent, X-Requested-With, If-Modified-Since, Cache-Control, Content-Type, Pragma")
+		// 允许浏览器（客户端）可以解析的头部
+		c.Header("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type")
+		//允许客户端传递校验信息比如 cookie
+		c.Header("Access-Control-Allow-Credentials", "true")
+
 		if method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
 		}

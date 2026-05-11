@@ -19,6 +19,11 @@ func IPWhiteList(whiteList []string) gin.HandlerFunc {
 	}
 	return func(c *gin.Context) {
 		ip := net.ParseIP(c.ClientIP())
+		if ip == nil {
+			xresponse.FailByError(c, e.HttpForbidden)
+			c.Abort()
+			return
+		}
 		for _, network := range cidrs {
 			if network.Contains(ip) {
 				c.Next()

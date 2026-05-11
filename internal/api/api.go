@@ -31,7 +31,16 @@ func PublishMessage(c *gin.Context) {
 		xresponse.FailByError(c, xerror.HttpServiceUnavailable)
 		return
 	}
-	delayMs, _ := strconv.ParseInt(c.Query("delay"), 10, 64)
+	delayStr := c.Query("delay")
+	var delayMs int64
+	if delayStr != "" {
+		var err error
+		delayMs, err = strconv.ParseInt(delayStr, 10, 64)
+		if err != nil {
+			xresponse.FailByError(c, xerror.HttpBadRequest)
+			return
+		}
+	}
 
 	body := struct {
 		ClientIP  string `json:"client_ip"`
