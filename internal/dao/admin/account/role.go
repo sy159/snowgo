@@ -269,6 +269,22 @@ func (r *RoleDao) GetMenuListByRoleId(ctx context.Context, roleId int32) ([]*mod
 	return menuList, nil
 }
 
+// GetUserMenuIds 获取用户所有角色关联的菜单ID集合
+func (r *RoleDao) GetUserMenuIds(ctx context.Context, userId int32) ([]int32, error) {
+	ur := r.repo.Query().SysUserRole
+	rm := r.repo.Query().SysRoleMenu
+	menuIds := make([]int32, 0, 20)
+	err := ur.WithContext(ctx).
+		Join(rm, ur.RoleID.EqCol(rm.RoleID)).
+		Where(ur.UserID.Eq(userId)).
+		Select(rm.MenuID).
+		Pluck(rm.MenuID, &menuIds)
+	if err != nil {
+		return nil, err
+	}
+	return menuIds, nil
+}
+
 // GetMenuPermsByRoleIds 批量获取多个角色的菜单 perms 列表
 func (r *RoleDao) GetMenuPermsByRoleIds(ctx context.Context, roleIds []int32) ([]string, error) {
 	if len(roleIds) == 0 {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"gorm.io/gorm"
+	"slices"
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
@@ -40,6 +41,7 @@ type RoleRepo interface {
 	GetMenuPermsByRoleIds(ctx context.Context, roleIds []int32) ([]string, error)
 	GetMenuListByRoleId(ctx context.Context, roleId int32) ([]*model.SysMenu, error)
 	ListRoleMenuPerms(ctx context.Context) ([]*account.RoleMenuPerm, error)
+	GetUserMenuIds(ctx context.Context, userId int32) ([]int32, error)
 }
 
 // RolePermsGetter 定义角色权限与菜单查询的接口，用于解耦 UserService 对 RoleService 的直接依赖
@@ -98,11 +100,12 @@ type RoleListCondition struct {
 }
 
 var (
-	ErrRoleNotFound     = e.NewBizError(e.RoleNotFound)
-	ErrRoleCodeUsed     = e.NewBizError(e.RoleCodeExist)
-	ErrRoleUsed         = e.NewBizError(e.RoleUsed)
-	ErrRoleIDInvalid    = e.NewBizError(e.RoleIDInvalid)
-	ErrRoleMenuNotExist = e.NewBizError(e.RoleMenuNotExist)
+	ErrRoleNotFound          = e.NewBizError(e.RoleNotFound)
+	ErrRoleCodeUsed          = e.NewBizError(e.RoleCodeExist)
+	ErrRoleUsed              = e.NewBizError(e.RoleUsed)
+	ErrRoleIDInvalid         = e.NewBizError(e.RoleIDInvalid)
+	ErrRoleMenuNotExist      = e.NewBizError(e.RoleMenuNotExist)
+	ErrRoleMenuNotAuthorized = e.NewBizError(e.RoleMenuNotAuthorized)
 )
 
 // CreateRole 创建角色
@@ -131,7 +134,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 	var roleObj *model.SysRole
 	// 事务创建角色，以及关联菜单权限
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
-		// 校验 菜单id是否都存在（事务内防止并发删除）
+		// 校验菜单id是否都存在
 		if len(param.MenuIds) > 0 {
 			menuLen, err := s.roleDao.CountMenuByIds(ctx, param.MenuIds)
 			if err != nil {
@@ -140,6 +143,18 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 			}
 			if menuLen != int64(len(param.MenuIds)) {
 				return ErrRoleMenuNotExist
+			}
+
+			// 校验操作者是否有权限分配这些菜单
+			operatorMenuIds, err := s.roleDao.GetUserMenuIds(ctx, userContext.UserId)
+			if err != nil {
+				xlogger.ErrorfCtx(ctx, "获取操作者菜单权限异常: %v", err)
+				return fmt.Errorf("校验操作者菜单权限失败: %w", err)
+			}
+			for _, id := range param.MenuIds {
+				if !slices.Contains(operatorMenuIds, id) {
+					return ErrRoleMenuNotAuthorized
+				}
 			}
 		}
 
@@ -227,7 +242,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 	// 事务内更新角色，以及关联菜单权限
 	var ruleObj *model.SysRole
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
-		// 校验 菜单id是否都存在（事务内防止并发删除）
+		// 校验菜单id是否都存在
 		if len(param.MenuIds) > 0 {
 			menuLen, err := s.roleDao.CountMenuByIds(ctx, param.MenuIds)
 			if err != nil {
@@ -236,6 +251,18 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 			}
 			if menuLen != int64(len(param.MenuIds)) {
 				return ErrRoleMenuNotExist
+			}
+
+			// 校验操作者是否有权限分配这些菜单
+			operatorMenuIds, err := s.roleDao.GetUserMenuIds(ctx, userContext.UserId)
+			if err != nil {
+				xlogger.ErrorfCtx(ctx, "获取操作者菜单权限异常: %v", err)
+				return fmt.Errorf("校验操作者菜单权限失败: %w", err)
+			}
+			for _, id := range param.MenuIds {
+				if !slices.Contains(operatorMenuIds, id) {
+					return ErrRoleMenuNotAuthorized
+				}
 			}
 		}
 

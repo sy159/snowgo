@@ -407,6 +407,10 @@ make gen add / make gen update   # 生成 Model + Query
 
 - [Apifox 接口文档](https://apifox.com/apidoc/shared-becb3022-d340-491c-bdd7-1f4d4b84620f)
 
+### 前端项目
+
+- [snowgo-vue](https://github.com/sy159/snowgo-vue) — 后台管理前端（Vue 3 + TypeScript + Element Plus）
+
 ### 参考资源
 
 - [Gin 官方文档](https://gin-gonic.com/)
