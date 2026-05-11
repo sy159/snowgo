@@ -362,10 +362,10 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 			ResourceID:   int64(id),
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionDelete,
-			BeforeData:   nil,
+			BeforeData:   dict,
 			AfterData:    nil,
-			Description: fmt.Sprintf("用户(%d-%s)删除了字典(%d)信息",
-				userContext.UserId, userContext.Username, id),
+			Description: fmt.Sprintf("用户(%d-%s)删除了字典(%d-%s)",
+				userContext.UserId, userContext.Username, id, dict.Code),
 			IP: userContext.IP,
 		})
 		if err != nil {
@@ -641,10 +641,10 @@ func (d *DictService) DeleteItemById(ctx context.Context, id int32) error {
 			ResourceID:   int64(id),
 			TraceID:      userContext.TraceId,
 			Action:       constant.ActionDelete,
-			BeforeData:   nil,
+			BeforeData:   item,
 			AfterData:    nil,
-			Description: fmt.Sprintf("用户(%d-%s)删除了字典item(%d)信息",
-				userContext.UserId, userContext.Username, id),
+			Description: fmt.Sprintf("用户(%d-%s)删除了字典item(%d-%s)",
+				userContext.UserId, userContext.Username, id, item.ItemCode),
 			IP: userContext.IP,
 		})
 		if err != nil {
