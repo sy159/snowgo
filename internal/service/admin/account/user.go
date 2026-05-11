@@ -5,7 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
+	"sort"
+	"strings"
+	"time"
+	"unicode"
+
 	"gorm.io/gorm"
+
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
@@ -19,8 +26,6 @@ import (
 	"snowgo/pkg/xdatabase/mysql"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
-	"sort"
-	"time"
 )
 
 // UserRepo 定义User相关db操作接口
@@ -137,7 +142,47 @@ var (
 	ErrAuth             = e.NewBizError(e.AuthError)
 	ErrRoleNotExist     = e.NewBizError(e.UserRoleNotExist)
 	ErrDeleteSelf       = e.NewBizError(e.UserDeleteSelfError)
+	ErrPwdWeak          = e.NewBizError(e.PwdError)
 )
+
+var (
+	allowedPasswordChars = regexp.MustCompile(`^[A-Za-z0-9.!@#$%^&*?_~-]+$`)
+	symbolChars          = ".!@#$%^&*?_~-"
+)
+
+// validatePassword 校验密码强度：6-32位，至少包含字母、数字、特殊字符中的两类
+func validatePassword(pw string) error {
+	if len(pw) == 0 {
+		return errors.New("密码为空")
+	}
+	if len(pw) < 6 || len(pw) > 32 {
+		return errors.New("密码长度需为6-32位")
+	}
+	if !allowedPasswordChars.MatchString(pw) {
+		return errors.New("密码只能包含字母、数字或特殊字符(.!@#$%^&*?_~-)")
+	}
+	var hasLetter, hasDigit, hasSymbol bool
+	typeCount := 0
+	for _, r := range pw {
+		if !hasLetter && unicode.IsLetter(r) {
+			hasLetter = true
+			typeCount++
+		} else if !hasDigit && unicode.IsDigit(r) {
+			hasDigit = true
+			typeCount++
+		} else if !hasSymbol && strings.ContainsRune(symbolChars, r) {
+			hasSymbol = true
+			typeCount++
+		}
+		if typeCount >= 2 {
+			break
+		}
+	}
+	if typeCount < 2 {
+		return errors.New("密码必须同时包含以下任意两类：字母、数字或特殊字符(.!@#$%^&*?_~-)")
+	}
+	return nil
+}
 
 // CreateUser 创建用户
 func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int32, error) {
@@ -154,6 +199,11 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 	}
 	if isDuplicate {
 		return 0, ErrUserNameTelExist
+	}
+
+	// 校验密码强度
+	if err := validatePassword(userParam.Password); err != nil {
+		return 0, ErrPwdWeak
 	}
 
 	// 加密密码
@@ -518,6 +568,10 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password string) error {
 	if userId <= 0 {
 		return ErrUserNotFound
+	}
+	// 校验密码强度
+	if err := validatePassword(password); err != nil {
+		return ErrPwdWeak
 	}
 	// 获取登录ctx
 	userContext, err := xauth.GetUserContext(ctx)

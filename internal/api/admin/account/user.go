@@ -3,7 +3,6 @@ package account
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
-	"regexp"
 	"snowgo/internal/constant"
 	"snowgo/internal/di"
 	"snowgo/internal/service/admin/account"
@@ -12,8 +11,6 @@ import (
 	"snowgo/pkg/xgin"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
-	"strings"
-	"unicode"
 )
 
 type UserListInfo struct {
@@ -56,44 +53,6 @@ type UserList struct {
 	Total int64           `json:"total"`
 }
 
-var (
-	allowedPasswordChars = regexp.MustCompile(`^[A-Za-z0-9.!@#$%^&*?_~-]+$`)
-	symbolChars          = ".!@#$%^&*?_~-"
-)
-
-func ValidatePassword(pw string) error {
-	if len(pw) == 0 {
-		return errors.New("password is empty")
-	}
-	if len(pw) < 6 || len(pw) > 32 {
-		return errors.New("密码长度需为 6-32 位")
-	}
-	if !allowedPasswordChars.MatchString(pw) {
-		return errors.New("密码只能包含字母、数字或特殊字符(.!@#$%^&*?_~-)")
-	}
-	var hasLetter, hasDigit, hasSymbol bool
-	typeCount := 0
-	for _, r := range pw {
-		if !hasLetter && unicode.IsLetter(r) {
-			hasLetter = true
-			typeCount++
-		} else if !hasDigit && unicode.IsDigit(r) {
-			hasDigit = true
-			typeCount++
-		} else if !hasSymbol && strings.ContainsRune(symbolChars, r) {
-			hasSymbol = true
-			typeCount++
-		}
-		if typeCount >= 2 {
-			break
-		}
-	}
-	if typeCount < 2 {
-		return errors.New("密码必须同时包含以下任意两类：字母、数字或特殊字符(.!@#$%^&*?_~-)")
-	}
-	return nil
-}
-
 // CreateUser 创建用户
 func CreateUser(c *gin.Context) {
 	var user account.UserParam
@@ -105,10 +64,6 @@ func CreateUser(c *gin.Context) {
 	// 可以额外校验
 	if user.Username == "" || user.Tel == "" {
 		xresponse.FailByError(c, e.UserNameTelEmptyError)
-		return
-	}
-	if err := ValidatePassword(user.Password); err != nil {
-		xresponse.FailByError(c, e.PwdError)
 		return
 	}
 	ctx := c.Request.Context()
@@ -288,11 +243,6 @@ func ResetPwdById(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&param); err != nil {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
-		return
-	}
-	// 额外校验
-	if err := ValidatePassword(param.Password); err != nil {
-		xresponse.FailByError(c, e.PwdError)
 		return
 	}
 	ctx := c.Request.Context()
