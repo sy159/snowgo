@@ -138,3 +138,68 @@ func TestMiddlewareLogger_ConsoleOption(t *testing.T) {
 		logger.Sync()
 	})
 }
+
+func TestWithFileMaxAgeDays(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    uint32
+		expected uint32
+	}{
+		{"valid days", 14, 14},
+		{"too small (0)", 0, 0}, // 不满足 days >= 2, 不修改，保持零值
+		{"too small (1)", 1, 0}, // 不满足 days >= 2, 不修改，保持零值
+		{"minimum (2)", 2, 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var opts logOptions
+			optFn := WithFileMaxAgeDays(tt.input)
+			optFn(&opts)
+			if opts.fileMaxAgeDays != tt.expected {
+				t.Errorf("fileMaxAgeDays = %d, want %d", opts.fileMaxAgeDays, tt.expected)
+			}
+		})
+	}
+}
+
+func TestWithConsoleOutput(t *testing.T) {
+	var opts logOptions
+	WithConsoleOutput(true)(&opts)
+	if !opts.enableConsoleOutput {
+		t.Error("enableConsoleOutput should be true")
+	}
+
+	WithConsoleOutput(false)(&opts)
+	if opts.enableConsoleOutput {
+		t.Error("enableConsoleOutput should be false")
+	}
+}
+
+func TestMergeFieldsWithTrace(t *testing.T) {
+	// nil context → trace field skipped (test defensive nil handling)
+	fields := mergeFieldsWithTrace(context.TODO(), nil)
+	if len(fields) != 0 {
+		t.Errorf("expected 0 fields for nil ctx, got %d", len(fields))
+	}
+
+	// empty context → trace field skipped
+	fields = mergeFieldsWithTrace(context.Background(), nil)
+	if len(fields) != 0 {
+		t.Errorf("expected 0 fields for background ctx, got %d", len(fields))
+	}
+}
+
+func TestGetTraceField(t *testing.T) {
+	var nilCtx context.Context //nolint:staticcheck // 测试 nil context 防御性处理
+	f := getTraceField(nilCtx)
+	if f != zap.Skip() {
+		t.Error("getTraceField(nil) should return Skip")
+	}
+
+	// empty context
+	f = getTraceField(context.Background())
+	if f != zap.Skip() {
+		t.Error("getTraceField(background) should return Skip")
+	}
+}

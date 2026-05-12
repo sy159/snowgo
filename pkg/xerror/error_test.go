@@ -109,3 +109,40 @@ func TestGetCodes(t *testing.T) {
 		t.Error("Expected to find OK code in GetCodes result")
 	}
 }
+
+func TestGetCategory(t *testing.T) {
+	code := xerror.NewCode(xerror.CategoryHttp, 90030, "test category")
+	if code.GetCategory() != xerror.CategoryHttp {
+		t.Errorf("GetCategory() = %q, want %q", code.GetCategory(), xerror.CategoryHttp)
+	}
+}
+
+func TestNewBizError(t *testing.T) {
+	bizErr := xerror.NewBizError(xerror.UserNotFound)
+	if bizErr.Code.GetErrCode() != xerror.UserNotFound.GetErrCode() {
+		t.Errorf("BizError code = %d, want %d", bizErr.Code.GetErrCode(), xerror.UserNotFound.GetErrCode())
+	}
+	if bizErr.Error() != xerror.UserNotFound.GetErrMsg() {
+		t.Errorf("BizError.Error() = %q, want %q", bizErr.Error(), xerror.UserNotFound.GetErrMsg())
+	}
+	if bizErr.Unwrap() != nil {
+		t.Error("BizError.Unwrap() should be nil when no cause")
+	}
+}
+
+func TestWrapBizError(t *testing.T) {
+	cause := xerror.NewCode(xerror.CategoryHttp, 90031, "cause error")
+	bizErr := xerror.WrapBizError(xerror.UserNotFound, cause)
+	if bizErr.Code.GetErrCode() != xerror.UserNotFound.GetErrCode() {
+		t.Errorf("BizError code = %d, want %d", bizErr.Code.GetErrCode(), xerror.UserNotFound.GetErrCode())
+	}
+	// Error() 应该包含 cause 信息
+	errMsg := bizErr.Error()
+	if errMsg == "" {
+		t.Error("BizError.Error() should not be empty")
+	}
+	// Unwrap 应该返回 cause
+	if unwrapped := bizErr.Unwrap(); unwrapped == nil {
+		t.Error("BizError.Unwrap() should return cause when present")
+	}
+}

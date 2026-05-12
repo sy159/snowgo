@@ -36,3 +36,25 @@ func TestNewContextWithTrace(t *testing.T) {
 		t.Errorf("GetTraceID after NewContextWithTrace = %q, want %q", got, "trace-xyz")
 	}
 }
+
+func TestGetTraceID_NilContext(t *testing.T) {
+	var nilCtx context.Context //nolint:staticcheck // 测试 nil context 防御性处理
+	if got := GetTraceID(nilCtx); got != "" {
+		t.Errorf("GetTraceID(nil) = %q, want empty", got)
+	}
+}
+
+func TestNewContextWithTrace_Overwrite(t *testing.T) {
+	ctx := context.WithValue(context.Background(), xauth.XTraceId, "old-id")
+	ctx = NewContextWithTrace(ctx, "new-id")
+	if got := GetTraceID(ctx); got != "new-id" {
+		t.Errorf("GetTraceID after overwrite = %q, want %q", got, "new-id")
+	}
+}
+
+func TestGetTraceID_EmptyString(t *testing.T) {
+	ctx := context.WithValue(context.Background(), xauth.XTraceId, "")
+	if got := GetTraceID(ctx); got != "" {
+		t.Errorf("GetTraceID(empty string) = %q, want empty", got)
+	}
+}
