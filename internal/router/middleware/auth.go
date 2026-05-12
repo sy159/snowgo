@@ -42,7 +42,7 @@ func JWTAuth() func(c *gin.Context) {
 				c.Abort()
 				return
 			}
-			xlogger.ErrorfCtx(c.Request.Context(), "parse token(%s) is err: %v", parts[1], err)
+			xlogger.ErrorfCtx(c.Request.Context(), "parse token err: %v", err)
 			xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenInvalid.GetErrMsg())
 			c.Abort()
 			return

@@ -143,7 +143,7 @@ func RefreshToken(c *gin.Context) {
 			xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenExpired.GetErrMsg())
 			return
 		}
-		xlogger.ErrorfCtx(ctx, "parse token(%s) is err: %v", req.RefreshToken, err)
+		xlogger.ErrorfCtx(ctx, "parse refresh token err: %v", err)
 		xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenInvalid.GetErrMsg())
 		return
 	}
