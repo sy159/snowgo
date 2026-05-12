@@ -255,7 +255,7 @@ func (u *UserDao) UserNameScope(username string) func(tx gen.Dao) gen.Dao {
 			return tx
 		}
 		m := u.repo.Query().SysUser
-		tx = tx.Where(m.Username.Eq(username))
+		tx = tx.Where(m.Username.Like("%" + username + "%"))
 		return tx
 	}
 }
