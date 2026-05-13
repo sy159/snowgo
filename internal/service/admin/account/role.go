@@ -42,6 +42,7 @@ type RoleRepo interface {
 	GetMenuListByRoleId(ctx context.Context, roleId int32) ([]*model.SysMenu, error)
 	ListRoleMenuPerms(ctx context.Context) ([]*account.RoleMenuPerm, error)
 	GetUserMenuIds(ctx context.Context, userId int32) ([]int32, error)
+	IsSuperAdmin(ctx context.Context, userId int32) (bool, error)
 }
 
 // RolePermsGetter 定义角色权限与菜单查询的接口，用于解耦 UserService 对 RoleService 的直接依赖
@@ -253,15 +254,22 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 				return ErrRoleMenuNotExist
 			}
 
-			// 校验操作者是否有权限分配这些菜单
-			operatorMenuIds, err := s.roleDao.GetUserMenuIds(ctx, userContext.UserId)
+			// 校验操作者是否有权限分配这些菜单（超级管理员跳过）
+			isSuperAdmin, err := s.roleDao.IsSuperAdmin(ctx, userContext.UserId)
 			if err != nil {
-				xlogger.ErrorfCtx(ctx, "获取操作者菜单权限异常: %v", err)
-				return fmt.Errorf("校验操作者菜单权限失败: %w", err)
+				xlogger.ErrorfCtx(ctx, "判断操作者是否为超级管理员异常: %v", err)
+				return fmt.Errorf("判断操作者身份失败: %w", err)
 			}
-			for _, id := range param.MenuIds {
-				if !slices.Contains(operatorMenuIds, id) {
-					return ErrRoleMenuNotAuthorized
+			if !isSuperAdmin {
+				operatorMenuIds, err := s.roleDao.GetUserMenuIds(ctx, userContext.UserId)
+				if err != nil {
+					xlogger.ErrorfCtx(ctx, "获取操作者菜单权限异常: %v", err)
+					return fmt.Errorf("校验操作者菜单权限失败: %w", err)
+				}
+				for _, id := range param.MenuIds {
+					if !slices.Contains(operatorMenuIds, id) {
+						return ErrRoleMenuNotAuthorized
+					}
 				}
 			}
 		}
@@ -351,6 +359,9 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 
 	if id <= 0 {
 		return ErrRoleIDInvalid
+	}
+	if id == constant.SuperAdminRoleId {
+		return e.NewBizError(e.SuperAdminRoleCannotDelete)
 	}
 	// 查询被删除角色信息，用于操作日志记录
 	oldRole, err := s.roleDao.GetRoleById(ctx, id)

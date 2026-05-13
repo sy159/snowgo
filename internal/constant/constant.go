@@ -41,4 +41,7 @@ const (
 	MenuTypeDir  = "Dir"
 	MenuTypeMenu = "Menu"
 	MenuTypeBtn  = "Btn"
+
+	// SuperAdminRoleId 角色相关
+	SuperAdminRoleId int32 = 1 // 超级管理员角色 ID，系统内置，不可删除
 )

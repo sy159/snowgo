@@ -5,6 +5,7 @@ import (
 	"errors"
 	"gorm.io/gen"
 	"gorm.io/gorm"
+	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
@@ -267,6 +268,25 @@ func (r *RoleDao) GetMenuListByRoleId(ctx context.Context, roleId int32) ([]*mod
 		return nil, err
 	}
 	return menuList, nil
+}
+
+// IsSuperAdmin 判断用户是否拥有超级管理员角色（id=1）
+func (r *RoleDao) IsSuperAdmin(ctx context.Context, userId int32) (bool, error) {
+	if userId <= 0 {
+		return false, nil
+	}
+	ur := r.repo.Query().SysUserRole
+	_, err := ur.WithContext(ctx).
+		Where(ur.UserID.Eq(userId), ur.RoleID.Eq(constant.SuperAdminRoleId)).
+		Select(ur.ID).
+		First()
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // GetUserMenuIds 获取用户所有角色关联的菜单ID集合
