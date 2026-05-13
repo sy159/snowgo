@@ -142,7 +142,6 @@ var (
 	ErrAuth             = e.NewBizError(e.AuthError)
 	ErrRoleNotExist     = e.NewBizError(e.UserRoleNotExist)
 	ErrDeleteSelf       = e.NewBizError(e.UserDeleteSelfError)
-	ErrPwdWeak          = e.NewBizError(e.PwdError)
 )
 
 var (
@@ -203,7 +202,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 
 	// 校验密码强度
 	if err := validatePassword(userParam.Password); err != nil {
-		return 0, ErrPwdWeak
+		return 0, e.WrapBizError(e.PwdError, err)
 	}
 
 	// 加密密码
@@ -580,7 +579,7 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 	}
 	// 校验密码强度
 	if err := validatePassword(password); err != nil {
-		return ErrPwdWeak
+		return e.WrapBizError(e.PwdError, err)
 	}
 	// 获取登录ctx
 	userContext, err := xauth.GetUserContext(ctx)
@@ -647,6 +646,10 @@ func (u *UserService) Authenticate(ctx context.Context, username, password strin
 
 	user, err := u.userDao.GetUserByUsername(ctx, username)
 	if err != nil {
+		// 用户不存在统一返回认证失败，避免用户名枚举
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrAuth
+		}
 		xlogger.ErrorfCtx(ctx, "获取用户(%s)信息异常: %v", username, err)
 		return nil, fmt.Errorf("用户信息查询失败: %w", err)
 	}
