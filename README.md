@@ -274,7 +274,9 @@ make down
 ```
 
 # 启动 API 服务
+```shell
 go run ./cmd/http
+```
 
 # 运行效果
 ![](assets/images/run.png)

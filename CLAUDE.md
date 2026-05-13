@@ -23,9 +23,9 @@
 6. Define sentinel errors in Service using `pkg/xerror/` codes; compare with `errors.Is`.
 7. API layer validates all input before reaching Service.
 8. No `panic()` in API/Service/DAO for business errors.
-9. `created_at` mandatory for all tables; soft delete (`is_deleted tinyint(1) DEFAULT 0` + `deleted_at DATETIME(6) DEFAULT NULL`) 按业务需要决定，非强制。适用于需要审计/合规/用户撤销的表（如订单），跳过高容量日志表和关联表。
+9. `created_at` mandatory for all tables; soft delete (`is_deleted tinyint(1) DEFAULT 0` + `deleted_at DATETIME(6) DEFAULT NULL`) is optional, decide per business need. Use for tables requiring audit/compliance/user undo (e.g., orders). Skip for high-volume logs and junction tables.
 10. Run `go test ./... -cover` and `make lint` before declaring complete.
-11. Core and complex code must have Chinese comments. Update README / CLAUDE docs alongside code changes.
+11. Core and complex code must have comments. Update README / CLAUDE docs alongside code changes.
 
 ---
 

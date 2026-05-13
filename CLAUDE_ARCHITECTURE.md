@@ -34,7 +34,7 @@ Design principle: drive schema by query patterns, avoid over-engineering, choose
 | Primary key | BIGINT default. INT for small/config tables |
 | NOT NULL | Default. Avoid nullable unless truly optional |
 | Boolean | TINYINT(1) DEFAULT 0. 0 = false, 1 = true |
-| Status/enum | 大表用 TINYINT 追求效率，小表/配置表用 VARCHAR 追求可读性。在 column comment 中注明取值 |
+| Status/enum | TINYINT for large tables (efficiency), VARCHAR for small/config tables (readability). Document values in column comments |
 | Money | DECIMAL. Semi-structured: JSON |
 | Strings | VARCHAR(n) — set n based on actual business limits, avoid blanket VARCHAR(255) |
 
@@ -75,13 +75,13 @@ err := db.WriteQuery().Transaction(func(tx *query.Query) error {
 })
 ```
 
-Read/write separation: `repo.WriteQuery()` for mutations, `repo.ReadQuery()` for reads, `repo.Query()` default (write node).
+Read/write separation: `repo.WriteQuery()` forces write node, `repo.ReadQuery()` forces read replicas, `repo.Query()` relies on dbresolver auto-detection (SELECT→replica, INSERT/UPDATE/DELETE→source).
 
 DAO pattern: `CreateXxx(ctx, model)` direct use, `TransactionCreateXxx(ctx, tx, model)` for transactions. Always use Transaction* variant inside transactions.
 
 Operation logs: synchronous within transaction for consistency.
 
-**Read-write in transactions**: All reads and writes inside a transaction go to the write node. Outside transactions, reads default to `ReadQuery()`; use `WriteQuery()` explicitly when strong consistency is required.
+**Read-write in transactions**: All reads and writes inside a transaction go to the write node. Outside transactions, `repo.Query()` auto-detects via dbresolver; use `WriteQuery()` or `ReadQuery()` when you need to override automatic routing (e.g., read-after-write to avoid replication lag).
 
 **Reusing business logic in transactions**: When business logic from another service is needed inside a transaction, extract it as a DAO method or a stateless utility function in `pkg/`. Never call another service to avoid implicit transaction nesting or circular dependencies.
 
@@ -132,7 +132,7 @@ Performance targets: P99 read < 200ms, write < 500ms, slow SQL > 2s, cache hit r
 
 ## 7. Code Comments
 
-Core and complex code must have Chinese comments. Simple code needs none. The following must have comments:
+Core and complex code must have comments. Simple code needs none. The following must have comments:
 
 | What | Why |
 |------|-----|
