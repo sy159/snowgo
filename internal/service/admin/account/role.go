@@ -45,21 +45,12 @@ type RoleRepo interface {
 	IsSuperAdmin(ctx context.Context, userId int32) (bool, error)
 }
 
-// RolePermsGetter 定义角色权限与菜单查询的接口，用于解耦 UserService 对 RoleService 的直接依赖
-type RolePermsGetter interface {
-	GetRolePermsListByRuleID(ctx context.Context, roleId int32) ([]string, error)
-	GetRoleMenuListByRuleID(ctx context.Context, roleId int32) ([]*MenuData, error)
-	GetRolePermsListByRuleIds(ctx context.Context, roleIds []int32) ([]string, error)
-}
-
 type RoleService struct {
 	db         *repo.Repository
 	roleDao    RoleRepo
 	cache      xcache.Cache
 	logService system.OperationLogWriter
 }
-
-var _ RolePermsGetter = (*RoleService)(nil)
 
 // NewRoleService 构造函数
 func NewRoleService(db *repo.Repository, roleDao RoleRepo, cache xcache.Cache, logService system.OperationLogWriter) *RoleService {
