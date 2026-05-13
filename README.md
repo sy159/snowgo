@@ -133,6 +133,7 @@ snowgo
 │   ├── xcache/               # Redis 缓存
 │   ├── xcryption/            # 加密工具（bcrypt 哈希、AES-GCM 加解密、SHA256、ID 编码）
 │   ├── xdatabase/            # 数据库连接管理
+│   ├── xenv/                 # 环境检测
 │   ├── xerror/               # 业务错误码
 │   ├── xgin/                 # Gin 工具（URL path 参数解析）
 │   ├── xlimiter/             # 限流器（Fixed Window + Token Bucket）
@@ -141,6 +142,7 @@ snowgo
 │   ├── xmq/                  # RabbitMQ 封装
 │   ├── xrequests/            # HTTP 请求客户端
 │   ├── xresponse/            # 统一响应格式
+│   ├── xruntime/             # Go 运行时信息（服务启动时间等）
 │   ├── xstr_tool/            # 字符串工具
 │   └── xtrace/               # OpenTelemetry 链路追踪
 ├── logs/                     # 运行日志（.gitignore）

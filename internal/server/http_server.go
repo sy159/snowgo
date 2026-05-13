@@ -11,6 +11,7 @@ import (
 	"snowgo/pkg/xcolor"
 	"snowgo/pkg/xenv"
 	"snowgo/pkg/xlogger"
+	"snowgo/pkg/xruntime"
 	"time"
 )
 
@@ -20,6 +21,8 @@ var (
 
 // StartHttpServer 初始化路由，开启http服务
 func StartHttpServer(container *di.Container) {
+	// 记录启动时间
+	xruntime.SetStartTime()
 	// 初始化路由
 	r := router.InitRouter(container)
 	cfg := config.Get()

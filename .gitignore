@@ -29,6 +29,7 @@ Thumbs.db
 # AI agent files
 .claude/
 .agents/
+docs/superpowers/
 
 # Go build artifacts
 *.exe

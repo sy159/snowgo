@@ -11,6 +11,9 @@ import (
 func systemRouters(r *gin.RouterGroup) {
 	systemGroup := r.Group("/system")
 
+	// 服务信息（仅需 JWTAuth，不需要权限校验）
+	systemGroup.GET("/info", system.GetServerInfo)
+
 	logGroup := systemGroup.Group("/log")
 	{
 		// 操作日志
@@ -26,7 +29,7 @@ func systemRouters(r *gin.RouterGroup) {
 		dictGroup.POST("", middleware.PermissionAuth(constant.PermSystemDictCreate), system.CreateDict)
 		dictGroup.PUT("", middleware.PermissionAuth(constant.PermSystemDictUpdate), system.UpdateDict)
 		dictGroup.DELETE("/:id", middleware.PermissionAuth(constant.PermSystemDictDelete), system.DeleteDictById)
-		// 字典枚举信息，// 创建字典item，权限应该跟创建字典相同
+		// 字典枚举信息
 		dictGroup.POST("/item", middleware.PermissionAuth(constant.PermSystemDictCreate), system.CreateItem)
 		dictGroup.PUT("/item", middleware.PermissionAuth(constant.PermSystemDictUpdate), system.UpdateDictItem)
 		dictGroup.GET("/item/:code", system.GetItemListByDictCode)
