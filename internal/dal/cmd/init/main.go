@@ -22,6 +22,7 @@ func main() {
 	db, err := sql.Open("mysql", dbDSN)
 	if err != nil {
 		fmt.Println("连接数据库失败: ", err)
+		return
 	}
 	defer func() { _ = db.Close() }()
 
@@ -29,6 +30,7 @@ func main() {
 	content, err := os.ReadFile("docs/sql/init.sql")
 	if err != nil {
 		fmt.Println("读取 init.sql err: ", err)
+		return
 	}
 
 	// 拆分 SQL 语句
@@ -38,6 +40,7 @@ func main() {
 	tx, err := db.Begin()
 	if err != nil {
 		fmt.Println("开启事务失败: ", err)
+		return
 	}
 	for _, stmt := range stmts {
 		sqlStr := strings.TrimSpace(stmt)
@@ -47,12 +50,14 @@ func main() {
 		if _, err := tx.Exec(sqlStr); err != nil {
 			fmt.Printf("执行 SQL 失败: %s; 错误: %v\n", sqlStr, err)
 			_ = tx.Rollback()
-			fmt.Println("初始化中断")
+			fmt.Println("初始化中断，事务已回滚")
+			return
 		}
 	}
 	// 提交事务
 	if err := tx.Commit(); err != nil {
 		fmt.Println("提交事务失败: ", err)
+		return
 	}
 
 	fmt.Println("初始化数据完成")
