@@ -58,7 +58,7 @@ type MenuParam struct {
 	Path      *string `json:"path"`
 	Icon      *string `json:"icon"`
 	Perms     *string `json:"perms"`
-	SortOrder int32   `json:"sort_order" binding:"required,gte=0"`
+	SortOrder int32   `json:"sort_order" binding:"gte=0"`
 }
 
 // MenuInfo 返回给前端的树节点结构
