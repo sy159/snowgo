@@ -81,6 +81,9 @@ var (
 	ResetPwdError         = NewCode(CategoryAdminUser, 10211, "重置密码失败")
 	UserPermissionError   = NewCode(CategoryAdminUser, 10212, "用户权限获取失败")
 	UserRoleNotExist      = NewCode(CategoryAdminUser, 10213, "设置的角色不存在")
+	PwdLengthError        = NewCode(CategoryAdminUser, 10214, "密码长度需为6-32位")
+	PwdInvalidCharError   = NewCode(CategoryAdminUser, 10215, "密码只能包含字母、数字或特殊字符(.!@#$%^&*?_~-)")
+	PwdComplexityError    = NewCode(CategoryAdminUser, 10216, "密码必须同时包含以下任意两类：字母、数字或特殊字符(.!@#$%^&*?_~-)")
 
 	// MenuNotFound 菜单权限相关  102 21 - 102 39
 	MenuNotFound      = NewCode(CategoryAdminMenu, 10221, "菜单不存在")

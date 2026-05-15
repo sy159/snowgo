@@ -150,15 +150,15 @@ var (
 )
 
 // validatePassword 校验密码强度：6-32位，至少包含字母、数字、特殊字符中的两类
-func validatePassword(pw string) error {
+func validatePassword(pw string) *e.BizError {
 	if len(pw) == 0 {
-		return errors.New("密码为空")
+		return e.NewBizError(e.PwdComplexityError)
 	}
 	if len(pw) < 6 || len(pw) > 32 {
-		return errors.New("密码长度需为6-32位")
+		return e.NewBizError(e.PwdLengthError)
 	}
 	if !allowedPasswordChars.MatchString(pw) {
-		return errors.New("密码只能包含字母、数字或特殊字符(.!@#$%^&*?_~-)")
+		return e.NewBizError(e.PwdInvalidCharError)
 	}
 	var hasLetter, hasDigit, hasSymbol bool
 	typeCount := 0
@@ -178,7 +178,7 @@ func validatePassword(pw string) error {
 		}
 	}
 	if typeCount < 2 {
-		return errors.New("密码必须同时包含以下任意两类：字母、数字或特殊字符(.!@#$%^&*?_~-)")
+		return e.NewBizError(e.PwdComplexityError)
 	}
 	return nil
 }
@@ -201,8 +201,8 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 	}
 
 	// 校验密码强度
-	if err := validatePassword(userParam.Password); err != nil {
-		return 0, e.WrapBizError(e.PwdError, err)
+	if bizErr := validatePassword(userParam.Password); bizErr != nil {
+		return 0, bizErr
 	}
 
 	// 加密密码
@@ -578,8 +578,8 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 		return ErrUserNotFound
 	}
 	// 校验密码强度
-	if err := validatePassword(password); err != nil {
-		return e.WrapBizError(e.PwdError, err)
+	if bizErr := validatePassword(password); bizErr != nil {
+		return bizErr
 	}
 	// 获取登录ctx
 	userContext, err := xauth.GetUserContext(ctx)
