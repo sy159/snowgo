@@ -101,9 +101,12 @@ func getOsInfo() OsInfo {
 	// 获取当前工作目录所在磁盘分区
 	err := syscall.Statfs(".", &stat)
 	var totalGB, usedGB, freeGB uint64
-	if err == nil {
-		total := stat.Blocks * uint64(stat.Bsize)
-		free := stat.Bfree * uint64(stat.Bsize)
+	// stat.Bsize is int64 on Linux (uint32 on macOS). The > 0 guard prevents
+	// a negative int64 → uint64 overflow flagged by gosec G115 on Linux CI.
+	if err == nil && stat.Bsize > 0 {
+		bsize := uint64(stat.Bsize)
+		total := stat.Blocks * bsize
+		free := stat.Bfree * bsize
 		totalGB = total / 1024 / 1024 / 1024
 		freeGB = free / 1024 / 1024 / 1024
 		usedGB = totalGB - freeGB
