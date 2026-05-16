@@ -54,6 +54,7 @@ func (o *OperationLogDao) GetOperationLogList(ctx context.Context, condition *Op
 			o.StartTimeScope(condition.StartTime),
 			o.EndTimeScope(condition.EndTime),
 		).
+		Order(m.ID.Desc()).
 		FindByPage(int(condition.Offset), int(condition.Limit))
 	if err != nil {
 		return nil, 0, err
