@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"reflect"
 	"sync/atomic"
 	"time"
 
@@ -147,6 +149,7 @@ func Init(configPath string) {
 	if err := v.Unmarshal(&cfg); err != nil {
 		panic(fmt.Sprintf("config: failed to unmarshal config: %v", err))
 	}
+	expandEnvRefs(&cfg)
 	configAtomic.Store(cfg)
 
 	// 非生产环境启用热加载
@@ -165,6 +168,43 @@ func initViper(configName, configPath string) *viper.Viper {
 	v.AddConfigPath(configPath)
 	v.SetConfigType("yaml") // 根据实际配置文件类型设置
 	return v
+}
+
+// expandEnvRefs 遍历结构体中所有 string 字段，替换 ${VAR} 为环境变量值
+func expandEnvRefs(cfg *Config) {
+	expandReflect(reflect.ValueOf(cfg).Elem())
+}
+
+func expandReflect(v reflect.Value) {
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return
+		}
+		v = v.Elem()
+	}
+	switch v.Kind() {
+	case reflect.String:
+		if v.CanSet() {
+			v.SetString(os.ExpandEnv(v.String()))
+		}
+	case reflect.Struct:
+		for i := 0; i < v.NumField(); i++ {
+			expandReflect(v.Field(i))
+		}
+	case reflect.Slice:
+		for i := 0; i < v.Len(); i++ {
+			expandReflect(v.Index(i))
+		}
+	case reflect.Map:
+		for _, key := range v.MapKeys() {
+			elem := v.MapIndex(key)
+			if elem.Kind() == reflect.String && elem.CanSet() {
+				v.SetMapIndex(key, reflect.ValueOf(os.ExpandEnv(elem.String())))
+			} else {
+				expandReflect(elem)
+			}
+		}
+	}
 }
 
 //enableHotReload 启用配置热加载

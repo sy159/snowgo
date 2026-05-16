@@ -21,7 +21,7 @@ log:
 
 mysql:
   enable_read_write_separation: false  # 是否配置读写分离
-  dsn: root:zx.123@tcp(127.0.0.1:3306)/uat?charset=utf8mb4&parseTime=true&loc=Local&timeout=3s
+  dsn: ${DB_DSN}
   table_prefix: ""  # 表前缀
   max_idle_conns: 6  # 设置闲置的连接数，默认值为2；推荐 ((核心数 * 2) + 有效磁盘数)
   max_open_conns: 40  # 设置最大打开的连接数，默认值为0，表示不限制
@@ -43,12 +43,12 @@ redis:
 
 jwt:
   issuer: uat-snow  # 发布人
-  jwt_secret: sXZFd67X5ZiXJxF7Mi%Aapi*6wKRTph5  # jwt加密秘钥
+  jwt_secret: ${JWT_SECRET}  # jwt加密秘钥
   access_expiration_time: 10m  # 访问token到期时间
   refresh_expiration_time: 2h  # 刷新token到期时间
 
 rabbitmq:
-  url: "amqp://snow_dev:zx.123@127.0.0.1:5672/uat"
+  url: ${RABBITMQ_URL}
   channel_pool_size: 4  # 生产者channel 池大小，决定并发发布能力
   channel_acquire_timeout: 3s  # 获取可用channel 的超时时间
   channel_confirm_timeout_threshold: 3  # 连续 confirm 超时计数阈值

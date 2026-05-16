@@ -21,7 +21,7 @@ log:
 
 mysql:
   enable_read_write_separation: false  # 是否配置读写分离
-  dsn: root:zx.123@tcp(snowgo-mysql:3306)/snowgo?charset=utf8mb4&parseTime=true&loc=Local&timeout=3s
+  dsn: ${DB_DSN}
   table_prefix: ""  # 表前缀
   max_idle_conns: 16  # 设置闲置的连接数，默认值为2；推荐 ((核心数 * 2) + 有效磁盘数)
   max_open_conns: 120  # 设置最大打开的连接数，默认值为0，表示不限制
@@ -43,6 +43,6 @@ redis:
 
 jwt:
   issuer: snow-container  # 发布人
-  jwt_secret: SJFFZCK$3Q6KMpcfkhNfZWD&M5dAD@nf  # jwt加密秘钥
+  jwt_secret: ${JWT_SECRET}  # jwt加密秘钥
   access_expiration_time: 10m  # 访问token到期时间
   refresh_expiration_time: 1h  # 刷新token到期时间
