@@ -109,8 +109,8 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		return 0, err
 	}
 
-	// 校验父节点（基础校验，事务外快速失败）
-	if p.ParentID == p.ID {
+	// 校验父节点（创建时 p.ID 为 0，仅更新场景生效）
+	if p.ID > 0 && p.ParentID == p.ID {
 		return 0, ErrMenuParentSelf
 	}
 
@@ -296,26 +296,21 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 
 	xlogger.InfofCtx(ctx, "菜单更新成功: old=%+v new=%+v", oldMenu, mn)
 
-	// 如果修改了接口权限，需要更新角色-接口权限数据缓存
-	oldPermsVal := common.DerefOrZero(oldMenu.Perms)
-	newPermsVal := common.DerefOrZero(p.Perms)
-	if oldPermsVal != newPermsVal {
-		roleIds, err := s.menuDao.GetRoleIdsByIds(ctx, p.ID)
-		if err != nil {
-			xlogger.ErrorfCtx(ctx, "获取角色ids异常: %v", err)
-		}
-		for _, roleId := range roleIds {
-			// 清除角色对应接口权限缓存
-			cacheKey := fmt.Sprintf("%s%d", constant.CacheRoleMenuPrefix, roleId)
-			if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
-				xlogger.ErrorfCtx(ctx, "清除角色对应接口权限缓存失败: %v", err)
-			}
-		}
-	}
-
 	// 清理菜单树缓存
 	if _, err := s.cache.Delete(ctx, constant.CacheMenuTree); err != nil {
 		xlogger.ErrorfCtx(ctx, "清理菜单树缓存失败: %v", err)
+	}
+
+	// 清理绑定了该菜单的角色缓存（精准失效）
+	roleIds, err := s.menuDao.GetRoleIdsByIds(ctx, p.ID)
+	if err != nil {
+		xlogger.ErrorfCtx(ctx, "获取角色ids异常: %v", err)
+	}
+	for _, roleId := range roleIds {
+		cacheKey := fmt.Sprintf("%s%d", constant.CacheRoleMenuPrefix, roleId)
+		if _, err := s.cache.Delete(ctx, cacheKey); err != nil {
+			xlogger.ErrorfCtx(ctx, "清除角色对应接口权限缓存失败: %v", err)
+		}
 	}
 	return nil
 }
