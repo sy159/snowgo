@@ -97,6 +97,11 @@ jobs:
           echo "high=${HIGH}" >> "$GITHUB_OUTPUT"
           echo "medium=${MED}" >> "$GITHUB_OUTPUT"
 
+          # Fix gosec SARIF: remove non-object entries from rules[].relationships
+          if [ -f "${SARIF}" ]; then
+            jq 'if .runs then .runs[].tool.driver.rules |= map(if .relationships then .relationships |= map(select(type == "object")) | if length == 0 then del(.relationships) else . end else . end) else . end' "${SARIF}" > "${SARIF}.tmp" && mv "${SARIF}.tmp" "${SARIF}"
+          fi
+
       - name: Upload SARIF
         if: steps.gosec-scan.outputs.sarif_has_runs == 'true'
         uses: github/codeql-action/upload-sarif@v4
