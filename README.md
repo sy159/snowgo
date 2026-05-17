@@ -178,10 +178,23 @@ cd snowgo
 
 ### 2. 修改配置
 
+项目采用 **YAML 文件 + 环境变量注入** 的配置方案：
+- **非敏感配置**（端口、超时、连接池等）：直接写在 `config/config.{env}.yaml` 中
+- **敏感配置**（DSN、密码、密钥等）：通过 `${VAR}` 或 `${VAR:-default}` 占位符从环境变量注入
+
+| 环境 | 策略 | 示例 |
+|------|------|------|
+| dev | 明文写在 YAML 中 | `dsn: root:pass@tcp(...)` |
+| uat / container | `${VAR:-default}`，有默认值方便本地调试 | `dsn: ${MYSQL_DSN:-root:pass@tcp(...)}` |
+| prod | `${VAR}`，无默认值，必须注入 | `dsn: ${MYSQL_DSN}` |
+
 ```shell
 # 本地开发使用 ENV=dev，对应 config/config.dev.yaml
 # Docker Compose 环境使用 ENV=container，对应 config/config.container.yaml
-vim config/config.${ENV}.yaml
+
+# 非 dev 环境需要先设置环境变量（参考 .env.example 中的变量列表）
+cp .env.example .env
+vim .env  # 填入实际的数据库密码、JWT 密钥等
 ```
 
 ### 3. 初始化（可选）
@@ -263,8 +276,9 @@ docker run -d \
 # 1. 构建镜像
 make api-build
 
-# 2. 配置环境变量
-vim .env   # 修改 ENV=container，会使用 config.container.yaml
+# 2. 配置环境变量（敏感字段从环境变量注入，参考 .env.example）
+cp .env.example .env
+vim .env   # 填入实际密码、密钥；设置 ENV=container
 
 # 3. 启动完整服务栈（nginx + mysql + redis + app x2）
 make up
@@ -385,13 +399,40 @@ make gen add / make gen update   # 生成 Model + Query
 
 ## 🌍 环境变量
 
+### 运行环境
+
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `ENV` | 运行环境（dev / container / uat / prod） | `dev` |
 | `SNOWFLAKE_NODE` | 雪花算法节点 ID（多实例部署时需区分） | `1` |
+
+### Docker Compose 部署
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
 | `SERVICE_IMAGE_NAME` | API 服务镜像名称 | `snowgo` |
 | `SERVICE_IMAGE_VERSION` | API 服务镜像版本 | `1.0.0` |
-| `GOPRIVATE` | 私有仓库地址（构建时传递） | 空 |
+| `MYSQL_ROOT_PASSWORD` | MySQL root 密码 | — |
+| `MYSQL_DATABASE` | MySQL 数据库名 | `snowgo` |
+| `MYSQL_PORT` | MySQL 宿主机映射端口 | `3307` |
+| `REDIS_PORT` | Redis 宿主机映射端口 | `6380` |
+| `NGINX_PORT` | Nginx 宿主机映射端口 | `80` |
+| `SUBNET` | Docker 网络子网 | `172.101.0.0/24` |
+
+### 应用敏感配置（dev 环境无需设置，uat / container / prod 通过环境变量注入）
+
+| 变量 | 说明 | uat/container 有默认值 | prod 必填 |
+|------|------|:---:|:---:|
+| `MYSQL_DSN` | MySQL 主库连接串 | ✓ | ✓ |
+| `MYSQL_MAIN_DSN` | 读写分离主库连接串 | — | — |
+| `MYSQL_SLAVE_DSN_1` | 读写分离从库连接串 1 | — | — |
+| `MYSQL_SLAVE_DSN_2` | 读写分离从库连接串 2 | — | — |
+| `MYSQL_USER_DSN` | 用户库连接串（dbMap） | — | — |
+| `REDIS_PASSWORD` | Redis 密码 | ✓ | — |
+| `JWT_SECRET` | JWT 签名密钥 | ✓ | ✓ |
+| `RABBITMQ_URL` | RabbitMQ 连接地址 | ✓ | — |
+
+> 完整列表参见 `.env.example`。
 
 ---
 
