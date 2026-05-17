@@ -1,7 +1,11 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -138,11 +142,6 @@ func Init(configPath string) {
 
 	v := initViper(configName, configPath)
 
-	// 初始加载配置
-	if err := v.ReadInConfig(); err != nil {
-		panic(fmt.Sprintf("config: failed to read config: %v", err))
-	}
-
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		panic(fmt.Sprintf("config: failed to unmarshal config: %v", err))
@@ -155,16 +154,37 @@ func Init(configPath string) {
 	//}
 }
 
-// initViper 初始化Viper实例
+// initViper 初始化Viper实例（读取配置文件并展开 ${VAR} / ${VAR:-default}）
 func initViper(configName, configPath string) *viper.Viper {
 	if len(configPath) == 0 {
 		configPath = defaultConfigPath
 	}
+
+	// 读取原始配置文件，展开 ${VAR} / ${VAR:-default} 后再交给 viper 解析
+	raw, err := os.ReadFile(filepath.Join(configPath, configName+".yaml"))
+	if err != nil {
+		panic(fmt.Sprintf("config: failed to read config file: %v", err))
+	}
+
 	v := viper.New()
-	v.SetConfigName(configName)
-	v.AddConfigPath(configPath)
-	v.SetConfigType("yaml") // 根据实际配置文件类型设置
+	v.SetConfigType("yaml")
+	if err := v.ReadConfig(bytes.NewReader([]byte(expandEnv(string(raw))))); err != nil {
+		panic(fmt.Sprintf("config: failed to parse config: %v", err))
+	}
 	return v
+}
+
+// expandEnv 展开字符串中的 ${VAR} 和 ${VAR:-default}
+func expandEnv(s string) string {
+	return os.Expand(s, func(key string) string {
+		if i := strings.Index(key, ":-"); i >= 0 {
+			if v, ok := os.LookupEnv(key[:i]); ok {
+				return v
+			}
+			return key[i+2:] // 返回默认值
+		}
+		return os.Getenv(key)
+	})
 }
 
 //enableHotReload 启用配置热加载

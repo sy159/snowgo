@@ -8,7 +8,6 @@ data/
 !.gitkeep
 *.log
 /logs/
-/config/*.prod.yaml
 
 # IDE / Editor settings
 .idea/
