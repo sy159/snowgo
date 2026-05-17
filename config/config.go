@@ -161,6 +161,7 @@ func initViper(configName, configPath string) *viper.Viper {
 	}
 
 	// 读取原始配置文件，展开 ${VAR} / ${VAR:-default} 后再交给 viper 解析
+	/* #nosec G304 — 配置文件名由内部映射表决定，非用户可控输入 */
 	raw, err := os.ReadFile(filepath.Join(configPath, configName+".yaml"))
 	if err != nil {
 		panic(fmt.Sprintf("config: failed to read config file: %v", err))

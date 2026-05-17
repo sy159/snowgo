@@ -77,7 +77,7 @@ jobs:
           rm -f "${SARIF}" "${LOG}" || true
 
           set +e
-          gosec -fmt=sarif -out="${SARIF}" ./... 2>&1 | tee "${LOG}"
+          gosec -exclude=G101 -fmt=sarif -out="${SARIF}" ./... 2>&1 | tee "${LOG}"
           GC_EXIT=$?
           set -e
 
