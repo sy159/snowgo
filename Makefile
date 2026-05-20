@@ -117,12 +117,16 @@ stop: down
 # --- Test & Lint ---
 
 .PHONY: test
-test: ## Run unit tests with race detector
+test: ## Run unit tests with race detector (excludes integration tests)
 	go test -race -count=1 -cover ./...
 
 .PHONY: test-verbose
-test-verbose: ## Run tests with verbose output
+test-verbose: ## Run unit tests with verbose output (excludes integration tests)
 	go test -race -v -count=1 ./...
+
+.PHONY: test-integration
+test-integration: ## Run integration tests (requires local Redis + RabbitMQ)
+	go test -race -v -count=1 -tags=integration ./pkg/xcache/... ./pkg/xlock/... ./pkg/xlimiter/... ./pkg/xmq/...
 
 .PHONY: lint
 lint: ## Run golangci-lint

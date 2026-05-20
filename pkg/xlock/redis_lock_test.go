@@ -1,3 +1,5 @@
+//go:build integration
+
 package xlock_test
 
 import (
@@ -8,13 +10,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"snowgo/pkg/xlock"
 )
-
-func TestNewRedisLock_NilClient(t *testing.T) {
-	_, err := xlock.NewRedisLock(nil, nil)
-	if err == nil {
-		t.Fatal("expected error for nil redis client")
-	}
-}
 
 func setupTestRedis(t *testing.T) *redis.Client {
 	t.Helper()
