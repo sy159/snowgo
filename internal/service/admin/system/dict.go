@@ -333,7 +333,7 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrDictCodeNotFound
 		}
-		xlogger.ErrorfCtx(ctx, "获取字典(%d)信息异常: %v", dict.ID, err)
+		xlogger.ErrorfCtx(ctx, "获取字典(%d)信息异常: %v", id, err)
 		return fmt.Errorf("字典信息查询失败: %w", err)
 	}
 
