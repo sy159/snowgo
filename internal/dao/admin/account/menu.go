@@ -18,17 +18,8 @@ func NewMenuDao(repo *repo.Repository) *MenuDao {
 }
 
 // CreateMenu 创建菜单或按钮
-func (d *MenuDao) CreateMenu(ctx context.Context, menu *model.SysMenu) (*model.SysMenu, error) {
-	err := d.repo.Query().WithContext(ctx).SysMenu.Create(menu)
-	if err != nil {
-		return nil, err
-	}
-	return menu, nil
-}
-
-// TransactionCreateMenu 创建菜单或按钮
-func (d *MenuDao) TransactionCreateMenu(ctx context.Context, tx *query.Query, menu *model.SysMenu) (*model.SysMenu, error) {
-	err := tx.WithContext(ctx).SysMenu.Create(menu)
+func (d *MenuDao) CreateMenu(ctx context.Context, q *query.Query, menu *model.SysMenu) (*model.SysMenu, error) {
+	err := q.WithContext(ctx).SysMenu.Create(menu)
 	if err != nil {
 		return nil, err
 	}
@@ -36,26 +27,11 @@ func (d *MenuDao) TransactionCreateMenu(ctx context.Context, tx *query.Query, me
 }
 
 // UpdateMenu 更新菜单
-func (d *MenuDao) UpdateMenu(ctx context.Context, menu *model.SysMenu) (*model.SysMenu, error) {
+func (d *MenuDao) UpdateMenu(ctx context.Context, q *query.Query, menu *model.SysMenu) (*model.SysMenu, error) {
 	if menu.ID <= 0 {
 		return nil, errors.New("菜单ID无效")
 	}
-	m := d.repo.Query().SysMenu
-	err := m.WithContext(ctx).
-		Where(m.ID.Eq(menu.ID)).
-		Save(menu)
-	if err != nil {
-		return nil, err
-	}
-	return menu, nil
-}
-
-// TransactionUpdateMenu 更新菜单
-func (d *MenuDao) TransactionUpdateMenu(ctx context.Context, tx *query.Query, menu *model.SysMenu) (*model.SysMenu, error) {
-	if menu.ID <= 0 {
-		return nil, errors.New("菜单ID无效")
-	}
-	err := tx.WithContext(ctx).SysMenu.Where(tx.SysMenu.ID.Eq(menu.ID)).Save(menu)
+	err := q.WithContext(ctx).SysMenu.Where(q.SysMenu.ID.Eq(menu.ID)).Save(menu)
 	if err != nil {
 		return nil, err
 	}
@@ -63,26 +39,11 @@ func (d *MenuDao) TransactionUpdateMenu(ctx context.Context, tx *query.Query, me
 }
 
 // DeleteById 删除菜单
-func (d *MenuDao) DeleteById(ctx context.Context, id int32) error {
+func (d *MenuDao) DeleteById(ctx context.Context, q *query.Query, id int32) error {
 	if id <= 0 {
 		return errors.New("菜单ID无效")
 	}
-	m := d.repo.Query().SysMenu
-	_, err := m.WithContext(ctx).
-		Where(m.ID.Eq(id)).
-		Delete()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// TransactionDeleteById 删除菜单
-func (d *MenuDao) TransactionDeleteById(ctx context.Context, tx *query.Query, id int32) error {
-	if id <= 0 {
-		return errors.New("菜单ID无效")
-	}
-	_, err := tx.WithContext(ctx).SysMenu.Where(tx.SysMenu.ID.Eq(id)).Delete()
+	_, err := q.WithContext(ctx).SysMenu.Where(q.SysMenu.ID.Eq(id)).Delete()
 	if err != nil {
 		return err
 	}
@@ -90,14 +51,11 @@ func (d *MenuDao) TransactionDeleteById(ctx context.Context, tx *query.Query, id
 }
 
 // GetById 查询单个菜单
-func (d *MenuDao) GetById(ctx context.Context, id int32) (*model.SysMenu, error) {
+func (d *MenuDao) GetById(ctx context.Context, q *query.Query, id int32) (*model.SysMenu, error) {
 	if id <= 0 {
 		return nil, errors.New("菜单ID无效")
 	}
-	m := d.repo.Query().SysMenu
-	menu, err := m.WithContext(ctx).
-		Where(m.ID.Eq(id)).
-		First()
+	menu, err := q.WithContext(ctx).SysMenu.Where(q.SysMenu.ID.Eq(id)).First()
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +63,8 @@ func (d *MenuDao) GetById(ctx context.Context, id int32) (*model.SysMenu, error)
 }
 
 // GetByParentId 根据parentId获取菜单权限
-func (d *MenuDao) GetByParentId(ctx context.Context, parentId int32) ([]*model.SysMenu, error) {
-	m := d.repo.Query().SysMenu
-	menus, err := m.WithContext(ctx).Where(m.ParentID.Eq(parentId)).Find()
+func (d *MenuDao) GetByParentId(ctx context.Context, q *query.Query, parentId int32) ([]*model.SysMenu, error) {
+	menus, err := q.WithContext(ctx).SysMenu.Where(q.SysMenu.ParentID.Eq(parentId)).Find()
 	if err != nil {
 		return nil, err
 	}
@@ -124,11 +81,11 @@ func (d *MenuDao) GetAllMenus(ctx context.Context) ([]*model.SysMenu, error) {
 }
 
 // IsUsedMenuByIds 判断菜单是否被使用过
-func (d *MenuDao) IsUsedMenuByIds(ctx context.Context, menuIds []int32) (bool, error) {
+func (d *MenuDao) IsUsedMenuByIds(ctx context.Context, q *query.Query, menuIds []int32) (bool, error) {
 	if len(menuIds) == 0 {
 		return false, nil
 	}
-	m := d.repo.Query().SysRoleMenu
+	m := q.SysRoleMenu
 	_, err := m.WithContext(ctx).Select(m.ID).Where(m.MenuID.In(menuIds...)).First()
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -140,16 +97,15 @@ func (d *MenuDao) IsUsedMenuByIds(ctx context.Context, menuIds []int32) (bool, e
 }
 
 // IsPermsExists 检查 perms 是否已存在，excludeId 用于排除自身（更新场景）
-func (d *MenuDao) IsPermsExists(ctx context.Context, perms string, excludeId int32) (bool, error) {
+func (d *MenuDao) IsPermsExists(ctx context.Context, q *query.Query, perms string, excludeId int32) (bool, error) {
 	if len(perms) == 0 {
 		return false, nil
 	}
-	m := d.repo.Query().SysMenu
-	query := m.WithContext(ctx).Select(m.ID).Where(m.Perms.Eq(perms))
+	stmt := q.WithContext(ctx).SysMenu.Select(q.SysMenu.ID).Where(q.SysMenu.Perms.Eq(perms))
 	if excludeId > 0 {
-		query = query.Where(m.ID.Neq(excludeId))
+		stmt = stmt.Where(q.SysMenu.ID.Neq(excludeId))
 	}
-	_, err := query.First()
+	_, err := stmt.First()
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
@@ -160,16 +116,15 @@ func (d *MenuDao) IsPermsExists(ctx context.Context, perms string, excludeId int
 }
 
 // IsPathExists 检查 path 是否已存在，excludeId 用于排除自身（更新场景）
-func (d *MenuDao) IsPathExists(ctx context.Context, path string, excludeId int32) (bool, error) {
+func (d *MenuDao) IsPathExists(ctx context.Context, q *query.Query, path string, excludeId int32) (bool, error) {
 	if len(path) == 0 {
 		return false, nil
 	}
-	m := d.repo.Query().SysMenu
-	query := m.WithContext(ctx).Select(m.ID).Where(m.Path.Eq(path))
+	stmt := q.WithContext(ctx).SysMenu.Select(q.SysMenu.ID).Where(q.SysMenu.Path.Eq(path))
 	if excludeId > 0 {
-		query = query.Where(m.ID.Neq(excludeId))
+		stmt = stmt.Where(q.SysMenu.ID.Neq(excludeId))
 	}
-	_, err := query.First()
+	_, err := stmt.First()
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil

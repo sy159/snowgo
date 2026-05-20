@@ -65,17 +65,8 @@ func (r *RoleDao) IsCodeExists(ctx context.Context, code string, roleId int32) (
 }
 
 // CreateRole 创建角色
-func (r *RoleDao) CreateRole(ctx context.Context, role *model.SysRole) (*model.SysRole, error) {
-	err := r.repo.Query().WithContext(ctx).SysRole.Create(role)
-	if err != nil {
-		return nil, err
-	}
-	return role, nil
-}
-
-// TransactionCreateRole 事务创建角色
-func (r *RoleDao) TransactionCreateRole(ctx context.Context, tx *query.Query, role *model.SysRole) (*model.SysRole, error) {
-	err := tx.WithContext(ctx).SysRole.Create(role)
+func (r *RoleDao) CreateRole(ctx context.Context, q *query.Query, role *model.SysRole) (*model.SysRole, error) {
+	err := q.WithContext(ctx).SysRole.Create(role)
 	if err != nil {
 		return nil, err
 	}
@@ -83,24 +74,11 @@ func (r *RoleDao) TransactionCreateRole(ctx context.Context, tx *query.Query, ro
 }
 
 // UpdateRole 更新角色
-func (r *RoleDao) UpdateRole(ctx context.Context, role *model.SysRole) (*model.SysRole, error) {
+func (r *RoleDao) UpdateRole(ctx context.Context, q *query.Query, role *model.SysRole) (*model.SysRole, error) {
 	if role.ID <= 0 {
 		return nil, errors.New("角色id不存在")
 	}
-	m := r.repo.Query().SysRole
-	err := m.WithContext(ctx).Where(m.ID.Eq(role.ID)).Save(role)
-	if err != nil {
-		return nil, err
-	}
-	return role, nil
-}
-
-// TransactionUpdateRole 事务内更新角色
-func (r *RoleDao) TransactionUpdateRole(ctx context.Context, tx *query.Query, role *model.SysRole) (*model.SysRole, error) {
-	if role.ID <= 0 {
-		return nil, errors.New("角色id不存在")
-	}
-	err := tx.WithContext(ctx).SysRole.Where(tx.SysRole.ID.Eq(role.ID)).Save(role)
+	err := q.WithContext(ctx).SysRole.Where(q.SysRole.ID.Eq(role.ID)).Save(role)
 	if err != nil {
 		return nil, err
 	}
@@ -108,12 +86,11 @@ func (r *RoleDao) TransactionUpdateRole(ctx context.Context, tx *query.Query, ro
 }
 
 // DeleteById 删除角色
-func (r *RoleDao) DeleteById(ctx context.Context, roleId int32) error {
+func (r *RoleDao) DeleteById(ctx context.Context, q *query.Query, roleId int32) error {
 	if roleId <= 0 {
 		return errors.New("角色id不存在")
 	}
-	m := r.repo.Query().SysRole
-	_, err := m.WithContext(ctx).Where(m.ID.Eq(roleId)).Delete()
+	_, err := q.WithContext(ctx).SysRole.Where(q.SysRole.ID.Eq(roleId)).Delete()
 	if err != nil {
 		return err
 	}
@@ -178,30 +155,18 @@ func (r *RoleDao) IdsScope(ids []int32) func(tx gen.Dao) gen.Dao {
 	}
 }
 
-// TransactionCreateRoleMenu 创建角色与菜单关联关系
-func (r *RoleDao) TransactionCreateRoleMenu(ctx context.Context, tx *query.Query, roleMenuList []*model.SysRoleMenu) error {
-	err := tx.WithContext(ctx).SysRoleMenu.CreateInBatches(roleMenuList, 1000)
+// CreateRoleMenu 创建角色与菜单关联关系
+func (r *RoleDao) CreateRoleMenu(ctx context.Context, q *query.Query, roleMenuList []*model.SysRoleMenu) error {
+	err := q.WithContext(ctx).SysRoleMenu.CreateInBatches(roleMenuList, 1000)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// TransactionDeleteRoleMenu 删除角色与菜单关联关系
-func (r *RoleDao) TransactionDeleteRoleMenu(ctx context.Context, tx *query.Query, roleId int32) error {
-	_, err := tx.WithContext(ctx).SysRoleMenu.Where(tx.SysRoleMenu.RoleID.Eq(roleId)).Delete()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// TransactionDeleteById 删除角色
-func (r *RoleDao) TransactionDeleteById(ctx context.Context, tx *query.Query, roleId int32) error {
-	if roleId <= 0 {
-		return errors.New("角色id不存在")
-	}
-	_, err := tx.WithContext(ctx).SysRole.Where(tx.SysRole.ID.Eq(roleId)).Delete()
+// DeleteRoleMenu 删除角色与菜单关联关系
+func (r *RoleDao) DeleteRoleMenu(ctx context.Context, q *query.Query, roleId int32) error {
+	_, err := q.WithContext(ctx).SysRoleMenu.Where(q.SysRoleMenu.RoleID.Eq(roleId)).Delete()
 	if err != nil {
 		return err
 	}
@@ -209,8 +174,8 @@ func (r *RoleDao) TransactionDeleteById(ctx context.Context, tx *query.Query, ro
 }
 
 // IsUsedUserByIds 判断角色是否被使用过
-func (r *RoleDao) IsUsedUserByIds(ctx context.Context, roleId int32) (bool, error) {
-	m := r.repo.Query().SysUserRole
+func (r *RoleDao) IsUsedUserByIds(ctx context.Context, q *query.Query, roleId int32) (bool, error) {
+	m := q.SysUserRole
 	_, err := m.WithContext(ctx).Select(m.ID).Where(m.RoleID.Eq(roleId)).First()
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -222,8 +187,8 @@ func (r *RoleDao) IsUsedUserByIds(ctx context.Context, roleId int32) (bool, erro
 }
 
 // CountMenuByIds 根据菜单ids，获取数量
-func (r *RoleDao) CountMenuByIds(ctx context.Context, ids []int32) (int64, error) {
-	m := r.repo.Query().SysMenu
+func (r *RoleDao) CountMenuByIds(ctx context.Context, q *query.Query, ids []int32) (int64, error) {
+	m := q.SysMenu
 	return m.WithContext(ctx).Where(m.ID.In(ids...)).Count()
 }
 
@@ -271,11 +236,11 @@ func (r *RoleDao) GetMenuListByRoleId(ctx context.Context, roleId int32) ([]*mod
 }
 
 // IsSuperAdmin 判断用户是否拥有超级管理员角色（id=1）
-func (r *RoleDao) IsSuperAdmin(ctx context.Context, userId int32) (bool, error) {
+func (r *RoleDao) IsSuperAdmin(ctx context.Context, q *query.Query, userId int32) (bool, error) {
 	if userId <= 0 {
 		return false, nil
 	}
-	ur := r.repo.Query().SysUserRole
+	ur := q.SysUserRole
 	_, err := ur.WithContext(ctx).
 		Where(ur.UserID.Eq(userId), ur.RoleID.Eq(constant.SuperAdminRoleId)).
 		Select(ur.ID).
@@ -290,9 +255,9 @@ func (r *RoleDao) IsSuperAdmin(ctx context.Context, userId int32) (bool, error) 
 }
 
 // GetUserMenuIds 获取用户所有角色关联的菜单ID集合
-func (r *RoleDao) GetUserMenuIds(ctx context.Context, userId int32) ([]int32, error) {
-	ur := r.repo.Query().SysUserRole
-	rm := r.repo.Query().SysRoleMenu
+func (r *RoleDao) GetUserMenuIds(ctx context.Context, q *query.Query, userId int32) ([]int32, error) {
+	ur := q.SysUserRole
+	rm := q.SysRoleMenu
 	menuIds := make([]int32, 0, 20)
 	err := ur.WithContext(ctx).
 		Join(rm, ur.RoleID.EqCol(rm.RoleID)).

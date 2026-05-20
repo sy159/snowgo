@@ -24,25 +24,22 @@ import (
 
 type RoleRepo interface {
 	IsCodeExists(ctx context.Context, code string, roleId int32) (bool, error)
-	CreateRole(ctx context.Context, role *model.SysRole) (*model.SysRole, error)
-	TransactionCreateRole(ctx context.Context, tx *query.Query, role *model.SysRole) (*model.SysRole, error)
-	UpdateRole(ctx context.Context, role *model.SysRole) (*model.SysRole, error)
-	TransactionUpdateRole(ctx context.Context, tx *query.Query, role *model.SysRole) (*model.SysRole, error)
-	DeleteById(ctx context.Context, roleId int32) error
+	CreateRole(ctx context.Context, q *query.Query, role *model.SysRole) (*model.SysRole, error)
+	UpdateRole(ctx context.Context, q *query.Query, role *model.SysRole) (*model.SysRole, error)
+	DeleteById(ctx context.Context, q *query.Query, roleId int32) error
 	GetRoleById(ctx context.Context, roleId int32) (*model.SysRole, error)
 	GetRoleList(ctx context.Context, cond *account.RoleListCondition) ([]*model.SysRole, int64, error)
-	TransactionCreateRoleMenu(ctx context.Context, tx *query.Query, roleMenuList []*model.SysRoleMenu) error
-	TransactionDeleteRoleMenu(ctx context.Context, tx *query.Query, roleId int32) error
-	TransactionDeleteById(ctx context.Context, tx *query.Query, roleId int32) error
-	IsUsedUserByIds(ctx context.Context, userId int32) (bool, error)
-	CountMenuByIds(ctx context.Context, ids []int32) (int64, error)
+	CreateRoleMenu(ctx context.Context, q *query.Query, roleMenuList []*model.SysRoleMenu) error
+	DeleteRoleMenu(ctx context.Context, q *query.Query, roleId int32) error
+	IsUsedUserByIds(ctx context.Context, q *query.Query, userId int32) (bool, error)
+	CountMenuByIds(ctx context.Context, q *query.Query, ids []int32) (int64, error)
 	GetMenuIdsByRoleId(ctx context.Context, roleId int32) ([]int32, error)
 	GetMenuPermsByRoleId(ctx context.Context, roleId int32) ([]string, error)
 	GetMenuPermsByRoleIds(ctx context.Context, roleIds []int32) ([]string, error)
 	GetMenuListByRoleId(ctx context.Context, roleId int32) ([]*model.SysMenu, error)
 	ListRoleMenuPerms(ctx context.Context) ([]*account.RoleMenuPerm, error)
-	GetUserMenuIds(ctx context.Context, userId int32) ([]int32, error)
-	IsSuperAdmin(ctx context.Context, userId int32) (bool, error)
+	GetUserMenuIds(ctx context.Context, q *query.Query, userId int32) ([]int32, error)
+	IsSuperAdmin(ctx context.Context, q *query.Query, userId int32) (bool, error)
 }
 
 type RoleService struct {
@@ -128,7 +125,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 校验菜单id是否都存在
 		if len(param.MenuIds) > 0 {
-			menuLen, err := s.roleDao.CountMenuByIds(ctx, param.MenuIds)
+			menuLen, err := s.roleDao.CountMenuByIds(ctx, tx, param.MenuIds)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "获取菜单数量异常: %v", err)
 				return fmt.Errorf("校验设置的菜单失败: %w", err)
@@ -138,7 +135,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 			}
 
 			// 校验操作者是否有权限分配这些菜单
-			operatorMenuIds, err := s.roleDao.GetUserMenuIds(ctx, userContext.UserId)
+			operatorMenuIds, err := s.roleDao.GetUserMenuIds(ctx, tx, userContext.UserId)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "获取操作者菜单权限异常: %v", err)
 				return fmt.Errorf("校验操作者菜单权限失败: %w", err)
@@ -151,7 +148,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 		}
 
 		// 创建角色
-		roleObj, err = s.roleDao.TransactionCreateRole(ctx, tx, role)
+		roleObj, err = s.roleDao.CreateRole(ctx, tx, role)
 		if err != nil {
 			// 唯一索引冲突兜底
 			if mysql.IsDuplicateKeyErr(err) {
@@ -170,7 +167,7 @@ func (s *RoleService) CreateRole(ctx context.Context, param *RoleParam) (int32, 
 					MenuID: menuId,
 				})
 			}
-			err = s.roleDao.TransactionCreateRoleMenu(ctx, tx, roleMenuList)
+			err = s.roleDao.CreateRoleMenu(ctx, tx, roleMenuList)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "角色与菜单关联关系创建失败: %v", err)
 				return fmt.Errorf("角色与菜单关联关系创建失败: %w", err)
@@ -236,7 +233,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 校验菜单id是否都存在
 		if len(param.MenuIds) > 0 {
-			menuLen, err := s.roleDao.CountMenuByIds(ctx, param.MenuIds)
+			menuLen, err := s.roleDao.CountMenuByIds(ctx, tx, param.MenuIds)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "获取菜单数量异常: %v", err)
 				return fmt.Errorf("校验设置的菜单失败: %w", err)
@@ -246,13 +243,13 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 			}
 
 			// 校验操作者是否有权限分配这些菜单（超级管理员跳过）
-			isSuperAdmin, err := s.roleDao.IsSuperAdmin(ctx, userContext.UserId)
+			isSuperAdmin, err := s.roleDao.IsSuperAdmin(ctx, tx, userContext.UserId)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "判断操作者是否为超级管理员异常: %v", err)
 				return fmt.Errorf("判断操作者身份失败: %w", err)
 			}
 			if !isSuperAdmin {
-				operatorMenuIds, err := s.roleDao.GetUserMenuIds(ctx, userContext.UserId)
+				operatorMenuIds, err := s.roleDao.GetUserMenuIds(ctx, tx, userContext.UserId)
 				if err != nil {
 					xlogger.ErrorfCtx(ctx, "获取操作者菜单权限异常: %v", err)
 					return fmt.Errorf("校验操作者菜单权限失败: %w", err)
@@ -266,7 +263,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 		}
 
 		// 更新字段
-		ruleObj, err = s.roleDao.TransactionUpdateRole(ctx, tx, &model.SysRole{
+		ruleObj, err = s.roleDao.UpdateRole(ctx, tx, &model.SysRole{
 			ID:          param.ID,
 			Name:        &param.Name,
 			Code:        param.Code,
@@ -281,7 +278,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 		}
 
 		// 删除角色关联权限
-		err = s.roleDao.TransactionDeleteRoleMenu(ctx, tx, param.ID)
+		err = s.roleDao.DeleteRoleMenu(ctx, tx, param.ID)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "角色与菜单关联关系删除失败: %v", err)
 			return fmt.Errorf("角色与菜单关联关系删除失败: %w", err)
@@ -296,7 +293,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, param *RoleParam) error {
 					MenuID: menuId,
 				})
 			}
-			err = s.roleDao.TransactionCreateRoleMenu(ctx, tx, roleMenuList)
+			err = s.roleDao.CreateRoleMenu(ctx, tx, roleMenuList)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "角色与菜单关联关系创建失败: %v", err)
 				return fmt.Errorf("角色与菜单关联关系创建失败: %w", err)
@@ -365,7 +362,7 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 检查角色是否被用户使用（事务内防止并发）
-		isUsed, err := s.roleDao.IsUsedUserByIds(ctx, id)
+		isUsed, err := s.roleDao.IsUsedUserByIds(ctx, tx, id)
 		if err != nil {
 			return fmt.Errorf("检查角色使用情况失败: %w", err)
 		}
@@ -374,14 +371,14 @@ func (s *RoleService) DeleteRole(ctx context.Context, id int32) error {
 		}
 
 		// 删除角色
-		err = s.roleDao.TransactionDeleteById(ctx, tx, id)
+		err = s.roleDao.DeleteById(ctx, tx, id)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "角色删除失败: %v", err)
 			return fmt.Errorf("角色删除失败: %w", err)
 		}
 
 		// 删除角色关联权限
-		err = s.roleDao.TransactionDeleteRoleMenu(ctx, tx, id)
+		err = s.roleDao.DeleteRoleMenu(ctx, tx, id)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "角色与菜单关联关系删除失败: %v", err)
 			return fmt.Errorf("角色与菜单关联关系删除失败: %w", err)

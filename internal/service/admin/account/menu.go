@@ -19,18 +19,15 @@ import (
 )
 
 type MenuRepo interface {
-	CreateMenu(ctx context.Context, mn *model.SysMenu) (*model.SysMenu, error)
-	TransactionCreateMenu(ctx context.Context, tx *query.Query, menu *model.SysMenu) (*model.SysMenu, error)
-	UpdateMenu(ctx context.Context, mn *model.SysMenu) (*model.SysMenu, error)
-	TransactionUpdateMenu(ctx context.Context, tx *query.Query, menu *model.SysMenu) (*model.SysMenu, error)
-	DeleteById(ctx context.Context, id int32) error
-	TransactionDeleteById(ctx context.Context, tx *query.Query, id int32) error
-	GetById(ctx context.Context, id int32) (*model.SysMenu, error)
-	GetByParentId(ctx context.Context, parentId int32) ([]*model.SysMenu, error)
+	CreateMenu(ctx context.Context, q *query.Query, mn *model.SysMenu) (*model.SysMenu, error)
+	UpdateMenu(ctx context.Context, q *query.Query, mn *model.SysMenu) (*model.SysMenu, error)
+	DeleteById(ctx context.Context, q *query.Query, id int32) error
+	GetById(ctx context.Context, q *query.Query, id int32) (*model.SysMenu, error)
+	GetByParentId(ctx context.Context, q *query.Query, parentId int32) ([]*model.SysMenu, error)
 	GetAllMenus(ctx context.Context) ([]*model.SysMenu, error)
-	IsUsedMenuByIds(ctx context.Context, menuIds []int32) (bool, error)
-	IsPermsExists(ctx context.Context, perms string, excludeId int32) (bool, error)
-	IsPathExists(ctx context.Context, path string, excludeId int32) (bool, error)
+	IsUsedMenuByIds(ctx context.Context, q *query.Query, menuIds []int32) (bool, error)
+	IsPermsExists(ctx context.Context, q *query.Query, perms string, excludeId int32) (bool, error)
+	IsPathExists(ctx context.Context, q *query.Query, path string, excludeId int32) (bool, error)
 	GetRoleIdsByIds(ctx context.Context, menuId int32) ([]int32, error)
 }
 
@@ -128,7 +125,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 校验父节点存在（事务内，防止并发删除父菜单）
 		if p.ParentID > 0 {
-			if _, err := s.menuDao.GetById(ctx, p.ParentID); err != nil {
+			if _, err := s.menuDao.GetById(ctx, tx, p.ParentID); err != nil {
 				return ErrMenuParentInvalid
 			}
 		}
@@ -136,7 +133,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		// 校验 perms 唯一性（事务内，menu 表无唯一索引，事务是唯一防线）
 		permsVal := common.DerefOrZero(p.Perms)
 		if permsVal != "" {
-			exists, err := s.menuDao.IsPermsExists(ctx, permsVal, 0)
+			exists, err := s.menuDao.IsPermsExists(ctx, tx, permsVal, 0)
 			if err != nil {
 				return fmt.Errorf("校验权限标识失败: %w", err)
 			}
@@ -147,7 +144,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		// 校验 path 唯一性（事务内，menu 表无唯一索引，事务是唯一防线）
 		pathVal := common.DerefOrZero(p.Path)
 		if pathVal != "" {
-			exists, err := s.menuDao.IsPathExists(ctx, pathVal, 0)
+			exists, err := s.menuDao.IsPathExists(ctx, tx, pathVal, 0)
 			if err != nil {
 				return fmt.Errorf("校验菜单路径失败: %w", err)
 			}
@@ -157,7 +154,7 @@ func (s *MenuService) CreateMenu(ctx context.Context, p *MenuParam) (int32, erro
 		}
 
 		// 创建菜单
-		menuObj, err = s.menuDao.TransactionCreateMenu(ctx, tx, menu)
+		menuObj, err = s.menuDao.CreateMenu(ctx, tx, menu)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "创建菜单失败: %v", err)
 			return fmt.Errorf("创建菜单失败: %w", err)
@@ -211,7 +208,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 	}
 
 	// 获取原始角色信息（可选）
-	oldMenu, err := s.menuDao.GetById(ctx, p.ID)
+	oldMenu, err := s.menuDao.GetById(ctx, s.db.Query(), p.ID)
 	if err != nil {
 		return ErrMenuNotFound
 	}
@@ -234,7 +231,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 			if p.ParentID == p.ID {
 				return ErrMenuParentSelf
 			}
-			if _, err := s.menuDao.GetById(ctx, p.ParentID); err != nil {
+			if _, err := s.menuDao.GetById(ctx, tx, p.ParentID); err != nil {
 				return ErrMenuParentInvalid
 			}
 		}
@@ -242,7 +239,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		// 校验 perms 唯一性（事务内，menu 表无唯一索引，事务是唯一防线）
 		permsVal := common.DerefOrZero(p.Perms)
 		if permsVal != "" {
-			exists, err := s.menuDao.IsPermsExists(ctx, permsVal, p.ID)
+			exists, err := s.menuDao.IsPermsExists(ctx, tx, permsVal, p.ID)
 			if err != nil {
 				return fmt.Errorf("校验权限标识失败: %w", err)
 			}
@@ -253,7 +250,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 		// 校验 path 唯一性（事务内，menu 表无唯一索引，事务是唯一防线）
 		pathVal := common.DerefOrZero(p.Path)
 		if pathVal != "" {
-			exists, err := s.menuDao.IsPathExists(ctx, pathVal, p.ID)
+			exists, err := s.menuDao.IsPathExists(ctx, tx, pathVal, p.ID)
 			if err != nil {
 				return fmt.Errorf("校验菜单路径失败: %w", err)
 			}
@@ -262,7 +259,7 @@ func (s *MenuService) UpdateMenu(ctx context.Context, p *MenuParam) error {
 			}
 		}
 
-		menuObj, err := s.menuDao.TransactionUpdateMenu(ctx, tx, mn)
+		menuObj, err := s.menuDao.UpdateMenu(ctx, tx, mn)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "更新菜单失败: %v", err)
 			return fmt.Errorf("更新菜单失败: %w", err)
@@ -327,20 +324,20 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 		return ErrMenuIDInvalid
 	}
 	// 查询被删除菜单信息，用于操作日志记录
-	oldMenu, err := s.menuDao.GetById(ctx, id)
+	oldMenu, err := s.menuDao.GetById(ctx, s.db.Query(), id)
 	if err != nil {
 		return ErrMenuNotFound
 	}
 
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 检查是否有子菜单（事务内，防止并发创建子菜单）
-		subMenus, _ := s.menuDao.GetByParentId(ctx, id)
+		subMenus, _ := s.menuDao.GetByParentId(ctx, tx, id)
 		if len(subMenus) > 0 {
 			return ErrMenuHasChildren
 		}
 
 		// 检查是否被角色使用（事务内，防止并发绑定角色）
-		isUsed, err := s.menuDao.IsUsedMenuByIds(ctx, []int32{id})
+		isUsed, err := s.menuDao.IsUsedMenuByIds(ctx, tx, []int32{id})
 		if err != nil {
 			return fmt.Errorf("查询角色是否被使用失败: %w", err)
 		}
@@ -349,7 +346,7 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 		}
 
 		// 删除菜单
-		err = s.menuDao.TransactionDeleteById(ctx, tx, id)
+		err = s.menuDao.DeleteById(ctx, tx, id)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "删除菜单失败: %v", err)
 			return fmt.Errorf("删除菜单失败: %w", err)

@@ -69,7 +69,8 @@ All multi-table writes must use transactions. Never call `container.SomeService.
 
 ```go
 err := db.WriteQuery().Transaction(func(tx *query.Query) error {
-    // Use Transaction* DAO variants
+    // Pass tx to DAO methods
+    obj, err := dao.CreateUser(ctx, tx, &model.SysUser{...})
     // Operation log within same tx
     return nil
 })
@@ -77,7 +78,30 @@ err := db.WriteQuery().Transaction(func(tx *query.Query) error {
 
 Read/write separation: `repo.WriteQuery()` forces write node, `repo.ReadQuery()` forces read replicas, `repo.Query()` relies on dbresolver auto-detection (SELECT→replica, INSERT/UPDATE/DELETE→source).
 
-DAO pattern: `CreateXxx(ctx, model)` direct use, `TransactionCreateXxx(ctx, tx, model)` for transactions. Always use Transaction* variant inside transactions.
+**DAO `*query.Query` parameter convention**: All DAO write methods accept `*query.Query` as a parameter. The DAO does not care whether it is in a transaction — the Service layer decides what to pass.
+
+| Context | DAO `q` parameter | Source |
+|---------|-------------------|--------|
+| Inside transaction | `tx` | From `Transaction(func(tx *query.Query) error)` |
+| Outside transaction | `repo.Query()` | From `db.WriteQuery().Query()` or `db.Query()` |
+
+```go
+// DAO: unified signature, q source determined by caller
+func (u *UserDao) CreateUser(ctx context.Context, q *query.Query, user *model.SysUser) (*model.SysUser, error) {
+    return q.SysUser.WithContext(ctx).Omit(userDefaultSkipColumns...).Create(user)
+}
+
+// Service: inside transaction → pass tx
+err := s.db.WriteQuery().Transaction(func(tx *query.Query) error {
+    userObj, err = s.userDao.CreateUser(ctx, tx, &model.SysUser{...})
+    return nil
+})
+
+// Service: outside transaction → pass db.Query()
+userObj, err := s.userDao.CreateUser(ctx, s.db.Query(), &model.SysUser{...})
+```
+
+There is only one method per DAO operation — no separate `Transaction*Xxx` variants.
 
 Operation logs: synchronous within transaction for consistency.
 

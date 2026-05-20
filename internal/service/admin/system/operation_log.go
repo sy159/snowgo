@@ -20,7 +20,7 @@ type OperationLogWriter interface {
 
 // OperationLogRepo 定义opt log相关db操作接口
 type OperationLogRepo interface {
-	TransactionCreate(ctx context.Context, tx *query.Query, operationLog *model.SysOperationLog) (*model.SysOperationLog, error)
+	Create(ctx context.Context, q *query.Query, operationLog *model.SysOperationLog) (*model.SysOperationLog, error)
 	GetOperationLogList(ctx context.Context, condition *daoSystem.OperationLogCondition) ([]*model.SysOperationLog, int64, error)
 }
 
@@ -115,7 +115,7 @@ func (o *OperationLogService) CreateOperationLog(ctx context.Context, tx *query.
 		IP:           &input.IP,
 	}
 
-	_, err := o.operationLogDao.TransactionCreate(ctx, tx, operationLog)
+	_, err := o.operationLogDao.Create(ctx, tx, operationLog)
 	return err
 }
 

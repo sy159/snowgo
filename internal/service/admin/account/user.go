@@ -30,24 +30,21 @@ import (
 
 // UserRepo 定义User相关db操作接口
 type UserRepo interface {
-	CreateUser(ctx context.Context, user *model.SysUser) (*model.SysUser, error)
-	TransactionCreateUser(ctx context.Context, tx *query.Query, user *model.SysUser) (*model.SysUser, error)
-	TransactionUpdateUser(ctx context.Context, tx *query.Query, user *model.SysUser) error
-	TransactionCreateUserRole(ctx context.Context, tx *query.Query, userRole *model.SysUserRole) error
-	TransactionCreateUserRoleInBatches(ctx context.Context, tx *query.Query, userRoleList []*model.SysUserRole) error
-	TransactionDeleteUserRole(ctx context.Context, tx *query.Query, userId int32) error
-	TransactionDeleteById(ctx context.Context, tx *query.Query, userId int32) error
+	CreateUser(ctx context.Context, q *query.Query, user *model.SysUser) (*model.SysUser, error)
+	UpdateUser(ctx context.Context, q *query.Query, user *model.SysUser) (*model.SysUser, error)
+	CreateUserRole(ctx context.Context, q *query.Query, userRole *model.SysUserRole) error
+	CreateUserRoleInBatches(ctx context.Context, q *query.Query, userRoleList []*model.SysUserRole) error
+	DeleteUserRole(ctx context.Context, q *query.Query, userId int32) error
+	DeleteById(ctx context.Context, q *query.Query, userId int32) error
 	GetRoleListByUserId(ctx context.Context, userId int32) ([]*model.SysRole, error)
 	GetRoleIdsByUserId(ctx context.Context, userId int32) ([]int32, error)
 	IsNameTelDuplicate(ctx context.Context, username, tel string, userId int32) (bool, error)
 	IsExistByRoleId(ctx context.Context, roleId int32) (bool, error)
-	CountRoleByIds(ctx context.Context, roleId []int32) (int64, error)
+	CountRoleByIds(ctx context.Context, q *query.Query, roleId []int32) (int64, error)
 	GetUserById(ctx context.Context, userId int32) (*model.SysUser, error)
 	GetUserByUsername(ctx context.Context, username string) (*model.SysUser, error)
 	GetUserList(ctx context.Context, condition *account.UserListCondition) ([]*model.SysUser, int64, error)
-	DeleteById(ctx context.Context, userId int32) error
-	ResetPwdById(ctx context.Context, userId int32, password string) error
-	TransactionResetPwdById(ctx context.Context, tx *query.Query, userId int32, password string) error
+	ResetPwdById(ctx context.Context, q *query.Query, userId int32, password string) error
 }
 
 type UserService struct {
@@ -216,7 +213,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 检查设置的角色id是否存在（事务内防止并发删除）
 		if len(userParam.RoleIds) > 0 {
-			roleLen, err := u.userDao.CountRoleByIds(ctx, userParam.RoleIds)
+			roleLen, err := u.userDao.CountRoleByIds(ctx, tx, userParam.RoleIds)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "查询角色数量存在异常: %v", err)
 				return fmt.Errorf("查询角色数量存在异常: %w", err)
@@ -227,7 +224,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		}
 
 		// 创建用户
-		userObj, err = u.userDao.TransactionCreateUser(ctx, tx, &model.SysUser{
+		userObj, err = u.userDao.CreateUser(ctx, tx, &model.SysUser{
 			Username:  userParam.Username,
 			Password:  pwd,
 			Tel:       userParam.Tel,
@@ -255,7 +252,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 					RoleID: roleId,
 				})
 			}
-			err = u.userDao.TransactionCreateUserRoleInBatches(ctx, tx, userRoles)
+			err = u.userDao.CreateUserRoleInBatches(ctx, tx, userRoles)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "用户与角色关联关系创建失败: %+v err: %v", userParam, err)
 				return fmt.Errorf("用户与角色关联关系创建失败: %w", err)
@@ -323,7 +320,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 检查设置的角色id是否存在（事务内防止并发删除）
 		if len(userParam.RoleIds) > 0 {
-			roleLen, err := u.userDao.CountRoleByIds(ctx, userParam.RoleIds)
+			roleLen, err := u.userDao.CountRoleByIds(ctx, tx, userParam.RoleIds)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "查询角色数量存在异常: %v", err)
 				return fmt.Errorf("查询角色数量存在异常: %w", err)
@@ -334,7 +331,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		}
 
 		// 更新用户（指针字段仅在非空时传入）
-		err = u.userDao.TransactionUpdateUser(ctx, tx, &model.SysUser{
+		_, err = u.userDao.UpdateUser(ctx, tx, &model.SysUser{
 			ID:        userParam.ID,
 			Username:  userParam.Username,
 			Tel:       userParam.Tel,
@@ -354,7 +351,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		}
 
 		// 删除用户关联角色
-		err = u.userDao.TransactionDeleteUserRole(ctx, tx, userParam.ID)
+		err = u.userDao.DeleteUserRole(ctx, tx, userParam.ID)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "用户与角色关联关系删除失败: %v", err)
 			return fmt.Errorf("用户与角色关联关系删除失败: %w", err)
@@ -369,7 +366,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 					RoleID: roleId,
 				})
 			}
-			err = u.userDao.TransactionCreateUserRoleInBatches(ctx, tx, userRoles)
+			err = u.userDao.CreateUserRoleInBatches(ctx, tx, userRoles)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "用户与角色关联关系创建失败: %+v err: %v", userParam, err)
 				return fmt.Errorf("用户与角色关联关系创建失败: %w", err)
@@ -524,14 +521,14 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 	}
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 删除用户
-		err := u.userDao.TransactionDeleteById(ctx, tx, userId)
+		err := u.userDao.DeleteById(ctx, tx, userId)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "用户删除异常: %v", err)
 			return fmt.Errorf("用户删除异常: %w", err)
 		}
 
 		// 删除用户-角色关联关系
-		err = u.userDao.TransactionDeleteUserRole(ctx, tx, userId)
+		err = u.userDao.DeleteUserRole(ctx, tx, userId)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "用户与角色关联关系删除失败: %v", err)
 			return fmt.Errorf("用户与角色关联关系删除失败: %w", err)
@@ -605,7 +602,7 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 
 	err = u.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 重置密码
-		err = u.userDao.TransactionResetPwdById(ctx, tx, userId, pwd)
+		err = u.userDao.ResetPwdById(ctx, tx, userId, pwd)
 		if err != nil {
 			return fmt.Errorf("重置密码失败: %w", err)
 		}

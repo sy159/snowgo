@@ -32,9 +32,9 @@ type OperationLogCondition struct {
 	Limit        int32      `json:"limit" form:"limit"`
 }
 
-// TransactionCreate 创建操作日志
-func (o *OperationLogDao) TransactionCreate(ctx context.Context, tx *query.Query, operationLog *model.SysOperationLog) (*model.SysOperationLog, error) {
-	err := tx.WithContext(ctx).SysOperationLog.Create(operationLog)
+// Create 创建操作日志
+func (o *OperationLogDao) Create(ctx context.Context, q *query.Query, operationLog *model.SysOperationLog) (*model.SysOperationLog, error) {
+	err := q.WithContext(ctx).SysOperationLog.Create(operationLog)
 	if err != nil {
 		return nil, err
 	}

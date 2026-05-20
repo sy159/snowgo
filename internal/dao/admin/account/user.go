@@ -33,89 +33,80 @@ type UserListCondition struct {
 }
 
 // CreateUser 创建用户
-func (u *UserDao) CreateUser(ctx context.Context, user *model.SysUser) (*model.SysUser, error) {
-	err := u.repo.Query().WithContext(ctx).SysUser.Create(user)
+func (u *UserDao) CreateUser(ctx context.Context, q *query.Query, user *model.SysUser) (*model.SysUser, error) {
+	err := q.WithContext(ctx).SysUser.Create(user)
 	if err != nil {
 		return nil, err
 	}
 	return user, nil
 }
 
-// TransactionCreateUser 创建用户
-func (u *UserDao) TransactionCreateUser(ctx context.Context, tx *query.Query, user *model.SysUser) (*model.SysUser, error) {
-	err := tx.WithContext(ctx).SysUser.Create(user)
-	if err != nil {
-		return nil, err
-	}
-	return user, nil
-}
-
-// TransactionUpdateUser 更新用户（事务内）
-// 根据传入的 model.SysUser 非零值字段进行部分更新
-func (u *UserDao) TransactionUpdateUser(ctx context.Context, tx *query.Query, user *model.SysUser) error {
+// UpdateUser 更新用户（根据传入的 model.SysUser 非零值字段进行部分更新）
+// UpdateSimple: gen独有的，会处理零值问题、会调用Hook、并且更新时间戳
+func (u *UserDao) UpdateUser(ctx context.Context, q *query.Query, user *model.SysUser) (*model.SysUser, error) {
 	if user.ID <= 0 {
-		return errors.New("用户id不存在")
+		return nil, errors.New("用户id不存在")
 	}
-	m := tx.WithContext(ctx).SysUser.Where(tx.SysUser.ID.Eq(user.ID))
+	m := q.WithContext(ctx).SysUser.Where(q.SysUser.ID.Eq(user.ID))
 	clauses := []field.AssignExpr{
-		tx.SysUser.Username.Value(user.Username),
-		tx.SysUser.Tel.Value(user.Tel),
+		q.SysUser.Username.Value(user.Username),
+		q.SysUser.Tel.Value(user.Tel),
 	}
 	if user.Nickname != nil {
-		clauses = append(clauses, tx.SysUser.Nickname.Value(*user.Nickname))
+		clauses = append(clauses, q.SysUser.Nickname.Value(*user.Nickname))
 	}
 	if user.Email != nil {
-		clauses = append(clauses, tx.SysUser.Email.Value(*user.Email))
+		clauses = append(clauses, q.SysUser.Email.Value(*user.Email))
 	}
 	if user.Remark != nil {
-		clauses = append(clauses, tx.SysUser.Remark.Value(*user.Remark))
+		clauses = append(clauses, q.SysUser.Remark.Value(*user.Remark))
 	}
 	if user.Status != nil {
-		clauses = append(clauses, tx.SysUser.Status.Value(*user.Status))
+		clauses = append(clauses, q.SysUser.Status.Value(*user.Status))
 	}
 	if user.UpdatedBy != nil {
-		clauses = append(clauses, tx.SysUser.UpdatedBy.Value(*user.UpdatedBy))
+		clauses = append(clauses, q.SysUser.UpdatedBy.Value(*user.UpdatedBy))
 	}
 	_, err := m.UpdateSimple(clauses...)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return user, nil
 }
 
-// TransactionCreateUserRole 创建用户-rule关联
-func (u *UserDao) TransactionCreateUserRole(ctx context.Context, tx *query.Query, userRole *model.SysUserRole) error {
-	err := tx.WithContext(ctx).SysUserRole.Create(userRole)
+// CreateUserRole 创建用户-role关联
+func (u *UserDao) CreateUserRole(ctx context.Context, q *query.Query, userRole *model.SysUserRole) error {
+	err := q.WithContext(ctx).SysUserRole.Create(userRole)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// TransactionCreateUserRoleInBatches 创建用户-rule关联
-func (u *UserDao) TransactionCreateUserRoleInBatches(ctx context.Context, tx *query.Query, userRoleList []*model.SysUserRole) error {
-	err := tx.WithContext(ctx).SysUserRole.CreateInBatches(userRoleList, 100)
+// CreateUserRoleInBatches 创建用户-role关联
+func (u *UserDao) CreateUserRoleInBatches(ctx context.Context, q *query.Query, userRoleList []*model.SysUserRole) error {
+	err := q.WithContext(ctx).SysUserRole.CreateInBatches(userRoleList, 100)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// TransactionDeleteUserRole 删除用户与角色关联关系
-func (u *UserDao) TransactionDeleteUserRole(ctx context.Context, tx *query.Query, userId int32) error {
-	_, err := tx.WithContext(ctx).SysUserRole.Where(tx.SysUserRole.UserID.Eq(userId)).Delete()
+// DeleteUserRole 删除用户与角色关联关系
+func (u *UserDao) DeleteUserRole(ctx context.Context, q *query.Query, userId int32) error {
+	_, err := q.WithContext(ctx).SysUserRole.Where(q.SysUserRole.UserID.Eq(userId)).Delete()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// TransactionDeleteById 删除用户（事务内硬删除）
-func (u *UserDao) TransactionDeleteById(ctx context.Context, tx *query.Query, userId int32) error {
+// DeleteById 删除用户by id（硬删除）
+func (u *UserDao) DeleteById(ctx context.Context, q *query.Query, userId int32) error {
 	if userId <= 0 {
 		return errors.New("用户id不存在")
 	}
-	_, err := tx.SysUser.WithContext(ctx).Where(tx.SysUser.ID.Eq(userId)).Delete()
+	_, err := q.SysUser.WithContext(ctx).Where(q.SysUser.ID.Eq(userId)).Delete()
 	if err != nil {
 		return err
 	}
@@ -189,8 +180,8 @@ func (u *UserDao) IsExistByRoleId(ctx context.Context, roleId int32) (bool, erro
 }
 
 // CountRoleByIds 根据role ids，获取数量
-func (u *UserDao) CountRoleByIds(ctx context.Context, roleIds []int32) (int64, error) {
-	m := u.repo.Query().SysRole
+func (u *UserDao) CountRoleByIds(ctx context.Context, q *query.Query, roleIds []int32) (int64, error) {
+	m := q.SysRole
 	return m.WithContext(ctx).Select(m.ID).Where(m.ID.In(roleIds...)).Count()
 }
 
@@ -293,56 +284,12 @@ func (u *UserDao) NickNameScope(nickname string) func(tx gen.Dao) gen.Dao {
 	}
 }
 
-// DeleteById 删除用户by id（硬删除）
-func (u *UserDao) DeleteById(ctx context.Context, userId int32) error {
-	if userId <= 0 {
-		return errors.New("用户id不存在")
-	}
-	m := u.repo.Query().SysUser
-	_, err := m.WithContext(ctx).Where(m.ID.Eq(userId)).Delete()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// UpdateUser 更新用户
-// UpdateSimple: gen独有的，会处理零值问题、会调用Hook、并且更新时间戳
-// UpdateColumnSimple：gen独有的，会处理零值问题、不是调用Hook、不会更新时间戳、性能更高，类似执行原生sql
-// Save: 会处理零值问题，但是是全部更新
-// Updates: 不会处理零值问题、会调用Hook、并且更新时间戳（map时会更新零值）
-// UpdateColumns: 会处理零值问题、不会调用Hook、不会更新时间戳、性能更高，类似执行原生sql，跟save差不多，不过不会更新时间戳
-func (u *UserDao) UpdateUser(ctx context.Context, user *model.SysUser) (*model.SysUser, error) {
-	if user.ID <= 0 {
-		return nil, errors.New("用户id不存在")
-	}
-	m := u.repo.Query().SysUser
-	err := m.WithContext(ctx).Where(m.ID.Eq(user.ID)).Save(user)
-	if err != nil {
-		return nil, err
-	}
-	return user, nil
-}
-
 // ResetPwdById 重置密码
-func (u *UserDao) ResetPwdById(ctx context.Context, userId int32, password string) error {
+func (u *UserDao) ResetPwdById(ctx context.Context, q *query.Query, userId int32, password string) error {
 	if userId <= 0 {
 		return errors.New("用户id不存在")
 	}
-	m := u.repo.Query().SysUser
-	_, err := m.WithContext(ctx).Where(m.ID.Eq(userId)).UpdateSimple(m.Password.Value(password))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// TransactionResetPwdById 事务内重置密码
-func (u *UserDao) TransactionResetPwdById(ctx context.Context, tx *query.Query, userId int32, password string) error {
-	if userId <= 0 {
-		return errors.New("用户id不存在")
-	}
-	_, err := tx.WithContext(ctx).SysUser.Where(tx.SysUser.ID.Eq(userId)).UpdateSimple(tx.SysUser.Password.Value(password))
+	_, err := q.WithContext(ctx).SysUser.Where(q.SysUser.ID.Eq(userId)).UpdateSimple(q.SysUser.Password.Value(password))
 	if err != nil {
 		return err
 	}

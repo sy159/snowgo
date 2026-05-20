@@ -382,7 +382,7 @@ GET /readyz    # Readiness probe（服务是否就绪）
     ↓
 make gen add / make gen update   # 生成 Model + Query
     ↓
-实现 DAO 层（直接 + 事务方法）
+实现 DAO 层（统一 *query.Query 参数，事务内传 tx，事务外传 db.Query()）
     ↓
 实现 Service 层（业务逻辑、缓存、操作日志）
     ↓

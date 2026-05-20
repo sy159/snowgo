@@ -121,59 +121,59 @@ func (d *DictDao) IsCodeDuplicate(ctx context.Context, code string, dictId int32
 	return true, nil
 }
 
-// TransactionCreateDict 创建字典
-func (d *DictDao) TransactionCreateDict(ctx context.Context, tx *query.Query, dict *model.SysDict) (*model.SysDict, error) {
-	err := tx.WithContext(ctx).SysDict.Create(dict)
+// CreateDict 创建字典
+func (d *DictDao) CreateDict(ctx context.Context, q *query.Query, dict *model.SysDict) (*model.SysDict, error) {
+	err := q.WithContext(ctx).SysDict.Create(dict)
 	if err != nil {
 		return nil, err
 	}
 	return dict, nil
 }
 
-// TransactionUpdateDict 更新字典
-func (d *DictDao) TransactionUpdateDict(ctx context.Context, tx *query.Query, dict *model.SysDict) (*model.SysDict, error) {
+// UpdateDict 更新字典
+func (d *DictDao) UpdateDict(ctx context.Context, q *query.Query, dict *model.SysDict) (*model.SysDict, error) {
 	if dict.ID <= 0 {
 		return nil, errors.New("字典id不存在")
 	}
-	err := tx.WithContext(ctx).SysDict.Where(tx.SysDict.ID.Eq(dict.ID)).Save(dict)
+	err := q.WithContext(ctx).SysDict.Where(q.SysDict.ID.Eq(dict.ID)).Save(dict)
 	if err != nil {
 		return nil, err
 	}
 	return dict, nil
 }
 
-// TransactionDeleteById 删除字典
-func (d *DictDao) TransactionDeleteById(ctx context.Context, tx *query.Query, id int32) error {
+// DeleteById 删除字典
+func (d *DictDao) DeleteById(ctx context.Context, q *query.Query, id int32) error {
 	if id <= 0 {
 		return errors.New("字典id不存在")
 	}
-	_, err := tx.WithContext(ctx).SysDict.Where(tx.SysDict.ID.Eq(id)).Delete()
+	_, err := q.WithContext(ctx).SysDict.Where(q.SysDict.ID.Eq(id)).Delete()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// TransactionDeleteItemByDictID 删除字典枚举 by id
-func (d *DictDao) TransactionDeleteItemByDictID(ctx context.Context, tx *query.Query, dictId int32) error {
+// DeleteItemByDictID 删除字典枚举 by id
+func (d *DictDao) DeleteItemByDictID(ctx context.Context, q *query.Query, dictId int32) error {
 	if dictId <= 0 {
 		return errors.New("字典id不存在")
 	}
-	_, err := tx.WithContext(ctx).SysDictItem.Where(tx.SysDictItem.DictID.Eq(dictId)).Delete()
+	_, err := q.WithContext(ctx).SysDictItem.Where(q.SysDictItem.DictID.Eq(dictId)).Delete()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// TransactionUpdateItemByDictID 更新字典枚举dict code by id
-func (d *DictDao) TransactionUpdateItemByDictID(ctx context.Context, tx *query.Query, dictId int32, dictCode string) error {
+// UpdateItemByDictID 更新字典枚举dict code by id
+func (d *DictDao) UpdateItemByDictID(ctx context.Context, q *query.Query, dictId int32, dictCode string) error {
 	if dictId <= 0 {
 		return errors.New("字典id不存在")
 	}
-	_, err := tx.WithContext(ctx).SysDictItem.
-		Where(tx.SysDictItem.DictID.Eq(dictId)).
-		UpdateSimple(tx.SysDictItem.DictCode.Value(dictCode))
+	_, err := q.WithContext(ctx).SysDictItem.
+		Where(q.SysDictItem.DictID.Eq(dictId)).
+		UpdateSimple(q.SysDictItem.DictCode.Value(dictCode))
 	if err != nil {
 		return err
 	}
@@ -216,9 +216,9 @@ func (d *DictDao) IsCodeItemDuplicate(ctx context.Context, dictId int32, itemCod
 	return true, nil
 }
 
-// TransactionCreateDictItem 创建字典枚举
-func (d *DictDao) TransactionCreateDictItem(ctx context.Context, tx *query.Query, item *model.SysDictItem) (*model.SysDictItem, error) {
-	err := tx.WithContext(ctx).SysDictItem.Create(item)
+// CreateDictItem 创建字典枚举
+func (d *DictDao) CreateDictItem(ctx context.Context, q *query.Query, item *model.SysDictItem) (*model.SysDictItem, error) {
+	err := q.WithContext(ctx).SysDictItem.Create(item)
 	if err != nil {
 		return nil, err
 	}
@@ -238,24 +238,24 @@ func (d *DictDao) GetDictItemById(ctx context.Context, itemId int32) (*model.Sys
 	return item, nil
 }
 
-// TransactionUpdateDictItem 更新字典item
-func (d *DictDao) TransactionUpdateDictItem(ctx context.Context, tx *query.Query, item *model.SysDictItem) (*model.SysDictItem, error) {
+// UpdateDictItem 更新字典item
+func (d *DictDao) UpdateDictItem(ctx context.Context, q *query.Query, item *model.SysDictItem) (*model.SysDictItem, error) {
 	if item.ID <= 0 {
 		return nil, errors.New("字典item id不存在")
 	}
-	err := tx.WithContext(ctx).SysDictItem.Where(tx.SysDictItem.ID.Eq(item.ID)).Save(item)
+	err := q.WithContext(ctx).SysDictItem.Where(q.SysDictItem.ID.Eq(item.ID)).Save(item)
 	if err != nil {
 		return nil, err
 	}
 	return item, nil
 }
 
-// TransactionDeleteItemByID 删除字典枚举 by id
-func (d *DictDao) TransactionDeleteItemByID(ctx context.Context, tx *query.Query, id int32) error {
+// DeleteItemByID 删除字典枚举 by id
+func (d *DictDao) DeleteItemByID(ctx context.Context, q *query.Query, id int32) error {
 	if id <= 0 {
 		return errors.New("字典item id不存在")
 	}
-	_, err := tx.WithContext(ctx).SysDictItem.Where(tx.SysDictItem.ID.Eq(id)).Delete()
+	_, err := q.WithContext(ctx).SysDictItem.Where(q.SysDictItem.ID.Eq(id)).Delete()
 	if err != nil {
 		return err
 	}

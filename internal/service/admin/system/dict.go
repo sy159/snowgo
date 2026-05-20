@@ -24,17 +24,17 @@ type DictRepo interface {
 	GetDictById(ctx context.Context, dictId int32) (*model.SysDict, error)
 	GetDictList(ctx context.Context, condition *daoSystem.DictListCondition) ([]*model.SysDict, int64, error)
 	IsCodeDuplicate(ctx context.Context, code string, dictId int32) (bool, error)
-	TransactionCreateDict(ctx context.Context, tx *query.Query, dict *model.SysDict) (*model.SysDict, error)
-	TransactionUpdateDict(ctx context.Context, tx *query.Query, dict *model.SysDict) (*model.SysDict, error)
-	TransactionDeleteById(ctx context.Context, tx *query.Query, id int32) error
-	TransactionDeleteItemByDictID(ctx context.Context, tx *query.Query, dictId int32) error
-	TransactionUpdateItemByDictID(ctx context.Context, tx *query.Query, dictId int32, dictCode string) error
+	CreateDict(ctx context.Context, q *query.Query, dict *model.SysDict) (*model.SysDict, error)
+	UpdateDict(ctx context.Context, q *query.Query, dict *model.SysDict) (*model.SysDict, error)
+	DeleteById(ctx context.Context, q *query.Query, id int32) error
+	DeleteItemByDictID(ctx context.Context, q *query.Query, dictId int32) error
+	UpdateItemByDictID(ctx context.Context, q *query.Query, dictId int32, dictCode string) error
 	GetItemListByDictCode(ctx context.Context, dictCode string) ([]*model.SysDictItem, error)
 	IsCodeItemDuplicate(ctx context.Context, dictId int32, itemCode string, dictItemId int32) (bool, error)
-	TransactionCreateDictItem(ctx context.Context, tx *query.Query, item *model.SysDictItem) (*model.SysDictItem, error)
+	CreateDictItem(ctx context.Context, q *query.Query, item *model.SysDictItem) (*model.SysDictItem, error)
 	GetDictItemById(ctx context.Context, itemId int32) (*model.SysDictItem, error)
-	TransactionUpdateDictItem(ctx context.Context, tx *query.Query, item *model.SysDictItem) (*model.SysDictItem, error)
-	TransactionDeleteItemByID(ctx context.Context, tx *query.Query, id int32) error
+	UpdateDictItem(ctx context.Context, q *query.Query, item *model.SysDictItem) (*model.SysDictItem, error)
+	DeleteItemByID(ctx context.Context, q *query.Query, id int32) error
 }
 
 type DictService struct {
@@ -177,7 +177,7 @@ func (d *DictService) CreateDict(ctx context.Context, param *DictParam) (int32, 
 	var dict *model.SysDict
 	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 创建字典
-		dict, err = d.dictRepo.TransactionCreateDict(ctx, tx, &model.SysDict{
+		dict, err = d.dictRepo.CreateDict(ctx, tx, &model.SysDict{
 			Code:        param.Code,
 			Name:        param.Name,
 			Description: param.Description,
@@ -254,7 +254,7 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 	// 更新字典
 	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 更新字典
-		dict, err := d.dictRepo.TransactionUpdateDict(ctx, tx, &model.SysDict{
+		dict, err := d.dictRepo.UpdateDict(ctx, tx, &model.SysDict{
 			ID:          param.ID,
 			Code:        param.Code,
 			Name:        param.Name,
@@ -271,7 +271,7 @@ func (d *DictService) UpdateDict(ctx context.Context, param *DictParam) (int32, 
 
 		// 如果更新了dict code，还需要更新item表对应的dict code
 		if oldDict.Code != param.Code {
-			err = d.dictRepo.TransactionUpdateItemByDictID(ctx, tx, param.ID, param.Code)
+			err = d.dictRepo.UpdateItemByDictID(ctx, tx, param.ID, param.Code)
 			if err != nil {
 				xlogger.ErrorfCtx(ctx, "字典枚举更新失败: %+v err: %v", param, err)
 				return fmt.Errorf("字典枚举更新失败: %w", err)
@@ -340,14 +340,14 @@ func (d *DictService) DeleteById(ctx context.Context, id int32) error {
 	// 删除字典
 	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 删除字典对应的item
-		err = d.dictRepo.TransactionDeleteItemByDictID(ctx, tx, id)
+		err = d.dictRepo.DeleteItemByDictID(ctx, tx, id)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典(%d)枚举删除失败:  err: %v", id, err)
 			return fmt.Errorf("字典枚举删除失败: %w", err)
 		}
 
 		// 删除字典
-		err = d.dictRepo.TransactionDeleteById(ctx, tx, id)
+		err = d.dictRepo.DeleteById(ctx, tx, id)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典(%d)删除失败:  err: %v", id, err)
 			return fmt.Errorf("字典删除失败: %w", err)
@@ -464,7 +464,7 @@ func (d *DictService) CreateItem(ctx context.Context, param *DictItemParam) (int
 	var item *model.SysDictItem
 	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 创建字典item
-		item, err = d.dictRepo.TransactionCreateDictItem(ctx, tx, &model.SysDictItem{
+		item, err = d.dictRepo.CreateDictItem(ctx, tx, &model.SysDictItem{
 			DictID:      dict.ID,
 			DictCode:    dict.Code,
 			ItemCode:    param.ItemCode,
@@ -550,7 +550,7 @@ func (d *DictService) UpdateItem(ctx context.Context, param *DictItemParam) (int
 	// 更新字典
 	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 更新字典
-		item, err := d.dictRepo.TransactionUpdateDictItem(ctx, tx, &model.SysDictItem{
+		item, err := d.dictRepo.UpdateDictItem(ctx, tx, &model.SysDictItem{
 			ID:          param.ID,
 			DictID:      oldItem.DictID,
 			DictCode:    oldItem.DictCode,
@@ -626,7 +626,7 @@ func (d *DictService) DeleteItemById(ctx context.Context, id int32) error {
 	// 删除字典item
 	err = d.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 删除字典item
-		err = d.dictRepo.TransactionDeleteItemByID(ctx, tx, id)
+		err = d.dictRepo.DeleteItemByID(ctx, tx, id)
 		if err != nil {
 			xlogger.ErrorfCtx(ctx, "字典(%d)枚举删除失败:  err: %v", id, err)
 			return fmt.Errorf("字典枚举删除失败: %w", err)
