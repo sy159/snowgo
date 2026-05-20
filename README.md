@@ -77,7 +77,8 @@
 
 - 每层只调用下一层，禁止跨层调用
 - API 只调用 Service（不调 DAO），Service 只调用 DAO（不调 GORM Gen 直接）
-- 多表写操作必须使用事务；操作日志在事务内同步写入
+- Service 层决定事务边界；DAO 统一接收调用方传入的 `*query.Query`
+- 多表写操作、需要操作日志原子落库的业务写操作必须使用事务；独立单表写入可按业务需要非事务执行
 - 缓存失效在 DB 提交后执行，禁止在事务中操作缓存
 
 ---
@@ -188,6 +189,8 @@ cd snowgo
 | uat / container | `${VAR:-default}`，有默认值方便本地调试 | `dsn: ${MYSQL_DSN:-root:pass@tcp(...)}` |
 | prod | `${VAR}`，无默认值，必须注入 | `dsn: ${MYSQL_DSN}` |
 
+`dev`、`uat`、`container` 中的默认账号、密码、DSN、JWT 密钥仅用于本地开发和演示项目首次启动。生产环境必须使用 `prod` 配置并通过环境变量注入真实密钥，不能复用示例凭据。
+
 ```shell
 # 本地开发使用 ENV=dev，对应 config/config.dev.yaml
 # Docker Compose 环境使用 ENV=container，对应 config/config.container.yaml
@@ -213,7 +216,7 @@ make mq-init      # 声明 RabbitMQ 队列与交换机
 | `admin` | `123456` | 管理员（admin） | 拥有全部权限 |
 | `test` | `123456` | 只读（read_only） | 仅具备查询与查看权限，不允许任何写操作 |
 
-> 两个账号的初始密码相同，登录后请及时修改。
+> 这些账号仅用于本地测试和演示。两个账号的初始密码相同，登录后请及时修改，生产数据不应复用这些账号或密码。
 
 ### 5. 运行项目
 
@@ -336,6 +339,8 @@ make down               # 停止全部服务
 make restart            # 重启全部服务
 ```
 
+测试范围按改动范围选择：小改动优先跑受影响包的单测，例如 `go test ./pkg/xauth/...`；涉及共享逻辑、路由、配置、数据库访问或跨模块行为时跑 `go test ./...`。每次完成前都必须跑通过 `make lint`。覆盖率命令用于覆盖率专项检查，不作为每次改动的默认完成门槛。
+
 ---
 
 ## 🔌 服务入口
@@ -359,8 +364,8 @@ make restart            # 重启全部服务
 | InjectContainerMiddleware | DI 容器注入到 Gin Context | 始终启用 |
 | AccessLogger | 访问日志（敏感字段自动脱敏） | 始终启用 |
 | IPWhiteList | IP 白名单限制 | pprof / 自定义路由 |
-| JWTAuth | JWT Access Token 校验 | 需要登录的接口 |
-| PermissionAuth | RBAC 权限校验 | 需要权限的接口 |
+| JWTAuth | JWT Access Token 校验 | 登录后的 admin 接口 |
+| PermissionAuth | RBAC 权限校验 | 敏感管理操作或按权限范围访问的数据接口 |
 | AccessLimiter | 路由级 Token Bucket 限流 | 配置启用 |
 | KeyLimiter | IP / 用户级限流 | 配置启用 |
 | Cors | 跨域支持 | 配置启用（当前默认关闭） |
@@ -383,13 +388,13 @@ GET /readyz    # Readiness probe（服务是否就绪）
     ↓
 make gen add / make gen update   # 生成 Model + Query
     ↓
-实现 DAO 层（统一 *query.Query 参数，事务内传 tx，事务外传 db.Query()）
+实现 DAO 层（统一 `*query.Query` 参数，事务内传 `tx`，事务外传 `repo.Query()` / `repo.WriteQuery()`）
     ↓
 实现 Service 层（业务逻辑、缓存、操作日志）
     ↓
 实现 API 层（参数绑定、校验、响应转换）
     ↓
-注册路由 + 权限配置（internal/router/*_router.go）
+注册路由 + 鉴权/权限配置（internal/router/*_router.go；登录态接口使用 JWTAuth，敏感管理接口额外使用 PermissionAuth）
     ↓
 更新 DI 容器（internal/di/container.go）
 ```

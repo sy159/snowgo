@@ -65,7 +65,17 @@ Left-prefix rule: `(a, b, c)` serves `(a)`, `(a, b)`, `(a, b, c)`. Range queries
 
 ## 3. Transactions
 
-All multi-table writes must use transactions. Never call `container.SomeService.Method()` inside a transaction. Service MUST NOT directly use GORM Gen query APIs.
+The Service layer owns transaction boundaries. DAO methods accept a caller-provided `*query.Query`, so the same DAO method can run inside a transaction (`tx`) or outside a transaction (`repo.Query()` / `repo.WriteQuery()`). DAO must not start, commit, or rollback transactions.
+
+Use `WriteQuery().Transaction()` for:
+
+- Multi-table writes.
+- Business mutations that must persist operation logs atomically.
+- Read-after-write logic that must be isolated from replica lag.
+
+Independent single-table writes may run without an explicit transaction when there is no cross-table or operation-log atomicity requirement, for example login logs. Prefer `repo.WriteQuery()` for non-transactional writes when the write node must be explicit; `repo.Query()` may rely on dbresolver auto-routing.
+
+Never call `container.SomeService.Method()` inside a transaction. Service MUST NOT directly use GORM Gen query APIs.
 
 ```go
 err := db.WriteQuery().Transaction(func(tx *query.Query) error {
@@ -78,12 +88,12 @@ err := db.WriteQuery().Transaction(func(tx *query.Query) error {
 
 Read/write separation: `repo.WriteQuery()` forces write node, `repo.ReadQuery()` forces read replicas, `repo.Query()` relies on dbresolver auto-detection (SELECT→replica, INSERT/UPDATE/DELETE→source).
 
-**DAO `*query.Query` parameter convention**: All DAO write methods accept `*query.Query` as a parameter. The DAO does not care whether it is in a transaction — the Service layer decides what to pass.
+**DAO `*query.Query` parameter convention**: DAO methods that may participate in a transaction accept `*query.Query` as a parameter. The DAO does not care whether it is in a transaction — the Service layer decides what to pass.
 
 | Context | DAO `q` parameter | Source |
 |---------|-------------------|--------|
 | Inside transaction | `tx` | From `Transaction(func(tx *query.Query) error)` |
-| Outside transaction | `repo.Query()` | From `db.WriteQuery().Query()` or `db.Query()` |
+| Outside transaction | `repo.Query()` / `repo.WriteQuery()` | From the Service's repository |
 
 ```go
 // DAO: unified signature, q source determined by caller
@@ -97,15 +107,15 @@ err := s.db.WriteQuery().Transaction(func(tx *query.Query) error {
     return nil
 })
 
-// Service: outside transaction → pass db.Query()
-userObj, err := s.userDao.CreateUser(ctx, s.db.Query(), &model.SysUser{...})
+// Service: outside transaction → pass repo query explicitly
+userObj, err := s.userDao.CreateUser(ctx, s.db.WriteQuery(), &model.SysUser{...})
 ```
 
 There is only one method per DAO operation — no separate `Transaction*Xxx` variants.
 
-Operation logs: synchronous within transaction for consistency.
+Operation logs for audited business mutations are synchronous within the same transaction for consistency.
 
-**Read-write in transactions**: All reads and writes inside a transaction go to the write node. Outside transactions, `repo.Query()` auto-detects via dbresolver; use `WriteQuery()` or `ReadQuery()` when you need to override automatic routing (e.g., read-after-write to avoid replication lag).
+**Read-write in transactions**: All reads and writes inside a transaction go to the write node. Outside transactions, `repo.Query()` auto-detects via dbresolver; use `WriteQuery()` or `ReadQuery()` when you need to override automatic routing, for example read-after-write to avoid replication lag.
 
 **Reusing business logic in transactions**: When business logic from another service is needed inside a transaction, extract it as a DAO method or a stateless utility function in `pkg/`. Never call another service to avoid implicit transaction nesting or circular dependencies.
 

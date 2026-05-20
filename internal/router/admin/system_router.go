@@ -32,6 +32,7 @@ func systemRouters(r *gin.RouterGroup) {
 		// 字典枚举信息
 		dictGroup.POST("/item", middleware.PermissionAuth(constant.PermSystemDictCreate), system.CreateItem)
 		dictGroup.PUT("/item", middleware.PermissionAuth(constant.PermSystemDictUpdate), system.UpdateDictItem)
+		// 字典枚举读取（仅需 JWTAuth，不需要 PermissionAuth）
 		dictGroup.GET("/item/:code", system.GetItemListByDictCode)
 		dictGroup.DELETE("/item/:id", middleware.PermissionAuth(constant.PermSystemDictDelete), system.DeleteDictItem)
 	}

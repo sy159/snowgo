@@ -102,8 +102,8 @@ Structure: `[level][module][specific]` — first digit = level, digits 2-3 = mod
 
 ## 4. Logging
 
-- Always use `xlogger.InfofCtx` / `xlogger.ErrorfCtx` (injects trace_id).
-- Never `fmt.Printf` / `log.Println`.
+- Business code uses `xlogger.InfofCtx` / `xlogger.ErrorfCtx` (injects trace_id).
+- Avoid `fmt.Printf` / `log.Println` in business code. CLI tools, startup banners, package-level fallback loggers, and non-production console access logs may use standard output when intentional.
 - `Warn`: reserved for access logs via `xlogger.Access()`.
 - `Info`: business events. `Error`: anomalies. `Debug`: disabled in production.
 - Sensitive fields auto-masked: password, token, secret, access_token, refresh_token, phone, id_card, email.

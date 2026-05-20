@@ -15,6 +15,7 @@ func accountRouters(r *gin.RouterGroup) {
 		accountGroup.GET("/user", middleware.PermissionAuth(constant.PermAccountUserList), account.GetUserList)
 		accountGroup.POST("/user", middleware.PermissionAuth(constant.PermAccountUserCreate), account.CreateUser)
 		accountGroup.PUT("/user", middleware.PermissionAuth(constant.PermAccountUserUpdate), account.UpdateUser)
+		// 当前登录用户权限（仅需 JWTAuth，不需要 PermissionAuth）
 		accountGroup.GET("/user/permission", account.GetUserPermission)
 		accountGroup.POST("/user/pwd", middleware.PermissionAuth(constant.PermAccountUserResetPwd), account.ResetPwdById)
 		accountGroup.DELETE("/user/:id", middleware.PermissionAuth(constant.PermAccountUserDelete), account.DeleteUserById)

@@ -9,7 +9,7 @@
 ## 1. Security
 
 - JWT access tokens short-lived. Refresh tokens single-use with JTI tracking in Redis.
-- Every admin endpoint: `JWTAuth()` + `PermissionAuth(constant.PermXXXX)`.
+- Admin endpoints require `JWTAuth()` after login. Add `PermissionAuth(constant.PermXXXX)` for privileged management operations or scoped business data. Login-only endpoints, such as current user permissions, server info, and allowed dictionary lookups, should be explicit in route comments.
 - Never log passwords, tokens, secrets, PII. Passwords via `xcryption.HashPassword()` (bcrypt).
 - API responses: no internal error details to clients.
 
@@ -40,6 +40,14 @@ Use **interface mocking**. Reference: `internal/service/admin/account/user_test.
 
 Coverage: pkg/ >= 80%. New business modules require Service tests. All code should have test cases where practical — aim for coverage of happy path, boundary conditions, error branches, and permission checks.
 
+### 2.3 Verification Scope
+
+- Small, localized changes: run the affected package tests, for example `go test ./pkg/xauth/...`.
+- Broad/shared behavior changes: run `go test ./...`.
+- Integration changes: run the relevant `make test-integration` target or package tests with `-tags=integration` when Redis/RabbitMQ/MySQL dependencies are available.
+- Always run `make lint` before declaring complete.
+- Coverage commands are useful for coverage work, but are not the default completion gate for every change.
+
 ---
 
 ## 3. Commit Convention
@@ -51,11 +59,12 @@ Conventional commits: `<type>(<scope>): <desc>`. Types: feat, fix, docs, refacto
 ## 4. Prohibited Patterns
 
 - DO NOT manually edit `internal/dal/model/` or `internal/dal/query/`
-- DO NOT use `fmt.Printf` / `log.Println` in production code
+- DO NOT use `fmt.Printf` / `log.Println` in business code; CLI tools, startup banners, package-level fallback loggers, and non-production console access logs are allowed when intentional
 - DO NOT call `container.SomeService.Method()` inside a transaction
+- DO NOT start transactions in DAO; Service owns transaction boundaries and passes `*query.Query`
 - DO NOT expose internal error details in API responses
 - Add `is_deleted = 0` filter only for tables that implement soft delete
-- DO NOT commit secrets or `.env` files. Use `.env.example` as a template.
+- DO NOT commit secrets or `.env` files. `.env.example` and local/container example configs may include documented demo credentials for first-run testing only; production configs must use injected secrets without defaults.
 - DO NOT skip tests or fabricate results
 
 ---
@@ -65,15 +74,16 @@ Conventional commits: `<type>(<scope>): <desc>`. Types: feat, fix, docs, refacto
 - [ ] created_at mandatory, updated_at only if table has updates
 - [ ] Soft delete per business need; PK type (INT vs BIGINT) matches volume
 - [ ] DAL generated, not hand-written
-- [ ] Multi-table mutations use `WriteQuery().Transaction()`
-- [ ] Operation log within transaction (sync, consistency guaranteed)
-- [ ] Admin endpoints: JWTAuth + PermissionAuth
+- [ ] Transaction boundary is owned by Service; DAO receives caller-provided `*query.Query`
+- [ ] Multi-table mutations and audited business mutations use `WriteQuery().Transaction()`
+- [ ] Operation log for audited business mutations is written within the same transaction
+- [ ] Admin endpoints: JWTAuth; PermissionAuth added for privileged/scoped endpoints, with login-only exceptions documented
 - [ ] Input validation at API layer
 - [ ] Errors use `e.NewBizError(e.Code)` sentinels in Service; API uses `errors.As` + `FailByError`; no `Fail(c, code, err.Error())` leaking internals
 - [ ] Logs use `*Ctx` variants
 - [ ] Cache invalidation after DB commit, not inside transaction
 - [ ] Sensitive data masked
-- [ ] `make test` passes
+- [ ] Tests appropriate to the change scope pass
 - [ ] `make lint` passes
 - [ ] Performance targets met (P99 read < 200ms, write < 500ms)
 - [ ] Indexes follow left-prefix rule
