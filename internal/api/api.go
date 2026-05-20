@@ -24,7 +24,40 @@ func Index(c *gin.Context) {
 	})
 }
 
-// PublishMessage 发送消息
+// Liveness 存活检查
+func Liveness(c *gin.Context) {
+	c.JSON(200, gin.H{"status": "ok"})
+}
+
+// Readiness 就绪检查
+func Readiness(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+
+	// db检查
+	container := di.GetContainer(c)
+	// mysql检查
+	if _, err := container.GetMyDB().CheckDBAlive(ctx); err != nil {
+		xlogger.ErrorfCtx(c.Request.Context(), "db check err: %v", err)
+		c.JSON(503, gin.H{
+			"status": "not ready",
+			"error":  "mysql not ready",
+		})
+		return
+	}
+	// redis检查
+	if _, err := container.GetRDB().Ping(ctx).Result(); err != nil {
+		xlogger.ErrorfCtx(c.Request.Context(), "redis check err: %v", err)
+		c.JSON(503, gin.H{
+			"status": "not ready",
+			"error":  "redis not ready",
+		})
+		return
+	}
+	c.JSON(200, gin.H{"status": "ready"})
+}
+
+// PublishMessage 发送消息（已移除路由注册，保留作为 MQ 发布示例参考）
 func PublishMessage(c *gin.Context) {
 	container := di.GetContainer(c)
 	if container.Producer == nil {
@@ -72,37 +105,4 @@ func PublishMessage(c *gin.Context) {
 		}
 	}
 	xresponse.Success(c, nil)
-}
-
-// Liveness 存活检查
-func Liveness(c *gin.Context) {
-	c.JSON(200, gin.H{"status": "ok"})
-}
-
-// Readiness 就绪检查
-func Readiness(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
-	defer cancel()
-
-	// db检查
-	container := di.GetContainer(c)
-	// mysql检查
-	if _, err := container.GetMyDB().CheckDBAlive(ctx); err != nil {
-		xlogger.ErrorfCtx(c.Request.Context(), "db check err: %v", err)
-		c.JSON(503, gin.H{
-			"status": "not ready",
-			"error":  "mysql not ready",
-		})
-		return
-	}
-	// redis检查
-	if _, err := container.GetRDB().Ping(ctx).Result(); err != nil {
-		xlogger.ErrorfCtx(c.Request.Context(), "redis check err: %v", err)
-		c.JSON(503, gin.H{
-			"status": "not ready",
-			"error":  "redis not ready",
-		})
-		return
-	}
-	c.JSON(200, gin.H{"status": "ready"})
 }

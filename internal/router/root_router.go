@@ -9,5 +9,4 @@ import (
 // 根路由配置
 func rootRouters(r *gin.RouterGroup) {
 	r.GET("/index", api.Index)
-	r.GET("/test/publish", api.PublishMessage)
 }
