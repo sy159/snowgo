@@ -33,6 +33,11 @@ import (
 	"time"
 )
 
+const (
+	maxLogBodyBytes = 16 << 10 // 16KB，请求/响应体日志最大记录大小
+	truncateSuffix  = "... [truncated]"
+)
+
 var (
 	// 一级敏感字段名
 	sensitiveRoots = []string{"password", "pwd", "token", "secret", "access_token", "refresh_token",
@@ -97,6 +102,13 @@ func fastMask(raw []byte) []byte {
 	}
 
 	return data
+}
+
+func truncateBody(data []byte) []byte {
+	if len(data) <= maxLogBodyBytes {
+		return data
+	}
+	return append(data[:maxLogBodyBytes], truncateSuffix...)
 }
 
 // 自定义一个结构体，实现 gin.ResponseWriter interface
@@ -177,8 +189,8 @@ func AccessLogger() gin.HandlerFunc {
 
 		// 记录访问日志
 		if cfg.Application.EnableAccessLog {
-			// 快速脱敏
-			maskedReq := fastMask(reqBody)
+			// 快速脱敏，脱敏后截断
+			maskedReq := truncateBody(fastMask(reqBody))
 			var maskedRes []byte
 			if writer != nil {
 				ct := c.Writer.Header().Get("Content-Type")
@@ -186,8 +198,8 @@ func AccessLogger() gin.HandlerFunc {
 				if !allowedCT[mimeType] {
 					maskedRes = []byte(fmt.Sprintf("{\"msg\": \"[skip response type: %s]\"}", mimeType))
 				} else {
-					// 普通文本/JSON
-					maskedRes = fastMask(writer.body.Bytes())
+					// 普通文本/JSON，脱敏后截断
+					maskedRes = truncateBody(fastMask(writer.body.Bytes()))
 				}
 			}
 
