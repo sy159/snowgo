@@ -146,10 +146,10 @@ snowgo
 │   ├── xstr_tool/            # 字符串工具
 │   └── xtrace/               # OpenTelemetry 链路追踪
 ├── logs/                     # 运行日志（.gitignore）
-├── CLAUDE.md                 # AI 辅助开发指南
-├── CLAUDE_CODING.md          # 编码规范
-├── CLAUDE_ARCHITECTURE.md    # 架构设计与数据库规范
-├── CLAUDE_OPERATIONS.md      # 安全、测试、Git 工作流
+├── AGENTS.md                 # AI agent 通用开发指南（Claude/Codex/Gemini）
+├── CODING.md                 # 编码规范
+├── ARCHITECTURE.md           # 架构设计与数据库规范
+├── OPERATIONS.md             # 安全、测试、Git 工作流
 ├── Makefile                  # 常用构建与运行命令
 ├── Dockerfile                # API 服务镜像
 ├── Dockerfile.consumer       # Consumer 服务镜像
