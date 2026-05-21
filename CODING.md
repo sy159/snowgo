@@ -130,4 +130,4 @@ Structure: `[level][module][specific]` — first digit = level, digits 2-3 = mod
 
 - No goroutines in Service/DAO unless justified.
 - Propagate `context.Context` and handle cancellation/timeout.
-- Distributed lock: `xlock.RedisLock` (`pkg/xlock/`). Callback-based — `TryLock()`, `Lock()`, `LockWithTries()`, `LockWithTriesTime()`. Unlock managed internally.
+- Distributed lock: `xlock.RedisLock` (`pkg/xlock/`). Callback-based — `TryLock()`, `ReTryLock()`, `LockWithTries()`, `LockWithTriesTime()`. LockContext provides `Unlock()` / `Extend()` methods; lock is auto-released after callback returns.

@@ -22,17 +22,12 @@
 | Type | Scope | Framework | Location |
 |------|-------|-----------|----------|
 | Unit | pkg/ utilities | testify/assert | `pkg/*_test.go` |
-| Service | Business logic, mock DAO | testify/assert + require | `internal/service/{module}/*_test.go` |
-| DAO | Integration, real DB | testify/suite | `internal/dao/{module}/*_test.go` |
+| Service | Business logic, mock DAO | testify/assert + require | `internal/service/{module}/*_test.go`（待创建） |
+| DAO | Integration, real DB | testify/suite | `internal/dao/{module}/*_test.go`（待创建） |
 
 ### 2.2 Service Test Pattern
 
-Use **interface mocking**. Reference: `internal/service/admin/account/user_test.go`.
-
-- **Mock DAO**: Embed DAO interface, override methods via struct fields.
-- **Mock Cache**: In-memory `map[string]string` implementing `xcache.Cache`.
-- **Mock cross-service**: `mockLogWriter` for operation log, `mockRolePerms` for permissions.
-- **Transaction methods**: Real database transactions (rollback, isolation) should be covered by DAO integration tests. Business logic within transaction methods can still be tested via mocks.
+Use **interface mocking**. Mock DAO by embedding the DAO interface and overriding methods via struct fields. Mock cache with in-memory map implementing `xcache.Cache`. Cross-service mocks: `mockLogWriter` for operation log, `mockRolePerms` for permissions.
 
 **Test Context**: `testCtx()` with auth fields (`xauth.XUserId`, `XUserName`, `XTraceId`, `XIp`, `XSessionId`).
 
@@ -44,7 +39,7 @@ Coverage: pkg/ >= 80%. New business modules require Service tests. All code shou
 
 - Small, localized changes: run the affected package tests, for example `go test ./pkg/xauth/...`.
 - Broad/shared behavior changes: run `go test ./...`.
-- Integration changes: run the relevant `make test-integration` target or package tests with `-tags=integration` when Redis/RabbitMQ/MySQL dependencies are available.
+- Integration changes: run integration tests with `make test-integration` or `go test -tags=integration ./pkg/...` when Redis/RabbitMQ/MySQL dependencies are available. Files that depend on external services use the `//go:build integration` build tag and are excluded from `go test ./...`.
 - Always run `make lint` before declaring complete.
 - Coverage commands are useful for coverage work, but are not the default completion gate for every change.
 
