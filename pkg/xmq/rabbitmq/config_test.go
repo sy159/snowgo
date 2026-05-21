@@ -201,9 +201,15 @@ type mockLogger struct {
 	errors []string
 }
 
-func (m *mockLogger) Info(_ context.Context, msg string, _ ...zap.Field)  { m.infos = append(m.infos, msg) }
-func (m *mockLogger) Warn(_ context.Context, msg string, _ ...zap.Field)  { m.warns = append(m.warns, msg) }
-func (m *mockLogger) Error(_ context.Context, msg string, _ ...zap.Field) { m.errors = append(m.errors, msg) }
+func (m *mockLogger) Info(_ context.Context, msg string, _ ...zap.Field) {
+	m.infos = append(m.infos, msg)
+}
+func (m *mockLogger) Warn(_ context.Context, msg string, _ ...zap.Field) {
+	m.warns = append(m.warns, msg)
+}
+func (m *mockLogger) Error(_ context.Context, msg string, _ ...zap.Field) {
+	m.errors = append(m.errors, msg)
+}
 
 func TestLoggerOptions(t *testing.T) {
 	// === Happy path ===
