@@ -23,7 +23,7 @@ func setupTestRedis(t *testing.T) *redis.Client {
 	return client
 }
 
-func TestFixedWindowLimiter_Add(t *testing.T) {
+func TestFixedWindowLimiter_Integration_Add(t *testing.T) {
 	client := setupTestRedis(t)
 	cache, _ := xcache.NewRedisCache(client)
 	ctx := context.Background()
@@ -100,16 +100,10 @@ func TestFixedWindowLimiter_Add(t *testing.T) {
 }
 
 func TestFixedWindowLimiter_Defaults(t *testing.T) {
-	t.Run("nil cache returns error", func(t *testing.T) {
-		_, err := NewFixedWindowLimiter(nil, "test:nil-cache", 0, 5)
-		if err == nil {
-			t.Fatal("expected error for nil cache")
-		}
-	})
+	client := setupTestRedis(t)
+	cache, _ := xcache.NewRedisCache(client)
 
 	t.Run("default windowSecond", func(t *testing.T) {
-		client := setupTestRedis(t)
-		cache, _ := xcache.NewRedisCache(client)
 		limiter, err := NewFixedWindowLimiter(cache, "test:default-window", 0, 5)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -140,15 +134,6 @@ func TestFixedWindowLimiter_Defaults(t *testing.T) {
 		}
 		if limiter.windowSec != 60 || limiter.maxFails != 1 {
 			t.Fatalf("expected defaults for negative values, got window=%d, maxFails=%d", limiter.windowSec, limiter.maxFails)
-		}
-	})
-}
-
-func TestFixedWindowLimiter_NilCache(t *testing.T) {
-	t.Run("NewFixedWindowLimiter returns error", func(t *testing.T) {
-		_, err := NewFixedWindowLimiter(nil, "test:nil-cache", 5, 3)
-		if err == nil {
-			t.Fatal("expected error for nil cache")
 		}
 	})
 }
