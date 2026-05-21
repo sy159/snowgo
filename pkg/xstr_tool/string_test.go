@@ -87,6 +87,36 @@ func TestRandShuffleStr(t *testing.T) {
 		t.Errorf("RandShuffleStr(8, 0) should return empty string")
 	}
 
+	// 测试包含大写字母
+	result = xstr_tool.RandShuffleStr(8, xstr_tool.UpperFlag)
+	if len(result) != 8 {
+		t.Errorf("RandShuffleStr(8, UpperFlag) length is not 8, got %d", len(result))
+	}
+	for _, c := range result {
+		if !strings.ContainsRune(uppercase, c) {
+			t.Errorf("RandShuffleStr(8, UpperFlag) contains invalid character: %c", c)
+			break
+		}
+	}
+	if !xstr_tool.IsUniqueStr(result) {
+		t.Errorf("RandShuffleStr(8, UpperFlag) contains duplicate characters")
+	}
+
+	// 测试包含标点符号
+	result = xstr_tool.RandShuffleStr(8, xstr_tool.PunctuationFlag)
+	if len(result) != 8 {
+		t.Errorf("RandShuffleStr(8, PunctuationFlag) length is not 8, got %d", len(result))
+	}
+	for _, c := range result {
+		if !strings.ContainsRune(punctuation, c) {
+			t.Errorf("RandShuffleStr(8, PunctuationFlag) contains invalid character: %c", c)
+			break
+		}
+	}
+	if !xstr_tool.IsUniqueStr(result) {
+		t.Errorf("RandShuffleStr(8, PunctuationFlag) contains duplicate characters")
+	}
+
 	// 测试长度超过字符集大小时会被截断
 	result = xstr_tool.RandShuffleStr(1000, xstr_tool.DigitFlag) // digits only = 10 chars
 	if len(result) != 10 {

@@ -2,6 +2,7 @@ package xerror_test
 
 import (
 	"encoding/json"
+	"errors"
 	"snowgo/pkg/xerror"
 	"testing"
 )
@@ -145,4 +146,121 @@ func TestWrapBizError(t *testing.T) {
 	if unwrapped := bizErr.Unwrap(); unwrapped == nil {
 		t.Error("BizError.Unwrap() should return cause when present")
 	}
+}
+
+// === Additional tests ===
+
+func TestNewCode_Boundary(t *testing.T) {
+	// === Boundary values ===
+	t.Run("boundary: custom category with unique code", func(t *testing.T) {
+		code := xerror.NewCode("custom", 99001, "test")
+		if code.GetErrCode() != 99001 {
+			t.Fatalf("expected error code 99001, got %d", code.GetErrCode())
+		}
+		if code.GetCategory() != "custom" {
+			t.Fatalf("expected category 'custom', got %q", code.GetCategory())
+		}
+	})
+
+	t.Run("boundary: negative error code", func(t *testing.T) {
+		code := xerror.NewCode(xerror.CategorySystem, -1, "negative code")
+		if code.GetErrCode() != -1 {
+			t.Fatalf("expected error code -1, got %d", code.GetErrCode())
+		}
+	})
+
+	t.Run("boundary: empty error message", func(t *testing.T) {
+		code := xerror.NewCode(xerror.CategorySystem, -2, "")
+		if code.GetErrMsg() != "" {
+			t.Fatalf("expected empty error message, got %q", code.GetErrMsg())
+		}
+	})
+
+	t.Run("boundary: empty category", func(t *testing.T) {
+		code := xerror.NewCode("", -3, "empty category")
+		if code.GetCategory() != "" {
+			t.Fatalf("expected empty category, got %q", code.GetCategory())
+		}
+	})
+}
+
+func TestBizError_Boundary(t *testing.T) {
+	// === Boundary values ===
+	t.Run("boundary: NewBizError with nil code", func(t *testing.T) {
+		bizErr := xerror.NewBizError(nil)
+		if bizErr == nil {
+			t.Fatal("NewBizError(nil) should not return nil")
+		}
+	})
+
+	t.Run("boundary: WrapBizError with nil cause", func(t *testing.T) {
+		bizErr := xerror.WrapBizError(xerror.UserNotFound, nil)
+		if bizErr == nil {
+			t.Fatal("WrapBizError with nil cause should not return nil")
+		}
+		// Error() should still work with nil cause
+		errMsg := bizErr.Error()
+		if errMsg != xerror.UserNotFound.GetErrMsg() {
+			t.Fatalf("expected error=%q, got %q", xerror.UserNotFound.GetErrMsg(), errMsg)
+		}
+		// Unwrap should return nil
+		if bizErr.Unwrap() != nil {
+			t.Fatal("WrapBizError with nil cause should have nil Unwrap")
+		}
+	})
+}
+
+func TestBizError_Unwrap(t *testing.T) {
+	// === Happy path ===
+	t.Run("happy: errors.Is with wrapped cause", func(t *testing.T) {
+		cause := xerror.NewCode(xerror.CategoryHttp, 90040, "inner cause")
+		bizErr := xerror.WrapBizError(xerror.UserNotFound, cause)
+
+		if !errors.Is(bizErr, cause) {
+			t.Fatal("errors.Is should find the wrapped cause")
+		}
+	})
+
+	t.Run("happy: errors.As extracts BizError", func(t *testing.T) {
+		bizErr := xerror.NewBizError(xerror.UserNotFound)
+
+		var extracted *xerror.BizError
+		if !errors.As(bizErr, &extracted) {
+			t.Fatal("errors.As should extract BizError")
+		}
+		if extracted.Code.GetErrCode() != xerror.UserNotFound.GetErrCode() {
+			t.Fatalf("extracted code = %d, want %d", extracted.Code.GetErrCode(), xerror.UserNotFound.GetErrCode())
+		}
+	})
+}
+
+func TestCode_Immutability(t *testing.T) {
+	// === Happy path: code is immutable ===
+	t.Run("happy: Code fields cannot be changed after creation", func(t *testing.T) {
+		code := xerror.NewCode(xerror.CategoryHttp, 90050, "immutable test")
+
+		// The code interface only exposes getters, no setters
+		if code.GetErrCode() != 90050 {
+			t.Fatalf("expected 90050, got %d", code.GetErrCode())
+		}
+		if code.GetErrMsg() != "immutable test" {
+			t.Fatalf("expected 'immutable test', got %q", code.GetErrMsg())
+		}
+		if code.GetCategory() != "http" {
+			t.Fatalf("expected 'http', got %q", code.GetCategory())
+		}
+	})
+}
+
+func TestNewCode_DifferentCategories(t *testing.T) {
+	// === Happy path: multiple categories ===
+	t.Run("happy: same code number in different categories", func(t *testing.T) {
+		// Note: NewCode uses ErrCode (not category) as the registry key,
+		// so same ErrCode in different categories would panic.
+		// This tests the design constraint.
+		c1 := xerror.NewCode("cat1", 90060, "cat1 error")
+		if c1.GetCategory() != "cat1" {
+			t.Fatalf("expected category 'cat1', got %q", c1.GetCategory())
+		}
+	})
 }

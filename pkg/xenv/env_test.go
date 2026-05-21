@@ -76,6 +76,39 @@ func TestDev(t *testing.T) {
 	}
 }
 
+// === Additional tests ===
+
+func TestEnvUnknown(t *testing.T) {
+	// === Boundary values: unknown environment ===
+	t.Run("boundary: unknown ENV value returns as-is", func(t *testing.T) {
+		t.Setenv("ENV", "staging")
+		if xenv.Env() != "staging" {
+			t.Errorf("Expected 'staging', got %s", xenv.Env())
+		}
+	})
+
+	t.Run("boundary: unknown ENV returns false for all helpers", func(t *testing.T) {
+		t.Setenv("ENV", "qa")
+		if xenv.Prod() {
+			t.Error("Prod() should be false for 'qa'")
+		}
+		if xenv.Uat() {
+			t.Error("Uat() should be false for 'qa'")
+		}
+		if xenv.Dev() {
+			t.Error("Dev() should be false for 'qa'")
+		}
+	})
+
+	t.Run("boundary: arbitrary string ENV value", func(t *testing.T) {
+		t.Setenv("ENV", "custom-env-123")
+		got := xenv.Env()
+		if got != "custom-env-123" {
+			t.Errorf("Expected 'custom-env-123', got %s", got)
+		}
+	})
+}
+
 func BenchmarkEnv(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = xenv.Env()

@@ -250,13 +250,14 @@ func TestWithMaxRetries(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		count++
 		if count == 1 {
+			// Close connection on first attempt — triggers network error → retry
 			hj, ok := w.(http.Hijacker)
 			if !ok {
-				t.Fatal("Server does not support hijacking")
+				t.Fatal("server does not support Hijacker")
 			}
 			conn, _, err := hj.Hijack()
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("Hijack failed: %v", err)
 			}
 			_ = conn.Close()
 			return
@@ -495,8 +496,16 @@ func TestWithFormData(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		_ = r.Body.Close()
+
+		// Echo Content-Type so test can verify request used form content type
+		resp := map[string]any{
+			"body":        string(body),
+			"contentType": r.Header.Get("Content-Type"),
+		}
+		b, _ := json.Marshal(resp)
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		_, _ = w.Write(body)
+		_, _ = w.Write(b)
 	}))
 	defer server.Close()
 
@@ -506,13 +515,23 @@ func TestWithFormData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Form data should be URL-encoded
-	body := resp.Text()
+
+	var m map[string]any
+	if err := resp.Json(&m); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify URL-encoded form data
+	body := m["body"].(string)
 	if body != "age=30&name=Alice" && body != "name=Alice&age=30" {
 		t.Fatalf("expected URL-encoded form data, got %q", body)
 	}
-	ct := resp.GetHeader("Content-Type") // Not set by mock; verify request used form content type
-	_ = ct
+
+	// Verify Content-Type header
+	ct := m["contentType"].(string)
+	if ct != "application/x-www-form-urlencoded" {
+		t.Fatalf("expected Content-Type application/x-www-form-urlencoded, got %q", ct)
+	}
 }
 
 func TestMergeHeaderNilDefaults(t *testing.T) {
@@ -576,6 +595,138 @@ func TestRequestMaxRetriesNegative(t *testing.T) {
 	defer server.Close()
 
 	resp, err := xrequests.Get(server.URL, xrequests.WithMaxRetries(-5))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestRequestIdempotentMethods(t *testing.T) {
+	server := mockServerForTest()
+	defer server.Close()
+
+	for _, method := range []string{"HEAD", "OPTIONS"} {
+		t.Run(method, func(t *testing.T) {
+			resp, err := xrequests.Request(method, server.URL)
+			if err != nil {
+				t.Fatalf("%s request error: %v", method, err)
+			}
+			if resp.StatusCode != 200 {
+				t.Fatalf("%s expected 200, got %d", method, resp.StatusCode)
+			}
+		})
+	}
+}
+
+func TestRequestIdempotentRetryOnReadError(t *testing.T) {
+	// Server that closes connection on first request, responds on second
+	count := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count++
+		if count == 1 {
+			// Close connection mid-response to trigger handleResponse error
+			hj, ok := w.(http.Hijacker)
+			if !ok {
+				t.Fatal("server does not support Hijacker")
+			}
+			conn, _, err := hj.Hijack()
+			if err != nil {
+				t.Fatalf("Hijack failed: %v", err)
+			}
+			_ = conn.Close()
+			return
+		}
+		_, _ = w.Write([]byte(`{"ok":1}`))
+	}))
+	defer server.Close()
+
+	// GET is idempotent, so retry on read error should work
+	resp, err := xrequests.Get(server.URL, xrequests.WithMaxRetries(3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestRequestWithCanceledContext(t *testing.T) {
+	server := mockServerForTest()
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // immediately cancel
+	_, err := xrequests.Get(server.URL, xrequests.WithCtx(ctx))
+	if err == nil {
+		t.Fatal("expected error for canceled context")
+	}
+}
+
+func TestRequestWithTimeoutContext(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(500 * time.Millisecond)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, err := xrequests.Get(server.URL, xrequests.WithCtx(ctx), xrequests.WithMaxRetries(2))
+	if err == nil {
+		t.Fatal("expected timeout error")
+	}
+}
+
+func TestRequestWithRequestAndBody(t *testing.T) {
+	server := mockServerForTest()
+	defer server.Close()
+
+	req, _ := http.NewRequest("POST", server.URL, nil)
+	req.Header.Set("X-Custom", "from-request")
+	resp, err := xrequests.Post(server.URL,
+		xrequests.WithRequest(req),
+		xrequests.WithBodyString("custom body"),
+		xrequests.WithHeader(map[string]string{"X-Extra": "extra-val"}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var m map[string]any
+	if err := resp.Json(&m); err != nil {
+		t.Fatal(err)
+	}
+	if m["body"] != "custom body" {
+		t.Fatalf("expected body='custom body', got %v", m["body"])
+	}
+}
+
+func TestNilTransportFallback(t *testing.T) {
+	server := mockServerForTest()
+	defer server.Close()
+
+	client := &http.Client{Transport: nil, Timeout: 5 * time.Second}
+	resp, err := xrequests.Get(server.URL, xrequests.WithClient(client), xrequests.WithTimeout(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestSleepBackoffCap(t *testing.T) {
+	// Backoff should cap at 1 second even after many retries.
+	// With 10 retries and base 100ms, backoff would grow to 100ms * 2^10 = 102s,
+	// but it's capped at 1s.
+	server := mockServerForTest()
+	defer server.Close()
+
+	resp, err := xrequests.Get(server.URL, xrequests.WithMaxRetries(10))
 	if err != nil {
 		t.Fatal(err)
 	}

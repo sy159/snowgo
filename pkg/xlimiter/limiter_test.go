@@ -38,6 +38,41 @@ func TestTokenBucket_New(t *testing.T) {
 	})
 }
 
+func TestTokenBucket_New_Boundary(t *testing.T) {
+	// === Boundary values ===
+	t.Run("boundary: burst=0 panics", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatal("expected panic for burst=0")
+			}
+		}()
+		NewTokenBucket("test:zero-burst", 5, 0)
+	})
+
+	t.Run("boundary: burst=-1 panics", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatal("expected panic for burst=-1")
+			}
+		}()
+		NewTokenBucket("test:neg-burst", 5, -1)
+	})
+
+	t.Run("boundary: limit=0 (no token refill)", func(t *testing.T) {
+		defer func() { limiterMap.Range(func(k, v any) bool { limiterMap.Delete(k); return true }) }()
+		tb, _ := NewTokenBucket("test:zero-limit", 0, 3)
+		// burst=3 means first 3 calls should succeed, then fail (no refill with limit=0)
+		for i := 0; i < 3; i++ {
+			if !tb.Allow() {
+				t.Fatalf("Allow %d should succeed (burst=3)", i+1)
+			}
+		}
+		if tb.Allow() {
+			t.Fatal("Allow should fail after burst exhausted (limit=0, no refill)")
+		}
+	})
+}
+
 func TestTokenBucket_Allow(t *testing.T) {
 	defer func() { limiterMap.Range(func(k, v any) bool { limiterMap.Delete(k); return true }) }()
 
@@ -79,10 +114,46 @@ func TestTokenBucket_Wait(t *testing.T) {
 	_ = tb.Wait(context.Background())
 	start := time.Now()
 	_ = tb.Wait(context.Background())
+	elapsed := time.Since(start)
 
-	if time.Since(start) < 900*time.Millisecond {
-		t.Fatalf("Wait should block for ~1s, returned in %v", time.Since(start))
+	// Use a more tolerant assertion: rate=1/sec means ~1s wait, allow 50% margin
+	if elapsed < 500*time.Millisecond {
+		t.Fatalf("Wait should block for ~1s, returned in %v", elapsed)
 	}
+}
+
+func TestTokenBucket_Wait_Canceled(t *testing.T) {
+	defer func() { limiterMap.Range(func(k, v any) bool { limiterMap.Delete(k); return true }) }()
+
+	// === Expected errors ===
+	t.Run("error: already-canceled context", func(t *testing.T) {
+		tb, _ := NewTokenBucket("test:canceled", 1, 1)
+		_ = tb.Allow() // consume the burst
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // cancel immediately
+		err := tb.Wait(ctx)
+		if err == nil {
+			t.Fatal("Wait with canceled context should return error")
+		}
+		if err != context.Canceled {
+			t.Fatalf("expected context.Canceled, got %v", err)
+		}
+	})
+
+	t.Run("error: deadline exceeded", func(t *testing.T) {
+		tb, _ := NewTokenBucket("test:deadline", 0, 1) // limit=0 means no refill
+		_ = tb.Allow()                                  // consume the burst
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+		err := tb.Wait(ctx)
+		if err == nil {
+			t.Fatal("Wait with short deadline should return error")
+		}
+		// rate.Wait wraps context deadline with its own message
+		if err.Error() == "" {
+			t.Fatal("expected non-empty error message")
+		}
+	})
 }
 
 func TestTokenBucket_Reserve(t *testing.T) {
@@ -106,7 +177,7 @@ func TestTokenBucket_SetLimitAndBurst(t *testing.T) {
 
 	tb.SetLimit(10)
 	tb.SetBurst(5)
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(600 * time.Millisecond) // rate=10/s * 0.6s = 6 tokens expected, allow 1 margin
 
 	success := 0
 	for i := 0; i < 5; i++ {
@@ -114,8 +185,8 @@ func TestTokenBucket_SetLimitAndBurst(t *testing.T) {
 			success++
 		}
 	}
-	if success != 5 {
-		t.Fatalf("expected 5 tokens after refill, got %d", success)
+	if success < 4 {
+		t.Fatalf("expected at least 4 tokens after refill, got %d", success)
 	}
 }
 

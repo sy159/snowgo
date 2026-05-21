@@ -1,4 +1,4 @@
-package xgin
+package xgin_test
 
 import (
 	"net/http"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"snowgo/pkg/xgin"
 )
 
 func setupTestRouter(path string, handler gin.HandlerFunc) *gin.Engine {
@@ -20,7 +21,7 @@ func setupTestRouter(path string, handler gin.HandlerFunc) *gin.Engine {
 func TestParsePathID64_ValidID(t *testing.T) {
 	var got int64
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID64(c)
+		got = xgin.ParsePathID64(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test/42", nil)
@@ -35,7 +36,7 @@ func TestParsePathID64_ValidID(t *testing.T) {
 func TestParsePathID64_LargeInt64(t *testing.T) {
 	var got int64
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID64(c)
+		got = xgin.ParsePathID64(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test/9223372036854775807", nil)
@@ -50,7 +51,7 @@ func TestParsePathID64_LargeInt64(t *testing.T) {
 func TestParsePathID64_Zero(t *testing.T) {
 	var got int64
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID64(c)
+		got = xgin.ParsePathID64(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test/0", nil)
@@ -65,7 +66,7 @@ func TestParsePathID64_Zero(t *testing.T) {
 func TestParsePathID64_Negative(t *testing.T) {
 	var got int64
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID64(c)
+		got = xgin.ParsePathID64(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test/-1", nil)
@@ -80,7 +81,7 @@ func TestParsePathID64_Negative(t *testing.T) {
 func TestParsePathID64_Empty(t *testing.T) {
 	var got int64
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID64(c)
+		got = xgin.ParsePathID64(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test/", nil)
@@ -95,7 +96,7 @@ func TestParsePathID64_Empty(t *testing.T) {
 func TestParsePathID64_NonNumeric(t *testing.T) {
 	var got int64
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID64(c)
+		got = xgin.ParsePathID64(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test/abc", nil)
@@ -110,7 +111,7 @@ func TestParsePathID64_NonNumeric(t *testing.T) {
 func TestParsePathID64_FloatString(t *testing.T) {
 	var got int64
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID64(c)
+		got = xgin.ParsePathID64(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test/3.14", nil)
@@ -122,12 +123,28 @@ func TestParsePathID64_FloatString(t *testing.T) {
 	}
 }
 
+func TestParsePathID64_MissingParam(t *testing.T) {
+	// Route does NOT define :id — c.Param("id") returns "", ParseInt fails, returns 0
+	var got int64
+	r := setupTestRouter("/test/other", func(c *gin.Context) {
+		got = xgin.ParsePathID64(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test/other", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if got != 0 {
+		t.Errorf("ParsePathID64() with missing :id param = %d, want 0", got)
+	}
+}
+
 // ParsePathID32 测试
 
 func TestParsePathID32_ValidID(t *testing.T) {
 	var got int32
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID32(c)
+		got = xgin.ParsePathID32(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test/42", nil)
@@ -142,7 +159,7 @@ func TestParsePathID32_ValidID(t *testing.T) {
 func TestParsePathID32_MaxInt32(t *testing.T) {
 	var got int32
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID32(c)
+		got = xgin.ParsePathID32(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test/2147483647", nil)
@@ -157,7 +174,7 @@ func TestParsePathID32_MaxInt32(t *testing.T) {
 func TestParsePathID32_Zero(t *testing.T) {
 	var got int32
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID32(c)
+		got = xgin.ParsePathID32(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test/0", nil)
@@ -172,7 +189,7 @@ func TestParsePathID32_Zero(t *testing.T) {
 func TestParsePathID32_Negative(t *testing.T) {
 	var got int32
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID32(c)
+		got = xgin.ParsePathID32(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test/-1", nil)
@@ -187,7 +204,7 @@ func TestParsePathID32_Negative(t *testing.T) {
 func TestParsePathID32_OverflowInt64(t *testing.T) {
 	var got int32
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID32(c)
+		got = xgin.ParsePathID32(c)
 	})
 
 	// 超出 int32 范围，应返回 0
@@ -203,7 +220,7 @@ func TestParsePathID32_OverflowInt64(t *testing.T) {
 func TestParsePathID32_Empty(t *testing.T) {
 	var got int32
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID32(c)
+		got = xgin.ParsePathID32(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test/", nil)
@@ -218,7 +235,7 @@ func TestParsePathID32_Empty(t *testing.T) {
 func TestParsePathID32_NonNumeric(t *testing.T) {
 	var got int32
 	r := setupTestRouter("/test/:id", func(c *gin.Context) {
-		got = ParsePathID32(c)
+		got = xgin.ParsePathID32(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test/abc", nil)
@@ -227,5 +244,21 @@ func TestParsePathID32_NonNumeric(t *testing.T) {
 
 	if got != 0 {
 		t.Errorf("ParsePathID32() = %d, want 0 for non-numeric", got)
+	}
+}
+
+func TestParsePathID32_MissingParam(t *testing.T) {
+	// Route does NOT define :id — c.Param("id") returns "", ParseInt fails, returns 0
+	var got int32
+	r := setupTestRouter("/test/other", func(c *gin.Context) {
+		got = xgin.ParsePathID32(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test/other", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if got != 0 {
+		t.Errorf("ParsePathID32() with missing :id param = %d, want 0", got)
 	}
 }

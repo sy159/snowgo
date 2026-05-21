@@ -46,7 +46,25 @@ func TestGenerateID_SnowflakeNodeEnv(t *testing.T) {
 	}
 }
 
+func TestGenerateID_SnowflakeNodeEnvNonInt(t *testing.T) {
+	// SNOWFLAKE_NODE set to a non-integer value should be silently ignored (defaults to 1)
+	if os.Getenv("GO_TEST_SNOWFLAKE_NONINT") == "1" {
+		id := GenerateID()
+		if id == "" {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+	cmd := exec.Command(os.Args[0], "-test.run=TestGenerateID_SnowflakeNodeEnvNonInt")
+	cmd.Env = append(os.Environ(), "GO_TEST_SNOWFLAKE_NONINT=1", "SNOWFLAKE_NODE=not-a-number")
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("subprocess with SNOWFLAKE_NODE=not-a-number failed: %v", err)
+	}
+}
+
 func TestGenerateID_Fallback(t *testing.T) {
+	// NOTE: This test modifies a package-level global (sfNode) and must NOT
+	// run in parallel with other tests that depend on it.
 	orig := sfNode
 	sfNode = nil
 	t.Cleanup(func() { sfNode = orig })
@@ -63,6 +81,8 @@ func TestGenerateID_Fallback(t *testing.T) {
 }
 
 func TestGenerateID_FallbackConcurrency(t *testing.T) {
+	// NOTE: This test modifies a package-level global (sfNode) and must NOT
+	// run in parallel with other tests that depend on it.
 	orig := sfNode
 	sfNode = nil
 	t.Cleanup(func() { sfNode = orig })
@@ -209,6 +229,14 @@ func TestStructToMap(t *testing.T) {
 		_, err := StructToMap(nil, "json")
 		if err == nil {
 			t.Fatal("expected error for nil input")
+		}
+	})
+
+	t.Run("nilStructPointer", func(t *testing.T) {
+		var p *testStruct = nil
+		_, err := StructToMap(p, "json")
+		if err == nil {
+			t.Fatal("expected error for nil struct pointer")
 		}
 	})
 
@@ -402,6 +430,73 @@ func TestDerefOrZero(t *testing.T) {
 		b := true
 		if got := DerefOrZero(&b); !got {
 			t.Errorf("DerefOrZero(&bool) = %v, want true", got)
+		}
+	})
+}
+
+func TestPtrIfNonZero(t *testing.T) {
+	// === Happy path ===
+	t.Run("happy: string non-zero", func(t *testing.T) {
+		p := PtrIfNonZero("hello")
+		if p == nil || *p != "hello" {
+			t.Fatalf("expected &%q, got %v", "hello", p)
+		}
+	})
+
+	t.Run("happy: int non-zero", func(t *testing.T) {
+		p := PtrIfNonZero(42)
+		if p == nil || *p != 42 {
+			t.Fatalf("expected &42, got %v", p)
+		}
+	})
+
+	t.Run("happy: bool true", func(t *testing.T) {
+		p := PtrIfNonZero(true)
+		if p == nil || !*p {
+			t.Fatalf("expected &true, got %v", p)
+		}
+	})
+
+	t.Run("happy: float64 non-zero", func(t *testing.T) {
+		p := PtrIfNonZero(3.14)
+		if p == nil || *p != 3.14 {
+			t.Fatalf("expected &3.14, got %v", p)
+		}
+	})
+
+	// === Boundary values (zero values) ===
+	t.Run("boundary: string zero", func(t *testing.T) {
+		p := PtrIfNonZero("")
+		if p != nil {
+			t.Fatalf("expected nil for empty string, got %v", p)
+		}
+	})
+
+	t.Run("boundary: int zero", func(t *testing.T) {
+		p := PtrIfNonZero(0)
+		if p != nil {
+			t.Fatalf("expected nil for 0, got %v", p)
+		}
+	})
+
+	t.Run("boundary: bool false", func(t *testing.T) {
+		p := PtrIfNonZero(false)
+		if p != nil {
+			t.Fatalf("expected nil for false, got %v", p)
+		}
+	})
+
+	t.Run("boundary: float64 zero", func(t *testing.T) {
+		p := PtrIfNonZero(0.0)
+		if p != nil {
+			t.Fatalf("expected nil for 0.0, got %v", p)
+		}
+	})
+
+	t.Run("boundary: int64 zero", func(t *testing.T) {
+		p := PtrIfNonZero(int64(0))
+		if p != nil {
+			t.Fatalf("expected nil for 0 int64, got %v", p)
 		}
 	})
 }

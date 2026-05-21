@@ -1,16 +1,17 @@
-package xauth
+package xauth_test
 
 import (
 	"context"
 	"testing"
 
+	"snowgo/pkg/xauth"
 	e "snowgo/pkg/xerror"
 )
 
 func TestGetContext(t *testing.T) {
 	t.Run("empty context", func(t *testing.T) {
 		ctx := context.Background()
-		c := GetContext(ctx)
+		c := xauth.GetContext(ctx)
 		if c.TraceId != "" {
 			t.Errorf("expected empty TraceId, got %q", c.TraceId)
 		}
@@ -24,10 +25,10 @@ func TestGetContext(t *testing.T) {
 
 	t.Run("with values", func(t *testing.T) {
 		ctx := context.Background()
-		ctx = context.WithValue(ctx, XTraceId, "trace-123")
-		ctx = context.WithValue(ctx, XIp, "10.0.0.1")
-		ctx = context.WithValue(ctx, XUserAgent, "test-agent")
-		c := GetContext(ctx)
+		ctx = context.WithValue(ctx, xauth.XTraceId, "trace-123")
+		ctx = context.WithValue(ctx, xauth.XIp, "10.0.0.1")
+		ctx = context.WithValue(ctx, xauth.XUserAgent, "test-agent")
+		c := xauth.GetContext(ctx)
 		if c.TraceId != "trace-123" {
 			t.Errorf("TraceId = %q, want %q", c.TraceId, "trace-123")
 		}
@@ -43,7 +44,7 @@ func TestGetContext(t *testing.T) {
 func TestGetUserContext(t *testing.T) {
 	t.Run("missing user ID returns forbidden", func(t *testing.T) {
 		ctx := context.Background()
-		_, err := GetUserContext(ctx)
+		_, err := xauth.GetUserContext(ctx)
 		if err == nil {
 			t.Fatal("expected error for missing user ID")
 		}
@@ -54,8 +55,8 @@ func TestGetUserContext(t *testing.T) {
 
 	t.Run("zero user ID returns forbidden", func(t *testing.T) {
 		ctx := context.Background()
-		ctx = context.WithValue(ctx, XUserId, int32(0))
-		_, err := GetUserContext(ctx)
+		ctx = context.WithValue(ctx, xauth.XUserId, int32(0))
+		_, err := xauth.GetUserContext(ctx)
 		if err == nil {
 			t.Fatal("expected error for zero user ID")
 		}
@@ -63,8 +64,8 @@ func TestGetUserContext(t *testing.T) {
 
 	t.Run("negative user ID returns forbidden", func(t *testing.T) {
 		ctx := context.Background()
-		ctx = context.WithValue(ctx, XUserId, int32(-1))
-		_, err := GetUserContext(ctx)
+		ctx = context.WithValue(ctx, xauth.XUserId, int32(-1))
+		_, err := xauth.GetUserContext(ctx)
 		if err == nil {
 			t.Fatal("expected error for negative user ID")
 		}
@@ -72,11 +73,11 @@ func TestGetUserContext(t *testing.T) {
 
 	t.Run("valid user ID", func(t *testing.T) {
 		ctx := context.Background()
-		ctx = context.WithValue(ctx, XUserId, int32(42))
-		ctx = context.WithValue(ctx, XUserName, "alice")
-		ctx = context.WithValue(ctx, XSessionId, "sess-1")
-		ctx = context.WithValue(ctx, XTraceId, "trace-1")
-		uc, err := GetUserContext(ctx)
+		ctx = context.WithValue(ctx, xauth.XUserId, int32(42))
+		ctx = context.WithValue(ctx, xauth.XUserName, "alice")
+		ctx = context.WithValue(ctx, xauth.XSessionId, "sess-1")
+		ctx = context.WithValue(ctx, xauth.XTraceId, "trace-1")
+		uc, err := xauth.GetUserContext(ctx)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -96,8 +97,8 @@ func TestGetUserContext(t *testing.T) {
 
 	t.Run("wrong type for user ID returns forbidden", func(t *testing.T) {
 		ctx := context.Background()
-		ctx = context.WithValue(ctx, XUserId, "not-an-int")
-		_, err := GetUserContext(ctx)
+		ctx = context.WithValue(ctx, xauth.XUserId, "not-an-int")
+		_, err := xauth.GetUserContext(ctx)
 		if err == nil {
 			t.Fatal("expected error for wrong type user ID")
 		}

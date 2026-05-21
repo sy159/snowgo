@@ -85,9 +85,8 @@ func prepareRequestBody(opts *requestOptions) error {
 		if opts.header == nil {
 			opts.header = make(map[string]string)
 		}
-		if opts.header["Content-Type"] == "" {
-			opts.header["Content-Type"] = "application/x-www-form-urlencoded"
-		}
+		// formData must override Content-Type regardless of default
+		opts.header["Content-Type"] = "application/x-www-form-urlencoded"
 	}
 	return nil
 }

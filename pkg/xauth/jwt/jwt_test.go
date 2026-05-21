@@ -82,7 +82,10 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("access token validation from header", func(t *testing.T) {
-		tokenPair, _ := jwtManager.GenerateTokens(userId, username)
+		tokenPair, err := jwtManager.GenerateTokens(userId, username)
+		if err != nil {
+			t.Fatalf("GenerateTokens error: %v", err)
+		}
 		authHeader := "Bearer " + tokenPair.AccessToken
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
@@ -98,11 +101,12 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("expired token", func(t *testing.T) {
+		// Create a token with 100ms expiry, sleep 200ms (more tolerant than original 1s/1.5s)
 		expiredManager, err := jwt.NewJwtManager(&jwt.Config{
 			JwtSecret:             testJwtSecret,
 			Issuer:                "test-snow",
-			AccessExpirationTime:  1 * time.Second,
-			RefreshExpirationTime: 1 * time.Second,
+			AccessExpirationTime:  100 * time.Millisecond,
+			RefreshExpirationTime: 100 * time.Millisecond,
 		})
 		if err != nil {
 			t.Fatalf("NewJwtManager error: %v", err)
@@ -111,7 +115,7 @@ func TestJwt(t *testing.T) {
 		if err != nil {
 			t.Fatalf("generate expired access token error: %v", err)
 		}
-		time.Sleep(1500 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		_, err = expiredManager.ParseToken(accessToken)
 		if !errors.Is(err, jwt.ErrTokenExpired) {
 			t.Fatalf("expected ErrTokenExpired, got: %v", err)
@@ -163,25 +167,37 @@ func TestJwt(t *testing.T) {
 		if err != nil {
 			t.Fatalf("generate refresh token error: %v", err)
 		}
-		claims, _ := jwtManager.ParseToken(refreshToken)
+		claims, err := jwtManager.ParseToken(refreshToken)
+		if err != nil {
+			t.Fatalf("ParseToken error: %v", err)
+		}
 		if err := claims.ValidAccessToken(); !errors.Is(err, jwt.ErrInvalidTokenType) {
 			t.Fatalf("expected ErrInvalidTokenType, got: %v", err)
 		}
 	})
 
 	t.Run("refresh tokens generate new access token", func(t *testing.T) {
-		tokenPair, _ := jwtManager.GenerateTokens(userId, username)
+		tokenPair, err := jwtManager.GenerateTokens(userId, username)
+		if err != nil {
+			t.Fatalf("GenerateTokens error: %v", err)
+		}
 		newPair, err := jwtManager.RefreshTokens(tokenPair.RefreshToken)
 		if err != nil {
 			t.Fatalf("RefreshTokens error: %v", err)
 		}
 
-		newAccessClaims, _ := jwtManager.ParseToken(newPair.AccessToken)
+		newAccessClaims, err := jwtManager.ParseToken(newPair.AccessToken)
+		if err != nil {
+			t.Fatalf("ParseToken error: %v", err)
+		}
 		if newAccessClaims.SessionId == "" {
 			t.Fatal("new access token missing session_id")
 		}
 
-		newRefreshClaims, _ := jwtManager.ParseToken(newPair.RefreshToken)
+		newRefreshClaims, err := jwtManager.ParseToken(newPair.RefreshToken)
+		if err != nil {
+			t.Fatalf("ParseToken error: %v", err)
+		}
 		if newAccessClaims.SessionId != newRefreshClaims.ID {
 			t.Fatal("new access token session_id not match new refresh token jti")
 		}
@@ -190,7 +206,10 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("refresh token reuse old access token", func(t *testing.T) {
-		oldPair, _ := jwtManager.GenerateTokens(userId, username)
+		oldPair, err := jwtManager.GenerateTokens(userId, username)
+		if err != nil {
+			t.Fatalf("GenerateTokens error: %v", err)
+		}
 		claims, err := jwtManager.ParseToken(oldPair.AccessToken)
 		if err != nil {
 			t.Fatalf("Parse old access token error: %v", err)
@@ -208,9 +227,15 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("claims type check", func(t *testing.T) {
-		tokenPair, _ := jwtManager.GenerateTokens(userId, username)
+		tokenPair, err := jwtManager.GenerateTokens(userId, username)
+		if err != nil {
+			t.Fatalf("GenerateTokens error: %v", err)
+		}
 
-		accessClaims, _ := jwtManager.ParseToken(tokenPair.AccessToken)
+		accessClaims, err := jwtManager.ParseToken(tokenPair.AccessToken)
+		if err != nil {
+			t.Fatalf("ParseToken error: %v", err)
+		}
 		if !accessClaims.IsAccessToken() {
 			t.Fatal("access token claims should be access type")
 		}
@@ -218,7 +243,10 @@ func TestJwt(t *testing.T) {
 			t.Fatal("access token claims should not be refresh type")
 		}
 
-		refreshClaims, _ := jwtManager.ParseToken(tokenPair.RefreshToken)
+		refreshClaims, err := jwtManager.ParseToken(tokenPair.RefreshToken)
+		if err != nil {
+			t.Fatalf("ParseToken error: %v", err)
+		}
 		if !refreshClaims.IsRefreshToken() {
 			t.Fatal("refresh token claims should be refresh type")
 		}
@@ -228,8 +256,11 @@ func TestJwt(t *testing.T) {
 	})
 
 	t.Run("refresh token with access token should fail", func(t *testing.T) {
-		tokenPair, _ := jwtManager.GenerateTokens(userId, username)
-		_, err := jwtManager.RefreshTokens(tokenPair.AccessToken)
+		tokenPair, err := jwtManager.GenerateTokens(userId, username)
+		if err != nil {
+			t.Fatalf("GenerateTokens error: %v", err)
+		}
+		_, err = jwtManager.RefreshTokens(tokenPair.AccessToken)
 		if err == nil {
 			t.Fatal("expected error when refreshing access token")
 		}

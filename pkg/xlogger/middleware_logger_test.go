@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -124,18 +126,48 @@ func TestMiddlewareLogger_MultipleEntries(t *testing.T) {
 }
 
 func TestMiddlewareLogger_ConsoleOption(t *testing.T) {
-	t.Run("with console output", func(t *testing.T) {
+	t.Run("with console output writes to stdout", func(t *testing.T) {
+		// Capture stdout using os.Pipe
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
 		logger := NewLogger(t.TempDir(), "test-console", WithConsoleOutput(true), WithFileMaxAgeDays(3))
 		ctx := context.Background()
 		logger.Info(ctx, "console test", zap.Int("id", 1))
 		logger.Sync()
+
+		// Restore stdout and read captured output
+		_ = w.Close()
+		os.Stdout = oldStdout
+
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, r)
+		output := buf.String()
+		if !strings.Contains(output, "console test") {
+			t.Fatalf("expected console output to contain 'console test', got: %q", output)
+		}
 	})
 
-	t.Run("without console output", func(t *testing.T) {
+	t.Run("without console output does not write to stdout", func(t *testing.T) {
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
 		logger := NewLogger(t.TempDir(), "test-file", WithConsoleOutput(false), WithFileMaxAgeDays(3))
 		ctx := context.Background()
-		logger.Info(ctx, "file test", zap.Int("id", 2))
+		logger.Info(ctx, "file only test", zap.Int("id", 2))
 		logger.Sync()
+
+		_ = w.Close()
+		os.Stdout = oldStdout
+
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, r)
+		output := buf.String()
+		if strings.Contains(output, "file only test") {
+			t.Fatalf("expected NO console output, got: %q", output)
+		}
 	})
 }
 
