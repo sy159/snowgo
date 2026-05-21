@@ -5,6 +5,7 @@ package rabbitmq_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"snowgo/internal/constant"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xmq"
@@ -19,10 +20,13 @@ import (
 )
 
 func rabbitURL() string {
+	if url := os.Getenv("RABBITMQ_URL"); url != "" {
+		return url
+	}
 	return "amqp://snow_dev:zx.123@127.0.0.1:5672/dev"
 }
 
-func mustDialOrSkip(t *testing.T) *amqp.Connection {
+func mustDialOrSkip(t testing.TB) *amqp.Connection {
 	t.Helper()
 	conn, err := amqp.Dial(rabbitURL())
 	if err != nil {
@@ -83,7 +87,7 @@ func BenchmarkProducerPublish(b *testing.B) {
 	exchange := constant.NormalExchange
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	conn := mustDialOrSkip(&testing.T{})
+	conn := mustDialOrSkip(b)
 	defer func() { _ = conn.Close() }()
 
 	reg := rabbitmq.NewRegistry(conn).

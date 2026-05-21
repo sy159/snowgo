@@ -9,7 +9,6 @@ import (
 	"snowgo/pkg/xmq/rabbitmq"
 	"testing"
 
-	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,9 +16,8 @@ import (
 func TestRegistry(t *testing.T) {
 	ctx := context.Background()
 
-	// 1. 拿到连接（TestMain 已启动 Docker）
-	conn, err := amqp.Dial("amqp://snow_dev:zx.123@127.0.0.1:5672/dev")
-	require.NoError(t, err)
+	// 1. 拿到连接
+	conn := mustDialOrSkip(t)
 	defer func() { _ = conn.Close() }()
 
 	// 2. 构造 Registry 并注册
@@ -39,7 +37,7 @@ func TestRegistry(t *testing.T) {
 			},
 		})
 
-	err = reg.RegisterAll(ctx)
+	err := reg.RegisterAll(ctx)
 	assert.NoError(t, err)
 
 	// 3. 简单验证：队列存在即可

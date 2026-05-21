@@ -4,6 +4,8 @@ package xlimiter
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -13,14 +15,35 @@ import (
 
 func setupTestRedis(t *testing.T) *redis.Client {
 	t.Helper()
+	db := 12
+	if rawDB := os.Getenv("REDIS_DB"); rawDB != "" {
+		var err error
+		db, err = strconv.Atoi(rawDB)
+		if err != nil {
+			t.Fatalf("invalid REDIS_DB %q: %v", rawDB, err)
+		}
+	}
 	client := redis.NewClient(&redis.Options{
-		Addr:     "127.0.0.1:6379",
-		Password: "",
-		DB:       0,
+		Addr:     redisAddr(),
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       db,
 		PoolSize: 5,
 	})
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := client.Ping(ctx).Err(); err != nil {
+		_ = client.Close()
+		t.Skipf("skipping Redis integration test: cannot connect to Redis at %s: %v", redisAddr(), err)
+	}
 	t.Cleanup(func() { _ = client.Close() })
 	return client
+}
+
+func redisAddr() string {
+	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
+		return addr
+	}
+	return "127.0.0.1:6379"
 }
 
 func TestFixedWindowLimiter_Integration_Add(t *testing.T) {

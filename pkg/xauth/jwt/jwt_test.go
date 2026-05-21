@@ -55,7 +55,6 @@ func TestJwt(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GenerateTokens error: %v", err)
 		}
-		t.Logf("AccessToken: %s\nRefreshToken: %s", tokenPair.AccessToken, tokenPair.RefreshToken)
 
 		accessClaims, err := jwtManager.ParseToken(tokenPair.AccessToken)
 		if err != nil {
@@ -201,8 +200,6 @@ func TestJwt(t *testing.T) {
 		if newAccessClaims.SessionId != newRefreshClaims.ID {
 			t.Fatal("new access token session_id not match new refresh token jti")
 		}
-
-		t.Logf("New AccessToken: %s\nNew RefreshToken: %s", newPair.AccessToken, newPair.RefreshToken)
 	})
 
 	t.Run("refresh token reuse old access token", func(t *testing.T) {

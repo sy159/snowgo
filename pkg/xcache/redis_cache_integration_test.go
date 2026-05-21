@@ -4,7 +4,9 @@ package xcache_test
 
 import (
 	"context"
+	"os"
 	"snowgo/pkg/xcache"
+	"strconv"
 	"testing"
 	"time"
 
@@ -13,19 +15,65 @@ import (
 
 func setupTestRedis(t *testing.T) *redis.Client {
 	t.Helper()
+	db := 11
+	if rawDB := os.Getenv("REDIS_DB"); rawDB != "" {
+		var err error
+		db, err = strconv.Atoi(rawDB)
+		if err != nil {
+			t.Fatalf("invalid REDIS_DB %q: %v", rawDB, err)
+		}
+	}
 	client := redis.NewClient(&redis.Options{
-		Addr:     "127.0.0.1:6379",
-		Password: "",
-		DB:       11, // separate DB to avoid polluting other integration tests
+		Addr:     redisAddr(),
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       db,
 		PoolSize: 5,
 	})
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := client.Ping(ctx).Err(); err != nil {
+		_ = client.Close()
+		t.Skipf("skipping Redis integration test: cannot connect to Redis at %s: %v", redisAddr(), err)
+	}
 	t.Cleanup(func() { _ = client.Close() })
 	return client
+}
+
+func redisAddr() string {
+	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
+		return addr
+	}
+	return "127.0.0.1:6379"
 }
 
 // key prefixes each subtest to avoid cross-test state leakage
 func testKey(prefix, name string) string {
 	return prefix + ":" + name
+}
+
+func cleanupRedisKeys(t *testing.T, client *redis.Client, keys ...string) {
+	t.Helper()
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = client.Del(ctx, keys...).Err()
+	})
+}
+
+func waitUntilKeyGone(t *testing.T, ctx context.Context, cache xcache.Cache, key string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		exists, err := cache.Exists(ctx, key)
+		if err != nil {
+			t.Fatalf("Exists error while waiting for key expiry: %v", err)
+		}
+		if !exists {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("key %q did not expire before deadline", key)
 }
 
 func TestRedisCacheGetNonExistentKey(t *testing.T) {
@@ -65,6 +113,7 @@ func TestRedisCacheIncrByDecrByEdgeCases(t *testing.T) {
 	ctx := context.Background()
 
 	key := testKey("test", "incr-decr-edge")
+	cleanupRedisKeys(t, client, key)
 	_ = cache.Set(ctx, key, "not-a-number", 5*time.Minute)
 
 	_, err := cache.IncrBy(ctx, key, 1)
@@ -123,6 +172,7 @@ func TestRedisCacheZRangeError(t *testing.T) {
 	ctx := context.Background()
 
 	zKey := testKey("test", "zrange-error")
+	cleanupRedisKeys(t, client, zKey)
 	_ = cache.Set(ctx, zKey, "not-a-zset", 5*time.Minute)
 
 	_, err := cache.ZRange(ctx, zKey, 0, -1)
@@ -137,6 +187,7 @@ func TestRedisCacheZCardError(t *testing.T) {
 	ctx := context.Background()
 
 	zKey := testKey("test", "zcard-error")
+	cleanupRedisKeys(t, client, zKey)
 	_ = cache.Set(ctx, zKey, "not-a-zset", 5*time.Minute)
 
 	_, err := cache.ZCard(ctx, zKey)
@@ -179,6 +230,7 @@ func TestRedisCacheHGetAllError(t *testing.T) {
 	ctx := context.Background()
 
 	hashKey := testKey("test", "hgetall-error")
+	cleanupRedisKeys(t, client, hashKey)
 	_ = cache.Set(ctx, hashKey, "not-a-hash", 5*time.Minute)
 
 	_, err := cache.HGetAll(ctx, hashKey)
@@ -193,6 +245,7 @@ func TestRedisCacheHLenError(t *testing.T) {
 	ctx := context.Background()
 
 	hashKey := testKey("test", "hlen-error")
+	cleanupRedisKeys(t, client, hashKey)
 	_ = cache.Set(ctx, hashKey, "not-a-hash", 5*time.Minute)
 
 	_, err := cache.HLen(ctx, hashKey)
@@ -207,6 +260,7 @@ func TestRedisCacheHIncrByError(t *testing.T) {
 	ctx := context.Background()
 
 	hIncrKey := testKey("test", "hincr-error")
+	cleanupRedisKeys(t, client, hIncrKey)
 	_ = cache.Set(ctx, hIncrKey, "not-a-hash", 5*time.Minute)
 
 	_, err := cache.HIncrBy(ctx, hIncrKey, "field", 1)
@@ -396,12 +450,7 @@ func TestRedisCache(t *testing.T) {
 			t.Fatalf("TTL wrong after set: err=%v ttl=%v", err, ttl)
 		}
 
-		time.Sleep(3 * time.Second)
-
-		exists, err = redisCache.Exists(ctx, expireKey)
-		if err != nil || exists {
-			t.Fatal("key should have expired")
-		}
+		waitUntilKeyGone(t, ctx, redisCache, expireKey)
 	})
 
 	// =========================
@@ -485,10 +534,6 @@ func TestRedisCache(t *testing.T) {
 			t.Fatalf("TTL after Expire: err=%v ttl=%v", err, ttl)
 		}
 
-		time.Sleep(3 * time.Second)
-		exists, err := redisCache.Exists(ctx, expKey)
-		if err != nil || exists {
-			t.Fatal("key should have expired after Expire")
-		}
+		waitUntilKeyGone(t, ctx, redisCache, expKey)
 	})
 }
