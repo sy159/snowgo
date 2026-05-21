@@ -18,7 +18,7 @@ import (
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
 	"snowgo/internal/dao/admin/account"
-	"snowgo/internal/service/admin/system"
+	"snowgo/internal/service/admin/contract"
 	common "snowgo/pkg"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcache"
@@ -52,11 +52,11 @@ type UserService struct {
 	userDao     UserRepo
 	cache       xcache.Cache
 	roleService *RoleService
-	logService  system.OperationLogWriter
+	logService  contract.OperationLogWriter
 }
 
 func NewUserService(db *repo.Repository, userDao UserRepo, cache xcache.Cache, roleService *RoleService,
-	logService system.OperationLogWriter) *UserService {
+	logService contract.OperationLogWriter) *UserService {
 	return &UserService{
 		db:          db,
 		cache:       cache,
@@ -260,7 +260,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 		}
 
 		// 创建操作日志
-		err = u.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
+		err = u.logService.CreateOperationLog(ctx, tx, &contract.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -374,7 +374,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		}
 
 		// 创建操作日志
-		err = u.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
+		err = u.logService.CreateOperationLog(ctx, tx, &contract.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -535,7 +535,7 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 		}
 
 		// 创建操作日志
-		err = u.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
+		err = u.logService.CreateOperationLog(ctx, tx, &contract.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,
@@ -608,7 +608,7 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 		}
 
 		// 创建操作日志
-		err = u.logService.CreateOperationLog(ctx, tx, &system.OperationLogInput{
+		err = u.logService.CreateOperationLog(ctx, tx, &contract.OperationLogInput{
 			OperatorID:   userContext.UserId,
 			OperatorName: userContext.Username,
 			OperatorType: constant.OperatorUser,

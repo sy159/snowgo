@@ -77,6 +77,7 @@
 
 - 每层只调用下一层，禁止跨层调用
 - API 只调用 Service（不调 DAO），Service 只调用 DAO（不调 GORM Gen 直接）
+- 跨 Service package 的共享能力通过 `internal/service/admin/contract` 定义稳定接口与 DTO，业务包依赖契约而不是依赖其他业务包的具体 Service
 - Service 层决定事务边界；DAO 统一接收调用方传入的 `*query.Query`
 - 多表写操作、需要操作日志原子落库的业务写操作必须使用事务；独立单表写入可按业务需要非事务执行
 - 缓存失效在 DB 提交后执行，禁止在事务中操作缓存
@@ -128,6 +129,7 @@ snowgo
 │   │   └── root_router.go    # 根路由（测试、健康检查等）
 │   ├── server/               # HTTP Server 生命周期管理
 │   ├── service/              # 业务逻辑层（admin/account、admin/system）
+│   │   └── admin/contract/   # 跨 Service package 共享契约（接口与 DTO，无实现）
 │   └── worker/               # MQ Consumer Handler
 ├── pkg/                      # 公共工具库
 │   ├── xauth/                # JWT 认证

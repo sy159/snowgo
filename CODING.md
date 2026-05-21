@@ -131,3 +131,20 @@ Structure: `[level][module][specific]` — first digit = level, digits 2-3 = mod
 - No goroutines in Service/DAO unless justified.
 - Propagate `context.Context` and handle cancellation/timeout.
 - Distributed lock: `xlock.RedisLock` (`pkg/xlock/`). Callback-based — `TryLock()`, `ReTryLock()`, `LockWithTries()`, `LockWithTriesTime()`. LockContext provides `Unlock()` / `Extend()` methods; lock is auto-released after callback returns.
+
+---
+
+## 8. Service Dependencies
+
+Use package boundaries to decide whether a Service dependency needs an interface.
+
+| Scenario | Rule | Example |
+|----------|------|---------|
+| Same package | Inject the concrete `*XxxService`. Do not add one-method interfaces only for indirection. | `system.DictService` may depend on `*OperationLogService`. |
+| Cross package, shared capability | Depend on a stable contract in `internal/service/admin/contract`. The contract package contains only interfaces and DTOs; no implementations, DAO, cache, logging side effects, or business orchestration. | `account` services depend on `contract.OperationLogWriter`; `system.OperationLogService` implements it. |
+| Cross package, one-off domain dependency | Prefer a consumer-local interface when the dependency is specific to one caller or likely to create an import cycle. | A future workflow package can define the exact user lookup methods it needs locally. |
+| Cross domain/module | Isolate behind `contract` or a consumer-local interface. Treat this as a future service boundary. | Admin-domain code calling another domain's Service must not import that domain's concrete Service. |
+
+`internal/service/admin/contract` is for admin-level public service contracts that are stable and reused by multiple packages, such as audit logs, notifications, or file storage. Do not place DAO interfaces, per-feature repositories, or single-consumer test doubles there. Adapters belong in `internal/di` only when an implementation cannot directly satisfy the contract.
+
+Contracts may include `*query.Query` only when the capability must participate synchronously in the caller's transaction, such as audited operation logs. Prefer context-only contracts for non-transactional or asynchronous capabilities.

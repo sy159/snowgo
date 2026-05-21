@@ -15,6 +15,7 @@ Router → API → Service → DAO → DAL (GORM Gen) → MySQL / Redis
 - Each layer calls only the layer below. API → Service (never DAO). Service → DAO (never GORM Gen directly).
 - `repo` (`dal/repo/repo.go`) provides `WriteQuery()` / `ReadQuery()` / `Query()` / `ChangeDB()`.
 - DI: `di.GetContainer(c)` or `di.GetSystemContainer(c)`. Option pattern, LIFO close.
+- Cross-package Service dependencies use stable contracts under `internal/service/admin/contract` for shared capabilities. Business packages depend on contracts, not concrete Services from other business packages.
 
 ---
 

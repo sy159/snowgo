@@ -9,14 +9,10 @@ import (
 	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
 	daoSystem "snowgo/internal/dao/admin/system"
+	"snowgo/internal/service/admin/contract"
 	"snowgo/pkg/xlogger"
 	"time"
 )
-
-// OperationLogWriter 定义跨模块写操作日志的接口，用于解耦依赖
-type OperationLogWriter interface {
-	CreateOperationLog(ctx context.Context, tx *query.Query, input *OperationLogInput) error
-}
 
 // OperationLogRepo 定义opt log相关db操作接口
 type OperationLogRepo interface {
@@ -24,21 +20,11 @@ type OperationLogRepo interface {
 	GetOperationLogList(ctx context.Context, condition *daoSystem.OperationLogCondition) ([]*model.SysOperationLog, int64, error)
 }
 
-var _ OperationLogWriter = (*OperationLogService)(nil)
+var _ contract.OperationLogWriter = (*OperationLogService)(nil)
 
-type OperationLogInput struct {
-	OperatorID   int32
-	OperatorName string
-	OperatorType string
-	Resource     string
-	ResourceID   int64
-	Action       string // "Create", "Update", "Delete"
-	TraceID      string
-	BeforeData   any // 结构体或 map，将会序列化为 JSON
-	AfterData    any
-	Description  string
-	IP           string
-}
+// OperationLogInput keeps system package callers on local operation-log terminology
+// while sharing the cross-package contract type.
+type OperationLogInput = contract.OperationLogInput
 
 type OperationLogCondition struct {
 	OperatorId   int32  `json:"operator_id" form:"operator_id"`
