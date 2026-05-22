@@ -186,23 +186,42 @@ func marshalAuditData(v any) string {
 }
 
 func shouldDropAuditField(key string) bool {
+	_, drop := auditDropFields[normalizeAuditField(key)]
+	return drop
+}
+
+func normalizeAuditField(key string) string {
+	runes := []rune(key)
 	var b strings.Builder
-	for i, r := range key {
-		if r >= 'A' && r <= 'Z' {
-			if i > 0 {
-				b.WriteByte('_')
-			}
-			b.WriteRune(r + ('a' - 'A'))
-			continue
-		}
+	for i, r := range runes {
 		if r == '-' || r == ' ' {
 			b.WriteByte('_')
 			continue
 		}
+		if i > 0 && isUpper(r) {
+			prev := runes[i-1]
+			nextIsLower := i+1 < len(runes) && isLower(runes[i+1])
+			if prev != '_' && prev != '-' && prev != ' ' && (!isUpper(prev) || nextIsLower) {
+				b.WriteByte('_')
+			}
+		}
+		if isUpper(r) {
+			r += 'a' - 'A'
+		}
+		if r == '_' && b.Len() > 0 && strings.HasSuffix(b.String(), "_") {
+			continue
+		}
 		b.WriteRune(r)
 	}
-	_, drop := auditDropFields[b.String()]
-	return drop
+	return strings.Trim(b.String(), "_")
+}
+
+func isUpper(r rune) bool {
+	return r >= 'A' && r <= 'Z'
+}
+
+func isLower(r rune) bool {
+	return r >= 'a' && r <= 'z'
 }
 
 func sanitizeAuditValue(v any) any {

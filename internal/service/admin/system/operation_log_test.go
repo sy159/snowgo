@@ -13,12 +13,14 @@ func TestMarshalAuditData_DropsCredentialFieldsOnly(t *testing.T) {
 		"email":    "admin@example.com",
 		"profile": map[string]any{
 			"refresh_token": "secret-token",
+			"JWTSecret":     "jwt-secret-camel",
+			"JWT_SECRET":    "jwt-secret-env",
 			"name":          "operator",
 		},
 	}
 
 	got := marshalAuditData(input)
-	for _, leaked := range []string{"password", "$2a$10$hash", "refresh_token", "secret-token"} {
+	for _, leaked := range []string{"password", "$2a$10$hash", "refresh_token", "secret-token", "JWTSecret", "jwt-secret-camel", "JWT_SECRET", "jwt-secret-env"} {
 		if strings.Contains(got, leaked) {
 			t.Fatalf("credential value %q leaked in audit json: %s", leaked, got)
 		}
