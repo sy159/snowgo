@@ -557,6 +557,7 @@ func (d *DictService) UpdateItem(ctx context.Context, param *DictItemParam) (int
 			ItemCode:    param.ItemCode,
 			ItemName:    param.ItemName,
 			Status:      param.Status,
+			SortOrder:   param.SortOrder,
 			Description: param.Description,
 		})
 		if err != nil {
