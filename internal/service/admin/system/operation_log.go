@@ -1,6 +1,7 @@
 package system
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	daoSystem "snowgo/internal/dao/admin/system"
 	"snowgo/internal/service/admin/contract"
 	"snowgo/pkg/xlogger"
+	"strings"
 	"time"
 )
 
@@ -21,6 +23,19 @@ type OperationLogRepo interface {
 }
 
 var _ contract.OperationLogWriter = (*OperationLogService)(nil)
+
+var (
+	auditDropFields = map[string]struct{}{
+		"password":      {},
+		"pass":          {},
+		"pwd":           {},
+		"token":         {},
+		"access_token":  {},
+		"refresh_token": {},
+		"secret":        {},
+		"jwt_secret":    {},
+	}
+)
 
 // OperationLogInput keeps system package callers on local operation-log terminology
 // while sharing the cross-package contract type.
@@ -73,19 +88,8 @@ func NewOperationLogService(db *repo.Repository, operationLogDao OperationLogRep
 
 // CreateOperationLog 记录一条操作日志
 func (o *OperationLogService) CreateOperationLog(ctx context.Context, tx *query.Query, input *OperationLogInput) error {
-	beforeJSON := "{}"
-	afterJSON := "{}"
-
-	if input.BeforeData != nil && input.BeforeData != "" {
-		if b, err := json.Marshal(input.BeforeData); err == nil {
-			beforeJSON = string(b)
-		}
-	}
-	if input.AfterData != nil && input.AfterData != "" {
-		if b, err := json.Marshal(input.AfterData); err == nil {
-			afterJSON = string(b)
-		}
-	}
+	beforeJSON := marshalAuditData(input.BeforeData)
+	afterJSON := marshalAuditData(input.AfterData)
 
 	operationLog := &model.SysOperationLog{
 		OperatorID:   input.OperatorID,
@@ -157,4 +161,67 @@ func (o *OperationLogService) GetOperationLogList(ctx context.Context, condition
 		})
 	}
 	return &OperationLogList{List: logList, Total: total}, nil
+}
+
+// marshalAuditData serializes snapshots after dropping high-risk credential fields.
+func marshalAuditData(v any) string {
+	if v == nil || v == "" {
+		return "{}"
+	}
+	data, err := json.Marshal(v)
+	if err != nil {
+		return "{}"
+	}
+	var raw any
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&raw); err != nil {
+		return "{}"
+	}
+	data, err = json.Marshal(sanitizeAuditValue(raw))
+	if err != nil {
+		return "{}"
+	}
+	return string(data)
+}
+
+func shouldDropAuditField(key string) bool {
+	var b strings.Builder
+	for i, r := range key {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				b.WriteByte('_')
+			}
+			b.WriteRune(r + ('a' - 'A'))
+			continue
+		}
+		if r == '-' || r == ' ' {
+			b.WriteByte('_')
+			continue
+		}
+		b.WriteRune(r)
+	}
+	_, drop := auditDropFields[b.String()]
+	return drop
+}
+
+func sanitizeAuditValue(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(val))
+		for k, item := range val {
+			if shouldDropAuditField(k) {
+				continue
+			}
+			out[k] = sanitizeAuditValue(item)
+		}
+		return out
+	case []any:
+		for i, item := range val {
+			val[i] = sanitizeAuditValue(item)
+		}
+		return val
+	default:
+		return v
+	}
 }

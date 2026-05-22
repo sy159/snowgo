@@ -239,7 +239,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 			if mysql.IsDuplicateKeyErr(err) {
 				return ErrUserNameTelExist
 			}
-			xlogger.ErrorfCtx(ctx, "用户创建失败: %+v err: %v", userParam, err)
+			xlogger.ErrorfCtx(ctx, "用户创建失败 username=%s err: %v", userParam.Username, err)
 			return fmt.Errorf("用户创建失败: %w", err)
 		}
 
@@ -254,7 +254,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 			}
 			err = u.userDao.CreateUserRoleInBatches(ctx, tx, userRoles)
 			if err != nil {
-				xlogger.ErrorfCtx(ctx, "用户与角色关联关系创建失败: %+v err: %v", userParam, err)
+				xlogger.ErrorfCtx(ctx, "用户与角色关联关系创建失败 user_id=%d role_ids=%v err: %v", userObj.ID, userParam.RoleIds, err)
 				return fmt.Errorf("用户与角色关联关系创建失败: %w", err)
 			}
 		}
@@ -275,7 +275,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 			IP: userContext.IP,
 		})
 		if err != nil {
-			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", userParam, err)
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败 resource=user resource_id=%d err: %v", userObj.ID, err)
 			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 
@@ -285,7 +285,7 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 	if err != nil {
 		return 0, err
 	}
-	xlogger.InfofCtx(ctx, "用户创建成功: %+v", userObj)
+	xlogger.InfofCtx(ctx, "用户创建成功 user_id=%d username=%s", userObj.ID, userObj.Username)
 	return userObj.ID, nil
 }
 
@@ -346,7 +346,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 			if mysql.IsDuplicateKeyErr(err) {
 				return ErrUserNameTelExist
 			}
-			xlogger.ErrorfCtx(ctx, "用户更新失败: %+v err: %v", userParam, err)
+			xlogger.ErrorfCtx(ctx, "用户更新失败 user_id=%d username=%s err: %v", userParam.ID, userParam.Username, err)
 			return fmt.Errorf("用户更新失败: %w", err)
 		}
 
@@ -368,7 +368,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 			}
 			err = u.userDao.CreateUserRoleInBatches(ctx, tx, userRoles)
 			if err != nil {
-				xlogger.ErrorfCtx(ctx, "用户与角色关联关系创建失败: %+v err: %v", userParam, err)
+				xlogger.ErrorfCtx(ctx, "用户与角色关联关系创建失败 user_id=%d role_ids=%v err: %v", userParam.ID, userParam.RoleIds, err)
 				return fmt.Errorf("用户与角色关联关系创建失败: %w", err)
 			}
 		}
@@ -398,7 +398,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 			IP: userContext.IP,
 		})
 		if err != nil {
-			xlogger.ErrorfCtx(ctx, "操作日志创建失败: %+v err: %v", userParam, err)
+			xlogger.ErrorfCtx(ctx, "操作日志创建失败 resource=user resource_id=%d err: %v", userParam.ID, err)
 			return fmt.Errorf("操作日志创建失败: %w", err)
 		}
 
@@ -408,7 +408,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 	if err != nil {
 		return 0, err
 	}
-	xlogger.InfofCtx(ctx, "用户更新成功: old=%+v new=%+v", oldUser, userParam)
+	xlogger.InfofCtx(ctx, "用户更新成功 user_id=%d username=%s", userParam.ID, userParam.Username)
 
 	// 清除用户对应角色缓存
 	cacheKey := fmt.Sprintf("%s%d", constant.CacheUserRolePrefix, userParam.ID)
