@@ -58,6 +58,35 @@ func TestUserServiceCreateUserIntegration(t *testing.T) {
 	}
 }
 
+func TestUserServiceCreateUserRollbackIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	role := insertIntegrationRole(t, db, "it_user_create_rollback_role", "用户创建回滚角色")
+	operationLogService := systemService.NewOperationLogService(deps.repo, failingOperationLogRepo{})
+	roleService := newIntegrationRoleService(deps)
+	service := NewUserService(deps.repo, daoAccount.NewUserDao(deps.repo), deps.cache, roleService, operationLogService)
+
+	_, err := service.CreateUser(testUserCtx(), &UserParam{
+		Username: "rollback_operator",
+		Password: "abc123",
+		Tel:      "18100000009",
+		RoleIds:  []int32{role.ID},
+	})
+	if !errors.Is(err, errIntegrationOperationLog) {
+		t.Fatalf("CreateUser expected operation log error, got %v", err)
+	}
+	userCount := countRows(t, db, model.TableNameSysUser, "username = ?", "rollback_operator")
+	if userCount != 0 {
+		t.Fatalf("expected user create to rollback, got count %d", userCount)
+	}
+	relationCount := countRows(t, db, model.TableNameSysUserRole, "role_id = ?", role.ID)
+	if relationCount != 0 {
+		t.Fatalf("expected user role create to rollback, got count %d", relationCount)
+	}
+}
+
 func TestUserServiceUpdateUserIntegration(t *testing.T) {
 	deps := setupIntegrationDeps(t)
 	db := deps.repo.DB()
@@ -196,6 +225,32 @@ func TestUserServiceDeleteByIdGuardsIntegration(t *testing.T) {
 	userCount := countRows(t, db, model.TableNameSysUser, "id = ?", 1)
 	if userCount != 1 {
 		t.Fatalf("expected self user to remain, got count %d", userCount)
+	}
+}
+
+func TestUserServiceDeleteByIdRollbackIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	insertIntegrationUser(t, db, "admin", "18000000000")
+	role := insertIntegrationRole(t, db, "it_delete_rollback_role", "删除用户回滚角色")
+	user := insertIntegrationUser(t, db, "rollback_operator", "18100000009", role.ID)
+	operationLogService := systemService.NewOperationLogService(deps.repo, failingOperationLogRepo{})
+	roleService := newIntegrationRoleService(deps)
+	service := NewUserService(deps.repo, daoAccount.NewUserDao(deps.repo), deps.cache, roleService, operationLogService)
+
+	err := service.DeleteById(testUserCtx(), user.ID)
+	if !errors.Is(err, errIntegrationOperationLog) {
+		t.Fatalf("DeleteById expected operation log error, got %v", err)
+	}
+	userCount := countRows(t, db, model.TableNameSysUser, "id = ?", user.ID)
+	if userCount != 1 {
+		t.Fatalf("expected user delete to rollback, got count %d", userCount)
+	}
+	relationCount := countRows(t, db, model.TableNameSysUserRole, "user_id = ? AND role_id = ?", user.ID, role.ID)
+	if relationCount != 1 {
+		t.Fatalf("expected user role delete to rollback, got count %d", relationCount)
 	}
 }
 

@@ -133,6 +133,37 @@ func TestRoleServiceCreateRoleGuardsIntegration(t *testing.T) {
 	}
 }
 
+func TestRoleServiceCreateRoleRollbackIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	insertIntegrationRole(t, db, "super_admin", "超级管理员")
+	insertIntegrationUser(t, db, "admin", "18000000000", constant.SuperAdminRoleId)
+	menu := insertIntegrationMenu(t, db, 0, constant.MenuTypeMenu, "角色菜单")
+	insertIntegrationRoleMenu(t, db, constant.SuperAdminRoleId, menu.ID)
+
+	operationLogService := systemService.NewOperationLogService(deps.repo, failingOperationLogRepo{})
+	service := NewRoleService(deps.repo, daoAccount.NewRoleDao(deps.repo), deps.cache, operationLogService)
+	_, err := service.CreateRole(testUserCtx(), &RoleParam{
+		Name:        "待回滚角色",
+		Code:        "it_role_create_rollback",
+		Description: "rollback",
+		MenuIds:     []int32{menu.ID},
+	})
+	if !errors.Is(err, errIntegrationOperationLog) {
+		t.Fatalf("CreateRole expected operation log error, got %v", err)
+	}
+	roleCount := countRows(t, db, model.TableNameSysRole, "code = ?", "it_role_create_rollback")
+	if roleCount != 0 {
+		t.Fatalf("expected role create to rollback, got count %d", roleCount)
+	}
+	relationCount := countRows(t, db, model.TableNameSysRoleMenu, "menu_id = ? AND role_id <> ?", menu.ID, constant.SuperAdminRoleId)
+	if relationCount != 0 {
+		t.Fatalf("expected role menu create to rollback, got count %d", relationCount)
+	}
+}
+
 func TestRoleServiceDeleteRoleIntegration(t *testing.T) {
 	deps := setupIntegrationDeps(t)
 	db := deps.repo.DB()
@@ -186,6 +217,32 @@ func TestRoleServiceDeleteRoleGuardsIntegration(t *testing.T) {
 	roleCount := countRows(t, db, model.TableNameSysRole, "id = ?", role.ID)
 	if roleCount != 1 {
 		t.Fatalf("expected used role to remain, got count %d", roleCount)
+	}
+}
+
+func TestRoleServiceDeleteRoleRollbackIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	insertIntegrationRole(t, db, "super_admin", "超级管理员")
+	role := insertIntegrationRole(t, db, "it_role_delete_rollback", "删除回滚角色")
+	menu := insertIntegrationMenu(t, db, 0, constant.MenuTypeMenu, "角色菜单")
+	insertIntegrationRoleMenu(t, db, role.ID, menu.ID)
+
+	operationLogService := systemService.NewOperationLogService(deps.repo, failingOperationLogRepo{})
+	service := NewRoleService(deps.repo, daoAccount.NewRoleDao(deps.repo), deps.cache, operationLogService)
+	err := service.DeleteRole(testUserCtx(), role.ID)
+	if !errors.Is(err, errIntegrationOperationLog) {
+		t.Fatalf("DeleteRole expected operation log error, got %v", err)
+	}
+	roleCount := countRows(t, db, model.TableNameSysRole, "id = ?", role.ID)
+	if roleCount != 1 {
+		t.Fatalf("expected role delete to rollback, got count %d", roleCount)
+	}
+	relationCount := countRows(t, db, model.TableNameSysRoleMenu, "role_id = ? AND menu_id = ?", role.ID, menu.ID)
+	if relationCount != 1 {
+		t.Fatalf("expected role menu delete to rollback, got count %d", relationCount)
 	}
 }
 

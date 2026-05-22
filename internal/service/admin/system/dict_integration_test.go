@@ -17,6 +17,78 @@ import (
 
 var errIntegrationOperationLog = errors.New("operation log integration error")
 
+func TestDictServiceCreateDictIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	service := newIntegrationDictService(deps)
+	description := "集成测试字典"
+	dictID, err := service.CreateDict(testUserCtx(), &DictParam{
+		Code:        "it_create",
+		Name:        "创建字典",
+		Description: &description,
+	})
+	if err != nil {
+		t.Fatalf("CreateDict expected success, got %v", err)
+	}
+	if dictID <= 0 {
+		t.Fatalf("expected created dict id, got %d", dictID)
+	}
+	dictCount := countRows(t, db, model.TableNameSysDict, "id = ? AND code = ? AND name = ? AND description = ?", dictID, "it_create", "创建字典", description)
+	if dictCount != 1 {
+		t.Fatalf("expected dict to be created, got count %d", dictCount)
+	}
+	operationLog := queryOperationLog(t, db, constant.ResourceDict, int64(dictID), constant.ActionCreate)
+	if operationLog.AfterData == nil || !strings.Contains(*operationLog.AfterData, `"code": "it_create"`) {
+		t.Fatalf("expected operation log after_data to include dict code, got %+v", operationLog.AfterData)
+	}
+}
+
+func TestDictServiceCreateDictDuplicateIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	insertIntegrationDict(t, db, "it_duplicate_dict", "已有字典")
+	service := newIntegrationDictService(deps)
+	_, err := service.CreateDict(testUserCtx(), &DictParam{
+		Code: "it_duplicate_dict",
+		Name: "重复字典",
+	})
+	if !errors.Is(err, ErrDictCodeExist) {
+		t.Fatalf("CreateDict duplicate expected ErrDictCodeExist, got %v", err)
+	}
+	dictCount := countRows(t, db, model.TableNameSysDict, "code = ?", "it_duplicate_dict")
+	if dictCount != 1 {
+		t.Fatalf("expected duplicate dict not created, got count %d", dictCount)
+	}
+	logCount := countRows(t, db, model.TableNameSysOperationLog, "resource = ? AND action = ?", constant.ResourceDict, constant.ActionCreate)
+	if logCount != 0 {
+		t.Fatalf("expected no operation log after duplicate failure, got %d", logCount)
+	}
+}
+
+func TestDictServiceCreateDictRollbackIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	operationLogService := NewOperationLogService(deps.repo, failingOperationLogRepo{})
+	service := NewDictService(deps.repo, deps.cache, daoSystem.NewDictDao(deps.repo), operationLogService)
+	_, err := service.CreateDict(testUserCtx(), &DictParam{
+		Code: "it_rollback_dict",
+		Name: "回滚字典",
+	})
+	if !errors.Is(err, errIntegrationOperationLog) {
+		t.Fatalf("CreateDict expected operation log error, got %v", err)
+	}
+	dictCount := countRows(t, db, model.TableNameSysDict, "code = ?", "it_rollback_dict")
+	if dictCount != 0 {
+		t.Fatalf("expected dict create to rollback, got count %d", dictCount)
+	}
+}
+
 func TestDictServiceCreateItemIntegration(t *testing.T) {
 	deps := setupIntegrationDeps(t)
 	db := deps.repo.DB()
@@ -179,6 +251,34 @@ func TestDictServiceUpdateDictIntegration(t *testing.T) {
 	}
 }
 
+func TestDictServiceUpdateDictRollbackIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	dict := insertIntegrationDict(t, db, "it_update_rollback", "旧字典")
+	insertIntegrationDictItem(t, db, dict, "启用", "Active", 1)
+	operationLogService := NewOperationLogService(deps.repo, failingOperationLogRepo{})
+	service := NewDictService(deps.repo, deps.cache, daoSystem.NewDictDao(deps.repo), operationLogService)
+
+	_, err := service.UpdateDict(testUserCtx(), &DictParam{
+		ID:   dict.ID,
+		Code: "it_update_rollback_new",
+		Name: "新字典",
+	})
+	if !errors.Is(err, errIntegrationOperationLog) {
+		t.Fatalf("UpdateDict expected operation log error, got %v", err)
+	}
+	dictCount := countRows(t, db, model.TableNameSysDict, "id = ? AND code = ? AND name = ?", dict.ID, "it_update_rollback", "旧字典")
+	if dictCount != 1 {
+		t.Fatalf("expected dict update to rollback, got count %d", dictCount)
+	}
+	itemCount := countRows(t, db, model.TableNameSysDictItem, "dict_id = ? AND dict_code = ?", dict.ID, "it_update_rollback")
+	if itemCount != 1 {
+		t.Fatalf("expected dict item code update to rollback, got count %d", itemCount)
+	}
+}
+
 func TestDictServiceDeleteByIdIntegration(t *testing.T) {
 	deps := setupIntegrationDeps(t)
 	db := deps.repo.DB()
@@ -212,6 +312,30 @@ func TestDictServiceDeleteByIdIntegration(t *testing.T) {
 		t.Fatalf("get dict cache: %v", err)
 	} else if ok {
 		t.Fatalf("expected dict cache %q to be invalidated", cacheKey)
+	}
+}
+
+func TestDictServiceDeleteByIdRollbackIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	dict := insertIntegrationDict(t, db, "it_delete_rollback", "删除回滚字典")
+	item := insertIntegrationDictItem(t, db, dict, "启用", "Active", 1)
+	operationLogService := NewOperationLogService(deps.repo, failingOperationLogRepo{})
+	service := NewDictService(deps.repo, deps.cache, daoSystem.NewDictDao(deps.repo), operationLogService)
+
+	err := service.DeleteById(testUserCtx(), dict.ID)
+	if !errors.Is(err, errIntegrationOperationLog) {
+		t.Fatalf("DeleteById expected operation log error, got %v", err)
+	}
+	dictCount := countRows(t, db, model.TableNameSysDict, "id = ?", dict.ID)
+	if dictCount != 1 {
+		t.Fatalf("expected dict delete to rollback, got count %d", dictCount)
+	}
+	itemCount := countRows(t, db, model.TableNameSysDictItem, "id = ?", item.ID)
+	if itemCount != 1 {
+		t.Fatalf("expected dict item delete to rollback, got count %d", itemCount)
 	}
 }
 
@@ -259,6 +383,34 @@ func TestDictServiceUpdateItemIntegration(t *testing.T) {
 	}
 }
 
+func TestDictServiceUpdateItemRollbackIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	dict := insertIntegrationDict(t, db, "it_item_update_rollback", "字典项更新回滚")
+	item := insertIntegrationDictItem(t, db, dict, "启用", "Active", 1)
+	status := constant.DisabledStatus
+	operationLogService := NewOperationLogService(deps.repo, failingOperationLogRepo{})
+	service := NewDictService(deps.repo, deps.cache, daoSystem.NewDictDao(deps.repo), operationLogService)
+
+	_, err := service.UpdateItem(testUserCtx(), &DictItemParam{
+		ID:        item.ID,
+		DictID:    dict.ID,
+		ItemName:  "禁用",
+		ItemCode:  "Disabled",
+		Status:    &status,
+		SortOrder: 9,
+	})
+	if !errors.Is(err, errIntegrationOperationLog) {
+		t.Fatalf("UpdateItem expected operation log error, got %v", err)
+	}
+	itemCount := countRows(t, db, model.TableNameSysDictItem, "id = ? AND item_name = ? AND item_code = ? AND sort_order = ?", item.ID, "启用", "Active", 1)
+	if itemCount != 1 {
+		t.Fatalf("expected dict item update to rollback, got count %d", itemCount)
+	}
+}
+
 func TestDictServiceDeleteItemByIdIntegration(t *testing.T) {
 	deps := setupIntegrationDeps(t)
 	db := deps.repo.DB()
@@ -288,6 +440,26 @@ func TestDictServiceDeleteItemByIdIntegration(t *testing.T) {
 		t.Fatalf("get dict cache: %v", err)
 	} else if ok {
 		t.Fatalf("expected dict cache %q to be invalidated", cacheKey)
+	}
+}
+
+func TestDictServiceDeleteItemByIdRollbackIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	dict := insertIntegrationDict(t, db, "it_item_delete_rollback", "字典项删除回滚")
+	item := insertIntegrationDictItem(t, db, dict, "启用", "Active", 1)
+	operationLogService := NewOperationLogService(deps.repo, failingOperationLogRepo{})
+	service := NewDictService(deps.repo, deps.cache, daoSystem.NewDictDao(deps.repo), operationLogService)
+
+	err := service.DeleteItemById(testUserCtx(), item.ID)
+	if !errors.Is(err, errIntegrationOperationLog) {
+		t.Fatalf("DeleteItemById expected operation log error, got %v", err)
+	}
+	itemCount := countRows(t, db, model.TableNameSysDictItem, "id = ?", item.ID)
+	if itemCount != 1 {
+		t.Fatalf("expected dict item delete to rollback, got count %d", itemCount)
 	}
 }
 
