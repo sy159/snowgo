@@ -70,7 +70,6 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.1.0
-          install-mode: goinstall
+          version: v2.12.2
           only-new-issues: ${{ github.event_name == 'pull_request' }}
           args: --timeout=5m

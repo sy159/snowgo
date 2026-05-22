@@ -319,7 +319,7 @@ make mq-init            # 声明 RabbitMQ 拓扑
 make test               # 运行单元测试（含 race 检测，不含集成测试）
 make test-verbose       # 详细输出模式运行单元测试
 make test-integration   # 运行集成测试（需要 Redis / RabbitMQ，Service 集成测试还需要 MySQL）
-make lint               # golangci-lint 代码检查（自动安装）
+make lint               # golangci-lint 代码检查（使用本机已安装版本）
 make fmt                # 格式化 Go 代码
 make tidy               # 清理 go.mod 无用依赖
 

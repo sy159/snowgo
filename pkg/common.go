@@ -108,7 +108,7 @@ func StructToMap(in any, tagName string) (map[string]any, error) {
 	out := make(map[string]any)
 
 	v := reflect.ValueOf(in)
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		// nil 指针需单独检查，v.Elem() 对 nil 指针返回 invalid Value，错误信息不明确
 		if v.IsNil() {
 			return nil, fmt.Errorf("StructToMap: nil pointer passed")

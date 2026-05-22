@@ -130,7 +130,6 @@ test-integration: ## Run integration tests (set MYSQL_DSN/REDIS_ADDR/REDIS_DB/RA
 
 .PHONY: lint
 lint: ## Run golangci-lint
-	@command -v golangci-lint >/dev/null 2>&1 || { echo "Installing golangci-lint..."; go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest; }
 	golangci-lint run ./...
 
 .PHONY: fmt
