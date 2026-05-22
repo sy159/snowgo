@@ -445,7 +445,7 @@ make gen do=add / make gen do=update   # 生成 Model + Query
 
 项目内置 GitHub Actions 工作流：
 
-- **lint_code.yml** — 代码规范检查
+- **lint_code.yml** — 单元测试与代码规范检查
 - **security.yml** — 依赖安全扫描
 - **docker_build_push_deploy.yml** — Docker 镜像构建、推送与部署
 
