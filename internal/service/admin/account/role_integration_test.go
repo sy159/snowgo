@@ -73,6 +73,122 @@ func TestRoleServiceUpdateRoleIntegration(t *testing.T) {
 	}
 }
 
+func TestRoleServiceCreateRoleIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	insertIntegrationRole(t, db, "super_admin", "超级管理员")
+	insertIntegrationUser(t, db, "admin", "18000000000", constant.SuperAdminRoleId)
+	menu := insertIntegrationMenu(t, db, 0, constant.MenuTypeMenu, "角色菜单")
+	insertIntegrationRoleMenu(t, db, constant.SuperAdminRoleId, menu.ID)
+
+	service := newIntegrationRoleService(deps)
+	roleID, err := service.CreateRole(testUserCtx(), &RoleParam{
+		Name:        "新角色",
+		Code:        "it_role_create",
+		Description: "created",
+		MenuIds:     []int32{menu.ID},
+	})
+	if err != nil {
+		t.Fatalf("CreateRole expected success, got %v", err)
+	}
+	if roleID <= 0 {
+		t.Fatalf("expected created role id, got %d", roleID)
+	}
+	roleCount := countRows(t, db, model.TableNameSysRole, "id = ? AND code = ?", roleID, "it_role_create")
+	if roleCount != 1 {
+		t.Fatalf("expected created role, got count %d", roleCount)
+	}
+	relationCount := countRows(t, db, model.TableNameSysRoleMenu, "role_id = ? AND menu_id = ?", roleID, menu.ID)
+	if relationCount != 1 {
+		t.Fatalf("expected created role menu relation, got count %d", relationCount)
+	}
+	operationLog := queryOperationLog(t, db, constant.ResourceRole, int64(roleID), constant.ActionCreate)
+	if operationLog.AfterData == nil || !strings.Contains(*operationLog.AfterData, `"code": "it_role_create"`) {
+		t.Fatalf("expected operation log after_data to include role code, got %+v", operationLog.AfterData)
+	}
+}
+
+func TestRoleServiceCreateRoleGuardsIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	insertIntegrationRole(t, db, "super_admin", "超级管理员")
+	insertIntegrationUser(t, db, "admin", "18000000000", constant.SuperAdminRoleId)
+	service := newIntegrationRoleService(deps)
+
+	_, err := service.CreateRole(testUserCtx(), &RoleParam{
+		Name:    "不存在菜单角色",
+		Code:    "it_missing_menu",
+		MenuIds: []int32{999},
+	})
+	if !errors.Is(err, ErrRoleMenuNotExist) {
+		t.Fatalf("CreateRole missing menu expected ErrRoleMenuNotExist, got %v", err)
+	}
+	roleCount := countRows(t, db, model.TableNameSysRole, "code = ?", "it_missing_menu")
+	if roleCount != 0 {
+		t.Fatalf("expected role not created when menu missing, got count %d", roleCount)
+	}
+}
+
+func TestRoleServiceDeleteRoleIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	insertIntegrationRole(t, db, "super_admin", "超级管理员")
+	role := insertIntegrationRole(t, db, "it_role_delete", "待删除角色")
+	menu := insertIntegrationMenu(t, db, 0, constant.MenuTypeMenu, "角色菜单")
+	insertIntegrationRoleMenu(t, db, role.ID, menu.ID)
+	cacheKey := fmt.Sprintf("%s%d", constant.CacheRoleMenuPrefix, role.ID)
+	if err := deps.cache.Set(testUserCtx(), cacheKey, `[{"id":1}]`, time.Hour); err != nil {
+		t.Fatalf("prime role cache: %v", err)
+	}
+
+	service := newIntegrationRoleService(deps)
+	if err := service.DeleteRole(testUserCtx(), role.ID); err != nil {
+		t.Fatalf("DeleteRole expected success, got %v", err)
+	}
+	roleCount := countRows(t, db, model.TableNameSysRole, "id = ?", role.ID)
+	if roleCount != 0 {
+		t.Fatalf("expected role to be deleted, got count %d", roleCount)
+	}
+	relationCount := countRows(t, db, model.TableNameSysRoleMenu, "role_id = ?", role.ID)
+	if relationCount != 0 {
+		t.Fatalf("expected role menu relations to be deleted, got count %d", relationCount)
+	}
+	operationLog := queryOperationLog(t, db, constant.ResourceRole, int64(role.ID), constant.ActionDelete)
+	if operationLog.BeforeData == nil || !strings.Contains(*operationLog.BeforeData, `"code": "it_role_delete"`) {
+		t.Fatalf("expected operation log before_data to include role code, got %+v", operationLog.BeforeData)
+	}
+	if _, ok, err := deps.cache.Get(testUserCtx(), cacheKey); err != nil {
+		t.Fatalf("get role cache: %v", err)
+	} else if ok {
+		t.Fatalf("expected role cache %q to be invalidated", cacheKey)
+	}
+}
+
+func TestRoleServiceDeleteRoleGuardsIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	insertIntegrationRole(t, db, "super_admin", "超级管理员")
+	role := insertIntegrationRole(t, db, "it_role_used", "被使用角色")
+	insertIntegrationUser(t, db, "operator", "18100000000", role.ID)
+	service := newIntegrationRoleService(deps)
+
+	if err := service.DeleteRole(testUserCtx(), role.ID); !errors.Is(err, ErrRoleUsed) {
+		t.Fatalf("DeleteRole used role expected ErrRoleUsed, got %v", err)
+	}
+	roleCount := countRows(t, db, model.TableNameSysRole, "id = ?", role.ID)
+	if roleCount != 1 {
+		t.Fatalf("expected used role to remain, got count %d", roleCount)
+	}
+}
+
 func TestRoleServiceUpdateRoleRollbackIntegration(t *testing.T) {
 	deps := setupIntegrationDeps(t)
 	db := deps.repo.DB()

@@ -129,6 +129,168 @@ func TestDictServiceCreateItemRollbackIntegration(t *testing.T) {
 	}
 }
 
+func TestDictServiceUpdateDictIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	service := newIntegrationDictService(deps)
+	ctx := testUserCtx()
+	dict := insertIntegrationDict(t, db, "it_old_code", "旧字典")
+	insertIntegrationDictItem(t, db, dict, "启用", "Active", 1)
+	oldCacheKey := constant.SystemDictPrefix + "it_old_code"
+	newCacheKey := constant.SystemDictPrefix + "it_new_code"
+	if err := deps.cache.Set(ctx, oldCacheKey, `[{"item_code":"old"}]`, time.Hour); err != nil {
+		t.Fatalf("prime old dict cache: %v", err)
+	}
+	if err := deps.cache.Set(ctx, newCacheKey, `[{"item_code":"new"}]`, time.Hour); err != nil {
+		t.Fatalf("prime new dict cache: %v", err)
+	}
+
+	dictID, err := service.UpdateDict(ctx, &DictParam{
+		ID:   dict.ID,
+		Code: "it_new_code",
+		Name: "新字典",
+	})
+	if err != nil {
+		t.Fatalf("UpdateDict expected success, got %v", err)
+	}
+	if dictID != dict.ID {
+		t.Fatalf("expected updated dict id %d, got %d", dict.ID, dictID)
+	}
+	dictCount := countRows(t, db, model.TableNameSysDict, "id = ? AND code = ? AND name = ?", dict.ID, "it_new_code", "新字典")
+	if dictCount != 1 {
+		t.Fatalf("expected dict to be updated, got count %d", dictCount)
+	}
+	itemCount := countRows(t, db, model.TableNameSysDictItem, "dict_id = ? AND dict_code = ?", dict.ID, "it_new_code")
+	if itemCount != 1 {
+		t.Fatalf("expected dict item dict_code to be updated, got count %d", itemCount)
+	}
+	operationLog := queryOperationLog(t, db, constant.ResourceDict, int64(dict.ID), constant.ActionUpdate)
+	if operationLog.AfterData == nil || !strings.Contains(*operationLog.AfterData, `"code": "it_new_code"`) {
+		t.Fatalf("expected operation log after_data to include updated code, got %+v", operationLog.AfterData)
+	}
+	for _, key := range []string{oldCacheKey, newCacheKey} {
+		if _, ok, err := deps.cache.Get(ctx, key); err != nil {
+			t.Fatalf("get dict cache %s: %v", key, err)
+		} else if ok {
+			t.Fatalf("expected dict cache %q to be invalidated", key)
+		}
+	}
+}
+
+func TestDictServiceDeleteByIdIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	service := newIntegrationDictService(deps)
+	ctx := testUserCtx()
+	dict := insertIntegrationDict(t, db, "it_delete", "待删除字典")
+	insertIntegrationDictItem(t, db, dict, "启用", "Active", 1)
+	cacheKey := constant.SystemDictPrefix + dict.Code
+	if err := deps.cache.Set(ctx, cacheKey, `[{"item_code":"stale"}]`, time.Hour); err != nil {
+		t.Fatalf("prime dict cache: %v", err)
+	}
+
+	if err := service.DeleteById(ctx, dict.ID); err != nil {
+		t.Fatalf("DeleteById expected success, got %v", err)
+	}
+	dictCount := countRows(t, db, model.TableNameSysDict, "id = ?", dict.ID)
+	if dictCount != 0 {
+		t.Fatalf("expected dict to be deleted, got count %d", dictCount)
+	}
+	itemCount := countRows(t, db, model.TableNameSysDictItem, "dict_id = ?", dict.ID)
+	if itemCount != 0 {
+		t.Fatalf("expected dict items to be deleted, got count %d", itemCount)
+	}
+	operationLog := queryOperationLog(t, db, constant.ResourceDict, int64(dict.ID), constant.ActionDelete)
+	if operationLog.BeforeData == nil || !strings.Contains(*operationLog.BeforeData, `"code": "it_delete"`) {
+		t.Fatalf("expected operation log before_data to include dict code, got %+v", operationLog.BeforeData)
+	}
+	if _, ok, err := deps.cache.Get(ctx, cacheKey); err != nil {
+		t.Fatalf("get dict cache: %v", err)
+	} else if ok {
+		t.Fatalf("expected dict cache %q to be invalidated", cacheKey)
+	}
+}
+
+func TestDictServiceUpdateItemIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	service := newIntegrationDictService(deps)
+	ctx := testUserCtx()
+	dict := insertIntegrationDict(t, db, "it_item_update", "字典项更新")
+	item := insertIntegrationDictItem(t, db, dict, "启用", "Active", 1)
+	status := constant.DisabledStatus
+	cacheKey := constant.SystemDictPrefix + dict.Code
+	if err := deps.cache.Set(ctx, cacheKey, `[{"item_code":"stale"}]`, time.Hour); err != nil {
+		t.Fatalf("prime dict cache: %v", err)
+	}
+
+	itemID, err := service.UpdateItem(ctx, &DictItemParam{
+		ID:        item.ID,
+		DictID:    dict.ID,
+		ItemName:  "禁用",
+		ItemCode:  "Disabled",
+		Status:    &status,
+		SortOrder: 9,
+	})
+	if err != nil {
+		t.Fatalf("UpdateItem expected success, got %v", err)
+	}
+	if itemID != item.ID {
+		t.Fatalf("expected updated item id %d, got %d", item.ID, itemID)
+	}
+	itemCount := countRows(t, db, model.TableNameSysDictItem, "id = ? AND item_name = ? AND item_code = ? AND status = ? AND sort_order = ?", item.ID, "禁用", "Disabled", status, 9)
+	if itemCount != 1 {
+		t.Fatalf("expected dict item to be updated, got count %d", itemCount)
+	}
+	operationLog := queryOperationLog(t, db, constant.ResourceDictItem, int64(item.ID), constant.ActionUpdate)
+	if operationLog.AfterData == nil || !strings.Contains(*operationLog.AfterData, `"item_code": "Disabled"`) {
+		t.Fatalf("expected operation log after_data to include item code, got %+v", operationLog.AfterData)
+	}
+	if _, ok, err := deps.cache.Get(ctx, cacheKey); err != nil {
+		t.Fatalf("get dict cache: %v", err)
+	} else if ok {
+		t.Fatalf("expected dict cache %q to be invalidated", cacheKey)
+	}
+}
+
+func TestDictServiceDeleteItemByIdIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	service := newIntegrationDictService(deps)
+	ctx := testUserCtx()
+	dict := insertIntegrationDict(t, db, "it_item_delete", "字典项删除")
+	item := insertIntegrationDictItem(t, db, dict, "启用", "Active", 1)
+	cacheKey := constant.SystemDictPrefix + dict.Code
+	if err := deps.cache.Set(ctx, cacheKey, `[{"item_code":"stale"}]`, time.Hour); err != nil {
+		t.Fatalf("prime dict cache: %v", err)
+	}
+
+	if err := service.DeleteItemById(ctx, item.ID); err != nil {
+		t.Fatalf("DeleteItemById expected success, got %v", err)
+	}
+	itemCount := countRows(t, db, model.TableNameSysDictItem, "id = ?", item.ID)
+	if itemCount != 0 {
+		t.Fatalf("expected dict item to be deleted, got count %d", itemCount)
+	}
+	operationLog := queryOperationLog(t, db, constant.ResourceDictItem, int64(item.ID), constant.ActionDelete)
+	if operationLog.BeforeData == nil || !strings.Contains(*operationLog.BeforeData, `"item_code": "Active"`) {
+		t.Fatalf("expected operation log before_data to include item code, got %+v", operationLog.BeforeData)
+	}
+	if _, ok, err := deps.cache.Get(ctx, cacheKey); err != nil {
+		t.Fatalf("get dict cache: %v", err)
+	} else if ok {
+		t.Fatalf("expected dict cache %q to be invalidated", cacheKey)
+	}
+}
+
 type failingOperationLogRepo struct{}
 
 func (failingOperationLogRepo) Create(context.Context, *query.Query, *model.SysOperationLog) (*model.SysOperationLog, error) {

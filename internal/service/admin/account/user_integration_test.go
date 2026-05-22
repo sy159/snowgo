@@ -145,3 +145,106 @@ func TestUserServiceUpdateUserRollbackIntegration(t *testing.T) {
 		t.Fatalf("expected new user role relation to rollback, got count %d", newRelationCount)
 	}
 }
+
+func TestUserServiceDeleteByIdIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	insertIntegrationUser(t, db, "admin", "18000000000")
+	role := insertIntegrationRole(t, db, "it_delete_role", "删除用户角色")
+	user := insertIntegrationUser(t, db, "operator", "18100000000", role.ID)
+	cacheKey := fmt.Sprintf("%s%d", constant.CacheUserRolePrefix, user.ID)
+	if err := deps.cache.Set(testUserCtx(), cacheKey, "[1]", time.Hour); err != nil {
+		t.Fatalf("prime user role cache: %v", err)
+	}
+
+	service := newIntegrationUserService(deps)
+	if err := service.DeleteById(testUserCtx(), user.ID); err != nil {
+		t.Fatalf("DeleteById expected success, got %v", err)
+	}
+	userCount := countRows(t, db, model.TableNameSysUser, "id = ?", user.ID)
+	if userCount != 0 {
+		t.Fatalf("expected user to be deleted, got count %d", userCount)
+	}
+	relationCount := countRows(t, db, model.TableNameSysUserRole, "user_id = ?", user.ID)
+	if relationCount != 0 {
+		t.Fatalf("expected user role relations to be deleted, got count %d", relationCount)
+	}
+	operationLog := queryOperationLog(t, db, constant.ResourceUser, int64(user.ID), constant.ActionDelete)
+	if operationLog.BeforeData == nil || !strings.Contains(*operationLog.BeforeData, `"username": "operator"`) {
+		t.Fatalf("expected operation log before_data to include username, got %+v", operationLog.BeforeData)
+	}
+	if _, ok, err := deps.cache.Get(testUserCtx(), cacheKey); err != nil {
+		t.Fatalf("get user role cache: %v", err)
+	} else if ok {
+		t.Fatalf("expected user role cache %q to be invalidated", cacheKey)
+	}
+}
+
+func TestUserServiceDeleteByIdGuardsIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	insertIntegrationUser(t, db, "admin", "18000000000")
+	service := newIntegrationUserService(deps)
+
+	if err := service.DeleteById(testUserCtx(), 1); !errors.Is(err, ErrDeleteSelf) {
+		t.Fatalf("DeleteById self expected ErrDeleteSelf, got %v", err)
+	}
+	userCount := countRows(t, db, model.TableNameSysUser, "id = ?", 1)
+	if userCount != 1 {
+		t.Fatalf("expected self user to remain, got count %d", userCount)
+	}
+}
+
+func TestUserServiceResetPwdByIdIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	user := insertIntegrationUser(t, db, "operator", "18100000000")
+	service := newIntegrationUserService(deps)
+
+	if err := service.ResetPwdById(testUserCtx(), user.ID, "new123"); err != nil {
+		t.Fatalf("ResetPwdById expected success, got %v", err)
+	}
+	var updated model.SysUser
+	if err := db.Where("id = ?", user.ID).First(&updated).Error; err != nil {
+		t.Fatalf("query updated user: %v", err)
+	}
+	if updated.Password == user.Password || !xcryption.CheckPassword(updated.Password, "new123") {
+		t.Fatalf("expected reset password to be updated bcrypt hash")
+	}
+	operationLog := queryOperationLog(t, db, constant.ResourceUser, int64(user.ID), constant.ActionUpdate)
+	if operationLog.Description == nil || !strings.Contains(*operationLog.Description, "重置") {
+		t.Fatalf("expected reset password operation log, got %+v", operationLog.Description)
+	}
+	if operationLog.AfterData == nil || *operationLog.AfterData != "{}" {
+		t.Fatalf("expected reset password operation log after_data empty, got %+v", operationLog.AfterData)
+	}
+}
+
+func TestUserServiceResetPwdByIdRollbackIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+
+	user := insertIntegrationUser(t, db, "operator", "18100000000")
+	operationLogService := systemService.NewOperationLogService(deps.repo, failingOperationLogRepo{})
+	roleService := newIntegrationRoleService(deps)
+	service := NewUserService(deps.repo, daoAccount.NewUserDao(deps.repo), deps.cache, roleService, operationLogService)
+
+	err := service.ResetPwdById(testUserCtx(), user.ID, "new123")
+	if !errors.Is(err, errIntegrationOperationLog) {
+		t.Fatalf("ResetPwdById expected operation log error, got %v", err)
+	}
+	var after model.SysUser
+	if err := db.Where("id = ?", user.ID).First(&after).Error; err != nil {
+		t.Fatalf("query user after rollback: %v", err)
+	}
+	if after.Password != user.Password {
+		t.Fatalf("expected reset password to rollback")
+	}
+}

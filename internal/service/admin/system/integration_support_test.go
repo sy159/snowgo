@@ -236,6 +236,23 @@ func insertIntegrationDict(t *testing.T, db *gorm.DB, code, name string) *model.
 	return dict
 }
 
+func insertIntegrationDictItem(t *testing.T, db *gorm.DB, dict *model.SysDict, itemName, itemCode string, sortOrder int32) *model.SysDictItem {
+	t.Helper()
+	status := "Active"
+	item := &model.SysDictItem{
+		DictID:    dict.ID,
+		DictCode:  dict.Code,
+		ItemName:  itemName,
+		ItemCode:  itemCode,
+		Status:    &status,
+		SortOrder: sortOrder,
+	}
+	if err := db.Create(item).Error; err != nil {
+		t.Fatalf("insert integration dict item: %v", err)
+	}
+	return item
+}
+
 func countRows(t *testing.T, db *gorm.DB, table string, where string, args ...any) int64 {
 	t.Helper()
 
