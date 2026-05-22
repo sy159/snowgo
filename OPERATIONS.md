@@ -26,7 +26,7 @@
 |------|-------|-----------|----------|
 | Unit | pkg/ utilities | testify/assert | `pkg/*_test.go` |
 | Service Unit | Business logic, mock DAO/contract/cache | testify/assert + require | `internal/service/{module}/*_test.go` |
-| Service Integration | Critical write paths, real DB | testify/suite | `internal/service/{module}/*_int_test.go` |
+| Service Integration | Critical write paths, real DB | testify/suite | `internal/service/{module}/*_integration_test.go` |
 | DAO | Integration, real DB | testify/suite | `internal/dao/{module}/*_test.go` |
 
 ### 2.2 Service Testing Strategy (Two-Tier)
@@ -43,7 +43,7 @@ Mock all external interfaces: DAO interfaces, `contract.OperationLogWriter`, `xc
 
 Cover core write operations (create/update/delete) that involve transactions, multi-table mutations, and ORM mappings. Not a full re-run of unit tests — only the paths where database-level behavior matters (unique constraint fallback, transaction rollback, soft delete filters, audit log in same transaction). Read-only endpoints and simple pass-through CRUD do not need integration tests.
 
-Files use `//go:build integration` build tag and are excluded from `go test ./...`. Run with `go test -tags=integration ./internal/service/...` when service integration tests exist for the touched module. The current `make test-integration` target covers integration tests under `pkg/` only.
+Files use `//go:build integration` build tag and are excluded from `go test ./...`. Run with `go test -tags=integration ./internal/service/...` when service integration tests exist for the touched module. Integration tests use environment variables such as `MYSQL_DSN`, `REDIS_ADDR`, `REDIS_DB`, `REDIS_PASSWORD`, and `RABBITMQ_URL`; Service integration tests must connect only to test databases.
 
 **Coverage targets**: pkg/ >= 80%. New business modules require Service unit tests for non-trivial methods and Service integration tests for critical write paths. Existing modules should be backfilled when they are materially changed.
 

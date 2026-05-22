@@ -125,8 +125,8 @@ test-verbose: ## Run unit tests with verbose output (excludes integration tests)
 	go test -race -v -count=1 ./...
 
 .PHONY: test-integration
-test-integration: ## Run integration tests (set REDIS_ADDR/REDIS_DB/RABBITMQ_URL as needed)
-	go test -race -v -count=1 -tags=integration ./pkg/xcache/... ./pkg/xlock/... ./pkg/xlimiter/... ./pkg/xmq/...
+test-integration: ## Run integration tests (set MYSQL_DSN/REDIS_ADDR/REDIS_DB/RABBITMQ_URL as needed)
+	go test -race -v -count=1 -tags=integration ./pkg/xcache/... ./pkg/xlock/... ./pkg/xlimiter/... ./pkg/xmq/... ./internal/service/...
 
 .PHONY: lint
 lint: ## Run golangci-lint

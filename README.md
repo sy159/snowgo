@@ -318,7 +318,7 @@ make mq-init            # 声明 RabbitMQ 拓扑
 # 代码质量
 make test               # 运行单元测试（含 race 检测，不含集成测试）
 make test-verbose       # 详细输出模式运行单元测试
-make test-integration   # 运行 pkg 集成测试（需要 Redis / RabbitMQ）
+make test-integration   # 运行集成测试（需要 Redis / RabbitMQ，Service 集成测试还需要 MySQL）
 make lint               # golangci-lint 代码检查（自动安装）
 make fmt                # 格式化 Go 代码
 make tidy               # 清理 go.mod 无用依赖
@@ -338,7 +338,7 @@ make restart            # 重启全部服务
 
 测试范围按改动范围选择：小改动优先跑受影响包的单测，例如 `go test ./pkg/xauth/...`；涉及共享逻辑、路由、配置、数据库访问或跨模块行为时跑 `go test ./...`。每次完成前都必须跑通过 `make lint`。覆盖率命令用于覆盖率专项检查，不作为每次改动的默认完成门槛。
 
-当前 `make test-integration` 覆盖 `pkg/xcache`、`pkg/xlock`、`pkg/xlimiter`、`pkg/xmq` 的 integration 测试，默认连接 `127.0.0.1:6379` 和 `amqp://snow_dev:zx.123@127.0.0.1:5672/dev`；可通过 `REDIS_ADDR`、`REDIS_PASSWORD`、`REDIS_DB`、`RABBITMQ_URL` 覆盖。依赖不可达时，相关 integration 测试会跳过。Service/DAO 层真实数据库集成测试按业务模块增量补充。
+当前 `make test-integration` 覆盖 `pkg/xcache`、`pkg/xlock`、`pkg/xlimiter`、`pkg/xmq` 和 `internal/service` 的 integration 测试，默认连接 `127.0.0.1:6379` 和 `amqp://snow_dev:zx.123@127.0.0.1:5672/dev`；可通过 `REDIS_ADDR`、`REDIS_PASSWORD`、`REDIS_DB`、`RABBITMQ_URL` 覆盖。Service 集成测试通过 `MYSQL_DSN` 连接独立测试库，库名必须包含 `test`，例如 `integration_test`，避免误连开发或生产库。依赖不可达时，相关 integration 测试会跳过。
 
 ---
 
