@@ -331,7 +331,11 @@ func (s *MenuService) DeleteMenuById(ctx context.Context, id int32) error {
 
 	err = s.db.WriteQuery().Transaction(func(tx *query.Query) error {
 		// 检查是否有子菜单（事务内，防止并发创建子菜单）
-		subMenus, _ := s.menuDao.GetByParentId(ctx, tx, id)
+		subMenus, err := s.menuDao.GetByParentId(ctx, tx, id)
+		if err != nil {
+			xlogger.ErrorfCtx(ctx, "查询子菜单失败 menu_id=%d err: %v", id, err)
+			return fmt.Errorf("查询子菜单失败: %w", err)
+		}
 		if len(subMenus) > 0 {
 			return ErrMenuHasChildren
 		}
