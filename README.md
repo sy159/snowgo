@@ -2,7 +2,7 @@
 
 <h1>snowgo</h1>
 
-<p>基于 <b>Gin + GORM Gen</b> 的高可用、模块化 Go Web 脚手架，企业级基础设施集成，快速构建后台管理系统与 RESTful API 服务</p>
+<p>基于 <b>Gin + GORM Gen</b> 的模块化 Go Web 脚手架，内置后台管理、鉴权、RBAC、缓存、消息队列与工程治理约束，适合快速构建企业内部 RESTful API 服务</p>
 
 <p>
   <a href="https://github.com/sy159/snowgo/actions/workflows/lint_code.yml"><img src="https://github.com/sy159/snowgo/actions/workflows/lint_code.yml/badge.svg" alt="Lint" /></a>
@@ -41,17 +41,17 @@
 |:------------ |:--------------------------- |:---- |
 | 🌐 Web 框架 | Gin | 高性能 HTTP 框架 |
 | ⚙️ 配置管理 | Viper | 多环境配置文件（dev / container / uat / prod） |
-| 📜 日志系统 | Zap + RotateLogs + ELK | 结构化日志，支持文件轮转与脱敏输出；可选集成 ELK |
+| 📜 日志系统 | Zap + RotateLogs | 结构化日志，支持文件轮转与脱敏输出；`deploy/elk` 提供可选采集示例 |
 | 🗄️ 数据访问 | GORM + Gen + dbresolver | ORM 工具，支持读写分离、多数据库配置；Model/Query 代码自动生成 |
 | 🚀 缓存系统 | go-redis | Redis 客户端封装，支持缓存与分布式锁 |
 | 🔐 鉴权系统 | JWT v5 | access_token / refresh_token 双 Token 鉴权，refresh_token 单用+JTI 追踪 |
 | 🛂 权限系统 | 自定义 RBAC | 基于菜单树结构的按钮/接口级权限控制 |
 | 🛡️ 限流中间件 | Fixed Window + Token Bucket | 固定窗口（Redis 原子计数）+ 令牌桶（内存速率控制）；支持 IP 白名单、路由级限流、Key 级限流 |
-| 🔗 链路追踪 | OpenTelemetry + Tempo | 可选开启，trace_id 自动注入日志与 HTTP Header |
+| 🔗 链路追踪 | OpenTelemetry | 可选开启，trace_id 自动注入日志与 HTTP Header；Tempo 作为外部后端接入 |
 | 📊 性能分析 | pprof | 按需开启，内网 IP 白名单保护 |
 | 🏥 健康检查 | /healthz / /readyz | 支持 K8s liveness / readiness probe |
 | 📨 消息队列 | RabbitMQ | 生产者/消费者封装，独立部署扩缩容 |
-| 📈 监控告警 | Prometheus + Grafana | 服务指标采集与可视化 |
+| 📈 监控部署 | Prometheus + Grafana | `deploy/monitor` 提供部署示例；业务指标与告警规则按项目接入 |
 | 🔨 代码生成 | GORM Gen | 根据数据库表自动生成 Model + Query API |
 
 ---
@@ -69,7 +69,7 @@
 ├─────────────┴─────────────┴─────────────┴───────────────┤
 │                    基础设施层                             │
 │    MySQL (读写分离)  │  Redis (缓存/锁)  │  RabbitMQ     │
-│    OpenTelemetry 追踪 │  Prometheus 监控  │  Zap 日志     │
+│    OpenTelemetry 追踪 │  可选监控部署     │  Zap 日志     │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -156,8 +156,8 @@ snowgo
 ├── Makefile                  # 常用构建与运行命令
 ├── Dockerfile                # API 服务镜像
 ├── Dockerfile.consumer       # Consumer 服务镜像
-├── docker-compose.yml        # 完整服务编排（nginx + mysql + redis + app x2）
-├── .env                      # Docker Compose 环境变量
+├── docker-compose.yml        # API 本地编排（nginx + mysql + redis + app x2）
+├── .env.example              # Docker Compose 环境变量示例
 ├── go.mod / go.sum
 └── README.md
 ```
@@ -191,7 +191,7 @@ cd snowgo
 | uat / container | `${VAR:-default}`，有默认值方便本地调试 | `dsn: ${MYSQL_DSN:-root:pass@tcp(...)}` |
 | prod | `${VAR}`，无默认值，必须注入 | `dsn: ${MYSQL_DSN}` |
 
-`dev`、`uat`、`container` 中的默认账号、密码、DSN、JWT 密钥仅用于本地开发和演示项目首次启动。生产环境必须使用 `prod` 配置并通过环境变量注入真实密钥，不能复用示例凭据。
+`dev`、`uat`、`container` 中的默认账号、密码、DSN、JWT 密钥仅用于本地开发和演示项目首次启动。生产环境必须使用 `prod` 配置并通过环境变量注入真实密钥，不能复用示例凭据。`.env` 为本地部署文件，禁止提交；仓库只保留 `.env.example`。
 
 ```shell
 # 本地开发使用 ENV=dev，对应 config/config.dev.yaml
@@ -285,16 +285,11 @@ make api-build
 cp .env.example .env
 vim .env   # 填入实际密码、密钥；设置 ENV=container
 
-# 3. 启动完整服务栈（nginx + mysql + redis + app x2）
+# 3. 启动 API 本地编排（nginx + mysql + redis + app x2）
 make up
 
 # 4. 停止
 make down
-```
-
-# 启动 API 服务
-```shell
-go run ./cmd/http
 ```
 
 # 运行效果
@@ -323,7 +318,7 @@ make mq-init            # 声明 RabbitMQ 拓扑
 # 代码质量
 make test               # 运行单元测试（含 race 检测，不含集成测试）
 make test-verbose       # 详细输出模式运行单元测试
-make test-integration   # 运行集成测试（需要 Redis + RabbitMQ）
+make test-integration   # 运行 pkg 集成测试（需要 Redis / RabbitMQ）
 make lint               # golangci-lint 代码检查（自动安装）
 make fmt                # 格式化 Go 代码
 make tidy               # 清理 go.mod 无用依赖
@@ -335,7 +330,7 @@ make consumer-run       # 运行 Consumer 容器
 make consumer-stop      # 停止 Consumer 容器
 
 # Docker Compose
-make up                 # 启动全部服务（nginx + mysql + redis + app）
+make up                 # 启动 API 本地编排（nginx + mysql + redis + app x2）
 make up-logs            # 启动并实时跟踪日志
 make down               # 停止全部服务
 make restart            # 重启全部服务
@@ -343,7 +338,7 @@ make restart            # 重启全部服务
 
 测试范围按改动范围选择：小改动优先跑受影响包的单测，例如 `go test ./pkg/xauth/...`；涉及共享逻辑、路由、配置、数据库访问或跨模块行为时跑 `go test ./...`。每次完成前都必须跑通过 `make lint`。覆盖率命令用于覆盖率专项检查，不作为每次改动的默认完成门槛。
 
-集成测试默认连接 `127.0.0.1:6379` 和 `amqp://snow_dev:zx.123@127.0.0.1:5672/dev`；可通过 `REDIS_ADDR`、`REDIS_PASSWORD`、`REDIS_DB`、`RABBITMQ_URL` 覆盖。依赖不可达时，相关 integration 测试会跳过。
+当前 `make test-integration` 覆盖 `pkg/xcache`、`pkg/xlock`、`pkg/xlimiter`、`pkg/xmq` 的 integration 测试，默认连接 `127.0.0.1:6379` 和 `amqp://snow_dev:zx.123@127.0.0.1:5672/dev`；可通过 `REDIS_ADDR`、`REDIS_PASSWORD`、`REDIS_DB`、`RABBITMQ_URL` 覆盖。依赖不可达时，相关 integration 测试会跳过。Service/DAO 层真实数据库集成测试按业务模块增量补充。
 
 ---
 
@@ -390,7 +385,7 @@ GET /readyz    # Readiness probe（服务是否就绪）
 ```
 数据库表设计
     ↓
-make gen add / make gen update   # 生成 Model + Query
+make gen do=add / make gen do=update   # 生成 Model + Query
     ↓
 实现 DAO 层（统一 `*query.Query` 参数，事务内传 `tx`，事务外传 `repo.Query()` / `repo.WriteQuery()`）
     ↓
@@ -422,7 +417,7 @@ make gen add / make gen update   # 生成 Model + Query
 |------|------|--------|
 | `SERVICE_IMAGE_NAME` | API 服务镜像名称 | `snowgo` |
 | `SERVICE_IMAGE_VERSION` | API 服务镜像版本 | `1.0.0` |
-| `MYSQL_ROOT_PASSWORD` | MySQL root 密码 | — |
+| `MYSQL_ROOT_PASSWORD` | MySQL root 密码 | 本地示例值 |
 | `MYSQL_DATABASE` | MySQL 数据库名 | `snowgo` |
 | `MYSQL_PORT` | MySQL 宿主机映射端口 | `3307` |
 | `REDIS_PORT` | Redis 宿主机映射端口 | `6380` |
@@ -431,16 +426,16 @@ make gen add / make gen update   # 生成 Model + Query
 
 ### 应用敏感配置（dev 环境无需设置，uat / container / prod 通过环境变量注入）
 
-| 变量 | 说明 | uat/container 有默认值 | prod 必填 |
-|------|------|:---:|:---:|
-| `MYSQL_DSN` | MySQL 主库连接串 | ✓ | ✓ |
-| `MYSQL_MAIN_DSN` | 读写分离主库连接串 | — | — |
-| `MYSQL_SLAVE_DSN_1` | 读写分离从库连接串 1 | — | — |
-| `MYSQL_SLAVE_DSN_2` | 读写分离从库连接串 2 | — | — |
-| `MYSQL_USER_DSN` | 用户库连接串（dbMap） | — | — |
-| `REDIS_PASSWORD` | Redis 密码 | ✓ | — |
-| `JWT_SECRET` | JWT 签名密钥 | ✓ | ✓ |
-| `RABBITMQ_URL` | RabbitMQ 连接地址 | ✓ | — |
+| 变量 | 说明 | container/uat | prod |
+|------|------|---------------|------|
+| `MYSQL_DSN` | 默认主库连接串 | 可使用示例默认值 | 必填 |
+| `MYSQL_MAIN_DSN` | 读写分离主库连接串 | 启用读写分离时必填 | 启用读写分离时必填 |
+| `MYSQL_SLAVE_DSN_1` | 读写分离从库连接串 1 | 启用读写分离时必填 | 启用读写分离时必填 |
+| `MYSQL_SLAVE_DSN_2` | 读写分离从库连接串 2 | 启用读写分离时可选 | 启用读写分离时可选 |
+| `MYSQL_USER_DSN` | 用户库连接串（dbMap） | 启用用户库时必填 | 启用用户库时必填 |
+| `REDIS_PASSWORD` | Redis 密码 | 可为空 | 按 Redis 安全策略配置 |
+| `JWT_SECRET` | JWT 签名密钥 | 可使用示例默认值 | 必填，使用强随机值 |
+| `RABBITMQ_URL` | RabbitMQ 连接地址 | 启用 MQ 时必填 | 启用 MQ 时必填 |
 
 > 完整列表参见 `.env.example`。
 

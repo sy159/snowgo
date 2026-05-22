@@ -27,8 +27,8 @@ Design principle: drive schema by query patterns, avoid over-engineering, choose
 
 | Item | Rule |
 |------|------|
-| Table name | `<module>_<entity>` (e.g., `user`, `role_menu`) |
-| Association table | `<entity_a>_<entity_b>` (e.g., `user_role`) |
+| Table name | System/admin tables use `sys_<entity>`; business tables use `<module>_<entity>` when a module prefix is needed |
+| Association table | `<entity_a>_<entity_b>` with the same prefix strategy, e.g. `sys_user_role` |
 | Foreign keys | None. Application-level integrity |
 | created_at | Mandatory. TIMESTAMP/DATETIME with DEFAULT CURRENT_TIMESTAMP |
 | updated_at | Only for tables with UPDATE |
@@ -76,7 +76,7 @@ Use `WriteQuery().Transaction()` for:
 
 Independent single-table writes may run without an explicit transaction when there is no cross-table or operation-log atomicity requirement, for example login logs. Prefer `repo.WriteQuery()` for non-transactional writes when the write node must be explicit; `repo.Query()` may rely on dbresolver auto-routing.
 
-Never call `container.SomeService.Method()` inside a transaction. Service MUST NOT directly use GORM Gen query APIs.
+Never call business Service methods through `container.SomeService.Method()` inside a transaction. Service MUST NOT directly use GORM Gen query APIs.
 
 ```go
 err := db.WriteQuery().Transaction(func(tx *query.Query) error {
@@ -118,7 +118,7 @@ Operation logs for audited business mutations are synchronous within the same tr
 
 **Read-write in transactions**: All reads and writes inside a transaction go to the write node. Outside transactions, `repo.Query()` auto-detects via dbresolver; use `WriteQuery()` or `ReadQuery()` when you need to override automatic routing, for example read-after-write to avoid replication lag.
 
-**Reusing business logic in transactions**: When business logic from another service is needed inside a transaction, extract it as a DAO method or a stateless utility function in `pkg/`. Never call another service to avoid implicit transaction nesting or circular dependencies.
+**Reusing business logic in transactions**: When business logic from another service is needed inside a transaction, extract it as a DAO method or a stateless utility function in `pkg/`. Transaction-safe infrastructure contracts may be used only when they are explicitly designed to receive the caller's `*query.Query` and do not start nested transactions, such as synchronous operation-log writing.
 
 ---
 
@@ -140,13 +140,15 @@ Pattern: Read-through (cache → miss → DB → fill non-blocking). Write-behin
 
 ---
 
-## 5. Interface Availability
+## 5. Availability & Resilience
 
-Graceful degradation: Cache down → query DB. DB down → return stale cache.
+Graceful degradation: cache down → query DB and log the cache error. DB down → return stale cache only for read paths that explicitly implement stale-cache semantics; otherwise return a controlled system error.
 
 External calls: `context.WithTimeout`. Retry transient errors only — max 3 times, exponential backoff. No retry on 4xx, validation errors, unique constraint violations.
 
 Idempotency: unique index for create-by-key, request_id in Redis for duplicate detection, WHERE status for transitions, distributed lock + unique tx number for financial.
+
+Queue consumers must be idempotent. Acknowledge messages only after durable side effects succeed; on retryable failures, reject/requeue according to queue policy; on poison messages, route to a dead-letter queue or persist a failure record for manual handling.
 
 ---
 
@@ -161,7 +163,7 @@ Paginate all lists. Default limit: `constant.DefaultLimit` (10). Avoid N+1 (JOIN
 | Fuzzy search | ES/Meilisearch. No LIKE '%term%' on large tables |
 | Export | Stream results |
 
-Performance targets: P99 read < 200ms, write < 500ms, slow SQL > 2s, cache hit rate > 90%.
+Performance targets should be defined per endpoint or module. Default review thresholds: P99 read < 200ms for hot cache-backed reads, P99 write < 500ms for common writes, slow SQL threshold 2s, cache hit rate > 90% for mature hot keys.
 
 ---
 

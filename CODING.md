@@ -24,7 +24,7 @@
 
 ## 2. Constants
 
-All in `internal/constant/`. Never inline.
+Shared business constants live in `internal/constant/`. Do not inline values that are reused, persisted, exposed through APIs, used for permissions/cache/MQ, or compared across packages. Local one-off strings in tests, logs, and small private helpers may stay inline when extracting them would reduce readability.
 
 | File | Scope |
 |------|-------|
@@ -35,6 +35,8 @@ All in `internal/constant/`. Never inline.
 
 Error codes: `pkg/xerror/` (5-digit scheme, separate registry).
 
+Configuration keys and environment variable names should be documented in `.env.example` and README when they affect deployment.
+
 ---
 
 ## 3. Error Handling
@@ -43,7 +45,7 @@ Error codes: `pkg/xerror/` (5-digit scheme, separate registry).
 |-------|------|
 | API | Use `errors.As` to extract `e.BizError`, respond with `FailByError(c, bizErr.Code)`. Use `Fail` only for binding errors. Never `Fail(c, code, err.Error())` for service errors |
 | Service | Define sentinels with `e.NewBizError(e.Code)`. Never `errors.New` for business errors. Use `fmt.Errorf("%w", err)` for infrastructure errors |
-| DAO | Return directly — `errors.New` for validation, raw GORM for DB |
+| DAO | Return directly — raw GORM for DB. DAO validation should be minimal; business validation belongs in API/Service |
 | Global | Never `panic()` in API/Service/DAO. Only `xlogger.Panic` for fatal init |
 
 ### BizError Pattern
@@ -74,6 +76,8 @@ To add a new business error:
 2. Add BizError sentinel in Service
 
 (API handler unchanged, `errors.As` handles it automatically)
+
+Prefer returning an existing sentinel with `errors.Is` compatibility when callers need branching. Use `WrapBizError` when the underlying cause is useful for logs but should not be exposed to clients.
 
 ### Error Code Scheme
 
@@ -148,3 +152,5 @@ Use package boundaries to decide whether a Service dependency needs an interface
 `internal/service/admin/contract` is for admin-level public service contracts that are stable and reused by multiple packages, such as audit logs, notifications, or file storage. Do not place DAO interfaces, per-feature repositories, or single-consumer test doubles there. Adapters belong in `internal/di` only when an implementation cannot directly satisfy the contract.
 
 Contracts may include `*query.Query` only when the capability must participate synchronously in the caller's transaction, such as audited operation logs. Prefer context-only contracts for non-transactional or asynchronous capabilities.
+
+Transaction-aware contracts must not start, commit, or rollback transactions internally. They must use the caller-provided `*query.Query` and keep side effects limited to the declared capability.

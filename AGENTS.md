@@ -16,21 +16,21 @@
 ## Core Rules
 
 1. **Never** manually edit `internal/dal/model/` or `internal/dal/query/`.
-2. Service owns transaction boundaries. DAO methods accept caller-provided `*query.Query` and never open transactions themselves. Multi-table mutations and audited business mutations that require operation logs use `WriteQuery().Transaction()`. Independent single-table writes may use a non-transactional `*query.Query` when atomic cross-table consistency is not required. Operation logs for audited business mutations are written synchronously within the same transaction.
+2. Service owns transaction boundaries. DAO methods accept caller-provided `*query.Query` and never open transactions themselves. Multi-table mutations and audited business mutations that require operation logs use `WriteQuery().Transaction()`. Independent single-table writes may use a non-transactional `*query.Query` when atomic cross-table consistency is not required. Operation logs for audited business mutations are written synchronously within the same transaction through transaction-aware contracts or DAO methods.
 3. All DAO methods that may participate in a transaction accept `*query.Query` as a parameter. The DAO does not care whether it runs in a transaction — the Service layer decides: pass `tx` inside `Transaction()`, pass `repo.Query()` or `repo.WriteQuery()` outside. There is only one method per DAO operation — no separate `Transaction*Xxx` variants.
 4. Cache invalidation happens **after** DB commit, never inside a transaction.
 5. Admin endpoints require `JWTAuth()` after login. Add `PermissionAuth(constant.PermXxx)` for privileged management or scoped business data endpoints. Login-only endpoints (current user permissions, server info, allowed dictionary lookups) must be documented in route comments. Middleware in `internal/router/middleware/auth.go`.
-6. Service dependencies follow package boundaries: same-package services inject concrete `*XxxService`; cross-package service calls use stable contracts from `internal/service/admin/contract` when the dependency is shared infrastructure capability, and consumer-local interfaces only for narrow one-off domain dependencies.
+6. Service dependencies follow package boundaries: same-package services inject concrete `*XxxService`; cross-package service calls use stable contracts from `internal/service/admin/contract` when the dependency is shared infrastructure capability, and consumer-local interfaces only for narrow one-off domain dependencies. Do not call business Services inside an open transaction; only transaction-aware infrastructure contracts that receive the caller's `*query.Query` are allowed.
 7. Use `xlogger.InfofCtx` / `xlogger.ErrorfCtx` for all logging.
 8. Define sentinel errors in Service using `pkg/xerror/` codes; compare with `errors.Is`.
 9. API layer validates all input before reaching Service.
 10. No `panic()` in API/Service/DAO for business errors.
 11. `created_at` mandatory for all tables; soft delete (`is_deleted tinyint(1) DEFAULT 0` + `deleted_at DATETIME(6) DEFAULT NULL`) is optional, decide per business need. Use for tables requiring audit/compliance/user undo (e.g., orders). Skip for high-volume logs and junction tables.
-12. Run tests according to change scope before declaring complete: small, localized changes run affected package tests; broad/shared behavior changes run `go test ./...`. Always run `make lint`. Use coverage commands only when coverage is the explicit goal. Integration tests use `-tags=integration` and require Redis/RabbitMQ/MySQL.
+12. Run tests according to change scope before declaring complete: small, localized changes run affected package tests; broad/shared behavior changes run `go test ./...`. Always run `make lint`. Use coverage commands only when coverage is the explicit goal. Integration tests use `-tags=integration`; current `make test-integration` covers pkg integrations, and service/DAO integration tests should be run with explicit package commands when present.
 13. Core and complex code must have comments. Update README / AGENTS docs alongside code changes.
 
 ---
 
 ## AI Workflow
 
-Non-trivial changes: output plan before coding. Steps: understand task → identify files → plan → note risks → verify. For new database tables, run `make gen add` / `make gen update` to generate Model + Query before coding DAO/Service/API layers.
+Non-trivial changes: output plan before coding. Steps: understand task → identify files → plan → note risks → verify. For new database tables, run `make gen do=add` / `make gen do=update` to generate Model + Query before coding DAO/Service/API layers.
