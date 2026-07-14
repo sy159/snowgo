@@ -8,6 +8,7 @@ import (
 
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
+	"snowgo/internal/dal/repo"
 	"snowgo/pkg/xcryption"
 	e "snowgo/pkg/xerror"
 )
@@ -137,7 +138,10 @@ func TestUserServiceAuthenticate(t *testing.T) {
 			if tt.wantErr == ErrUserNotFound {
 				username = ""
 			}
-			service := &UserService{userDao: tt.repo}
+			service := &UserService{
+				db:      &repo.Repository{},
+				userDao: tt.repo,
+			}
 			got, err := service.Authenticate(testUserCtx(), username, tt.password)
 			if tt.wantErr != nil {
 				if !errors.Is(err, tt.wantErr) {

@@ -199,11 +199,11 @@ func (u *UserDao) GetUserById(ctx context.Context, userId int32) (*model.SysUser
 }
 
 // GetUserByUsername 查询用户by name
-func (u *UserDao) GetUserByUsername(ctx context.Context, username string) (*model.SysUser, error) {
+func (u *UserDao) GetUserByUsername(ctx context.Context, q *query.Query, username string) (*model.SysUser, error) {
 	if len(username) <= 0 {
 		return nil, errors.New("用户username不存在")
 	}
-	m := u.repo.Query().SysUser
+	m := q.SysUser
 	user, err := m.WithContext(ctx).Where(m.Username.Eq(username)).First()
 	if err != nil {
 		return nil, err

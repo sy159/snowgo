@@ -77,7 +77,7 @@ func (f *fakeUserRepo) GetUserById(context.Context, int32) (*model.SysUser, erro
 	panic("not implemented")
 }
 
-func (f *fakeUserRepo) GetUserByUsername(context.Context, string) (*model.SysUser, error) {
+func (f *fakeUserRepo) GetUserByUsername(context.Context, *query.Query, string) (*model.SysUser, error) {
 	return f.userByUsername, f.userByUsernameErr
 }
 

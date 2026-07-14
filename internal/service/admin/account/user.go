@@ -42,7 +42,7 @@ type UserRepo interface {
 	IsExistByRoleId(ctx context.Context, roleId int32) (bool, error)
 	CountRoleByIds(ctx context.Context, q *query.Query, roleId []int32) (int64, error)
 	GetUserById(ctx context.Context, userId int32) (*model.SysUser, error)
-	GetUserByUsername(ctx context.Context, username string) (*model.SysUser, error)
+	GetUserByUsername(ctx context.Context, q *query.Query, username string) (*model.SysUser, error)
 	GetUserList(ctx context.Context, condition *account.UserListCondition) ([]*model.SysUser, int64, error)
 	ResetPwdById(ctx context.Context, q *query.Query, userId int32, password string) error
 }
@@ -641,7 +641,8 @@ func (u *UserService) Authenticate(ctx context.Context, username, password strin
 		return nil, ErrUserNotFound
 	}
 
-	user, err := u.userDao.GetUserByUsername(ctx, username)
+	// 鉴权读取主库，避免复制延迟导致旧密码或禁用前状态被继续接受。
+	user, err := u.userDao.GetUserByUsername(ctx, u.db.WriteQuery(), username)
 	if err != nil {
 		// 用户不存在统一返回认证失败，避免用户名枚举
 		if errors.Is(err, gorm.ErrRecordNotFound) {
