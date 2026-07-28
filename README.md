@@ -9,7 +9,7 @@
   <a href="https://github.com/sy159/snowgo/actions/workflows/security.yml"><img src="https://github.com/sy159/snowgo/actions/workflows/security.yml/badge.svg" alt="Security" /></a>
   <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.25+-007DFF" alt="Go" /></a>
   <a href="https://pkg.go.dev/github.com/gin-gonic/gin"><img src="https://img.shields.io/badge/Gin-1.12.0-00ADD8" alt="Gin" /></a>
-  <a href="https://pkg.go.dev/gorm.io/gorm"><img src="https://img.shields.io/badge/GORM-1.31.1-00C7B7" alt="GORM" /></a>
+  <a href="https://pkg.go.dev/gorm.io/gorm"><img src="https://img.shields.io/badge/GORM-1.31.2-00C7B7" alt="GORM" /></a>
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License" />
 </p>
 
