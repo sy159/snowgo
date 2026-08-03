@@ -40,6 +40,8 @@ func NewMysql(cfg config.MysqlConfig, otherCfg config.OtherDBConfig) (*MyDB, err
 	for k, v := range otherCfg.DBMap {
 		otherDb, err := connectMysql(v)
 		if err != nil {
+			// 失败前释放已建立的连接：默认 db 与此前已成功的 other DB
+			_ = myDB.Close()
 			return nil, err
 		}
 		myDB.DbMap[k] = otherDb
@@ -106,6 +108,14 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 		return nil, errors.New("mysql init failed, dsn is empty")
 	}
 
+	// 失败时若 db 已建立则关闭，避免 gorm.Open 成功但后续步骤失败导致句柄泄漏
+	defer func() {
+		if err != nil && db != nil {
+			_ = closeMysql(db)
+			db = nil
+		}
+	}()
+
 	mysqlConfig = processConfig(mysqlConfig) // 处理配置
 
 	// 连接额外配置信息
@@ -142,13 +152,13 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 	dsn := ensureTimeout(mysqlConfig.DSN) // 处理链接超时
 	db, err = gorm.Open(mysql.Open(dsn), gormConfig)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	// 设置连接池信息
 	sqlDB, err := db.DB()
 	if err != nil {
-		return nil, err
+		return
 	}
 	// 设置空闲连接池中连接的最大数量
 	sqlDB.SetMaxIdleConns(mysqlConfig.MaxIdleConns)
@@ -163,7 +173,8 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 		return db, nil
 	}
 	if len(mysqlConfig.MainsDSN) == 0 {
-		return nil, errors.New("读写分离需要配置主库地址")
+		err = errors.New("读写分离需要配置主库地址")
+		return
 	}
 	if len(mysqlConfig.SlavesDSN) == 0 {
 		mysqlConfig.SlavesDSN = mysqlConfig.MainsDSN
@@ -193,7 +204,7 @@ func connectMysql(mysqlConfig config.MysqlConfig) (db *gorm.DB, err error) {
 		SetConnMaxIdleTime(mysqlConfig.ConnMaxIdleTime).
 		SetConnMaxLifetime(mysqlConfig.ConnMaxLifeTime))
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	return db, nil
