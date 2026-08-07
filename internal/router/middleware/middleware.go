@@ -46,7 +46,7 @@ var (
 	arrayFieldMasks = []string{"data.list.*.operator_id"}
 )
 
-func fastMask(raw []byte) []byte {
+func fastMask(ctx context.Context, raw []byte) []byte {
 	if len(raw) == 0 {
 		return raw
 	}
@@ -57,7 +57,7 @@ func fastMask(raw []byte) []byte {
 		// a) 脱敏顶层 key
 		if gjson.GetBytes(data, key).Exists() {
 			if masked, err := sjson.SetBytes(data, key, "****"); err != nil {
-				xlogger.ErrorfCtx(context.Background(), "请求参数脱敏失败: %v", err)
+				xlogger.ErrorfCtx(ctx, "请求参数脱敏失败: %v", err)
 			} else {
 				data = masked
 			}
@@ -66,7 +66,7 @@ func fastMask(raw []byte) []byte {
 		prefixed := "data." + key
 		if gjson.GetBytes(data, prefixed).Exists() {
 			if masked, err := sjson.SetBytes(data, prefixed, "****"); err != nil {
-				xlogger.ErrorfCtx(context.Background(), "请求参数脱敏失败: %v", err)
+				xlogger.ErrorfCtx(ctx, "请求参数脱敏失败: %v", err)
 			} else {
 				data = masked
 			}
@@ -93,7 +93,7 @@ func fastMask(raw []byte) []byte {
 			fullPath := fmt.Sprintf("%s.%d.%s", prefix, idx, field)
 			if gjson.GetBytes(data, fullPath).Exists() {
 				if masked, err := sjson.SetBytes(data, fullPath, "****"); err != nil {
-					xlogger.ErrorfCtx(context.Background(), "请求参数脱敏失败: %v", err)
+					xlogger.ErrorfCtx(ctx, "请求参数脱敏失败: %v", err)
 				} else {
 					data = masked
 				}
@@ -165,7 +165,7 @@ func AccessLogger() gin.HandlerFunc {
 			if !allowedCT[mimeType] {
 				reqBody = []byte(fmt.Sprintf("{\"msg\": \"[skip request type: %s]\"}", mimeType))
 			} else {
-				// 读取请求体（body只能读一次）
+				// 读取请求体（body只能读一次）。请求体大小由网关限制，此处不做额外内存上限
 				reqBody, _ = c.GetRawData()
 				if len(reqBody) > 0 {
 					c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBody)) // 重置 Body 供后续处理使用
@@ -190,7 +190,7 @@ func AccessLogger() gin.HandlerFunc {
 		// 记录访问日志
 		if cfg.Application.EnableAccessLog {
 			// 快速脱敏，脱敏后截断
-			maskedReq := truncateBody(fastMask(reqBody))
+			maskedReq := truncateBody(fastMask(ctx, reqBody))
 			var maskedRes []byte
 			if writer != nil {
 				ct := c.Writer.Header().Get("Content-Type")
@@ -199,7 +199,7 @@ func AccessLogger() gin.HandlerFunc {
 					maskedRes = []byte(fmt.Sprintf("{\"msg\": \"[skip response type: %s]\"}", mimeType))
 				} else {
 					// 普通文本/JSON，脱敏后截断
-					maskedRes = truncateBody(fastMask(writer.body.Bytes()))
+					maskedRes = truncateBody(fastMask(ctx, writer.body.Bytes()))
 				}
 			}
 
