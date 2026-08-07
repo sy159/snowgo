@@ -124,10 +124,7 @@ func accessLogTargets(enabled bool, accessOutput string) (writeFile, writeConsol
 func AccessLogger() gin.HandlerFunc {
 	cfg := config.Get()
 	var allowedCT = map[string]bool{
-		"application/json":                  true,
-		"application/x-www-form-urlencoded": true,
-		"text/plain":                        true,
-		"text/xml":                          true,
+		"application/json": true,
 	}
 	return func(c *gin.Context) {
 		writeFile, writeConsole := accessLogTargets(cfg.Application.EnableAccessLog, cfg.Log.AccessOutput)
@@ -259,7 +256,8 @@ func Recovery() gin.HandlerFunc {
 					zap.String("method", c.Request.Method),
 					zap.String("path", c.Request.URL.Path),
 					zap.String("query", c.Request.URL.RawQuery),
-					zap.String("ip", c.ClientIP()),
+					zap.String("route", c.FullPath()),
+					zap.String("client_ip", c.ClientIP()),
 					zap.String("trace_id", xtrace.GetTraceID(c.Request.Context())),
 					zap.String("user_agent", c.Request.UserAgent()),
 					zap.ByteString("request", httpRequest),
@@ -323,6 +321,18 @@ func InjectContainerMiddleware(container *di.Container) gin.HandlerFunc {
 	}
 }
 
+func validTraceID(s string) bool {
+	if len(s) == 0 || len(s) > 64 {
+		return false
+	}
+	for _, c := range s {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", c) {
+			return false
+		}
+	}
+	return true
+}
+
 // TraceMiddleware 用于设置trace
 func TraceMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -331,10 +341,13 @@ func TraceMiddleware() gin.HandlerFunc {
 		// OTEL span 有效则取
 		if span := trace.SpanFromContext(c.Request.Context()); span.SpanContext().IsValid() {
 			traceID = span.SpanContext().TraceID().String()
-		} else if tid := c.GetHeader(xauth.XTraceIDHeader); tid != "" {
-			traceID = tid
 		} else {
-			traceID = strings.ReplaceAll(uuid.New().String(), "-", "")
+			tid := c.GetHeader(xauth.XTraceIDHeader)
+			if validTraceID(tid) {
+				traceID = tid
+			} else {
+				traceID = strings.ReplaceAll(uuid.New().String(), "-", "")
+			}
 		}
 
 		c.Set(xauth.XTraceId, traceID)
