@@ -60,10 +60,11 @@ type ServerConfig struct {
 // LogConfig 日志配置
 type LogConfig struct {
 	Output               string `mapstructure:"output"`
-	AccessEncoder        string `mapstructure:"access_encoder"`
 	LogEncoder           string `mapstructure:"log_encoder"`
-	AccessFileMaxAgeDays uint32 `mapstructure:"access_file_max_age_days"`
 	LogFileMaxAgeDays    uint32 `mapstructure:"log_file_max_age_days"`
+	AccessOutput         string `mapstructure:"access_output"`
+	AccessEncoder        string `mapstructure:"access_encoder"`
+	AccessFileMaxAgeDays uint32 `mapstructure:"access_file_max_age_days"`
 }
 
 // RedisConfig Redis配置

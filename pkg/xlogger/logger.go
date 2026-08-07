@@ -26,6 +26,7 @@ const (
 
 var (
 	defaultBasePath = "./logs"
+	ConsoleWriter   = "console"
 	FileWriter      = "file"
 	MultiWriter     = "multi"
 )
@@ -60,6 +61,7 @@ func Init(basePath string) {
 	logMaxAge := cfg.Log.LogFileMaxAgeDays
 	accountMaxAge := cfg.Log.AccessFileMaxAgeDays
 	writer := cfg.Log.Output
+	accessOutput := cfg.Log.AccessOutput
 
 	// 设置日志输出格式
 	encoder := getNormalEncoder()
@@ -103,7 +105,6 @@ func Init(basePath string) {
 	case FileWriter:
 		debugWriter = getTimeWriter(filepath.Join(basePath, "debug/debug.log"), logMaxAge)
 		infoWriter = getTimeWriter(filepath.Join(basePath, "info/info.log"), logMaxAge)
-		accessWriter = getTimeWriter(filepath.Join(basePath, "access/access.log"), accountMaxAge)
 		errorWriter = getTimeWriter(filepath.Join(basePath, "error/error.log"), logMaxAge)
 
 		// 日志大小分割
@@ -114,7 +115,6 @@ func Init(basePath string) {
 	case MultiWriter:
 		debugWriter = getTimeWriter(filepath.Join(basePath, "debug/debug.log"), logMaxAge)
 		infoWriter = getTimeWriter(filepath.Join(basePath, "info/info.log"), logMaxAge)
-		accessWriter = getTimeWriter(filepath.Join(basePath, "access/access.log"), accountMaxAge)
 		errorWriter = getTimeWriter(filepath.Join(basePath, "xerror/xerror.log"), logMaxAge)
 
 		// 日志大小分割
@@ -124,8 +124,13 @@ func Init(basePath string) {
 		//errorWriter := getSizeWriter("./logs/xerror/xerror.log")
 		debugWriter = zapcore.NewMultiWriteSyncer(stdoutWithPrefix, debugWriter)
 		infoWriter = zapcore.NewMultiWriteSyncer(stdoutWithPrefix, infoWriter)
-		//accessWriter = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), accessWriter)  // account其他地方有些
 		errorWriter = zapcore.NewMultiWriteSyncer(stdoutWithPrefix, errorWriter)
+	}
+
+	// 访问日志 console控制台输出，file输出到文件 multi控制台跟日志文件同时输出（通过中间件的fmt输出）
+	if accessOutput != ConsoleWriter {
+		accessWriter = getTimeWriter(filepath.Join(basePath, "access/access.log"), accountMaxAge)
+		//accessWriter = zapcore.NewMultiWriteSyncer(accessWriter, accessFileWriter)
 	}
 
 	// 创建具体的Logger

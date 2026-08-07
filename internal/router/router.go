@@ -44,6 +44,7 @@ func loadMiddleWare(router *gin.Engine, container *di.Container) {
 	// 依赖注入
 	router.Use(middleware.InjectContainerMiddleware(container))
 
+	// 注入客户端 IP、User-Agent 到 Gin/标准 Context，供登录日志、操作日志及业务层读取
 	router.Use(middleware.AccessLogger())
 	//router.Use(middleware.Cors())
 }

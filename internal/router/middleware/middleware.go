@@ -24,7 +24,6 @@ import (
 	"snowgo/internal/di"
 	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcolor"
-	"snowgo/pkg/xenv"
 	e "snowgo/pkg/xerror"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
@@ -111,17 +110,14 @@ func truncateBody(data []byte) []byte {
 	return append(data[:maxLogBodyBytes], truncateSuffix...)
 }
 
-// 自定义一个结构体，实现 gin.ResponseWriter interface
-type responseWriter struct {
-	gin.ResponseWriter
-	body *bytes.Buffer
-}
+// accessLogTargets 判断已启用访问日志的写入位置是文件还是输出
+func accessLogTargets(enabled bool, accessOutput string) (writeFile, writeConsole bool) {
+	if !enabled {
+		return false, false
+	}
 
-// Write 复制一份出来
-func (w *responseWriter) Write(b []byte) (int, error) {
-	//向一个bytes.buffer中写一份数据来为获取body使用
-	_, _ = w.body.Write(b)
-	return w.ResponseWriter.Write(b)
+	return accessOutput == xlogger.FileWriter || accessOutput == xlogger.MultiWriter,
+		accessOutput == xlogger.ConsoleWriter || accessOutput == xlogger.MultiWriter
 }
 
 // AccessLogger 控制台输出访问日志，如果app配置了记录访问日志，会记录下访问日志
@@ -134,6 +130,7 @@ func AccessLogger() gin.HandlerFunc {
 		"text/xml":                          true,
 	}
 	return func(c *gin.Context) {
+		writeFile, writeConsole := accessLogTargets(cfg.Application.EnableAccessLog, cfg.Log.AccessOutput)
 		startTime := time.Now()
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
@@ -156,10 +153,9 @@ func AccessLogger() gin.HandlerFunc {
 		}
 
 		var reqBody []byte
-		var writer *responseWriter
 
 		// 开启访问日志
-		if cfg.Application.EnableAccessLog {
+		if writeFile {
 			ct := c.ContentType()
 			mimeType, _, _ := mime.ParseMediaType(ct)
 			if !allowedCT[mimeType] {
@@ -171,13 +167,6 @@ func AccessLogger() gin.HandlerFunc {
 					c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBody)) // 重置 Body 供后续处理使用
 				}
 			}
-
-			// 替换 Writer 以捕获响应
-			writer = &responseWriter{
-				ResponseWriter: c.Writer,
-				body:           bytes.NewBuffer(nil),
-			}
-			c.Writer = writer
 		}
 
 		c.Next()
@@ -188,20 +177,16 @@ func AccessLogger() gin.HandlerFunc {
 		bizMsg := c.GetString(xresponse.BizMsg) // 业务返回msg
 
 		// 记录访问日志
-		if cfg.Application.EnableAccessLog {
-			// 快速脱敏，脱敏后截断
-			maskedReq := truncateBody(fastMask(ctx, reqBody))
-			var maskedRes []byte
-			if writer != nil {
-				ct := c.Writer.Header().Get("Content-Type")
-				mimeType, _, _ := mime.ParseMediaType(ct)
-				if !allowedCT[mimeType] {
-					maskedRes = []byte(fmt.Sprintf("{\"msg\": \"[skip response type: %s]\"}", mimeType))
-				} else {
-					// 普通文本/JSON，脱敏后截断
-					maskedRes = truncateBody(fastMask(ctx, writer.body.Bytes()))
-				}
+		if writeFile {
+			var maskedReq []byte
+			// 只有错误才记录请求的参数，快速脱敏，脱敏后截断,
+			if c.Writer.Status() >= http.StatusBadRequest || bizCode != e.OK.GetErrCode() {
+				maskedReq = truncateBody(fastMask(ctx, reqBody))
 			}
+
+			// 用户id
+			rawUserID, _ := c.Get(xauth.XUserId)
+			userID, _ := rawUserID.(int32)
 
 			xlogger.Access(bizMsg,
 				zap.Int("status", c.Writer.Status()),
@@ -210,10 +195,11 @@ func AccessLogger() gin.HandlerFunc {
 				zap.String("method", method),
 				zap.String("path", path),
 				zap.String("query", query),
+				zap.String("route", c.FullPath()),
 				zap.String("request_body", string(maskedReq)),
-				zap.String("ip", c.ClientIP()),
+				zap.String("client_ip", c.ClientIP()),
+				zap.Int32("user_id", userID),
 				zap.Duration("cost", cost),
-				zap.String("res", string(maskedRes)),
 				zap.String("trace_id", traceId),
 				zap.String("user_agent", c.Request.UserAgent()),
 				zap.String("errors", c.Errors.ByType(gin.ErrorTypePrivate).String()),
@@ -221,8 +207,7 @@ func AccessLogger() gin.HandlerFunc {
 				zap.String("end_time", endTime.Format(constant.TimeFmtWithMS)),
 			)
 		}
-		// 正式环境不进行标准输出
-		if !xenv.Prod() && (!cfg.Application.EnableAccessLog || cfg.Log.Output == xlogger.MultiWriter) {
+		if writeConsole {
 			// 控制台输出访问日志
 			fmt.Printf("%s %s %20s | status %3s | biz code %6s | %8v | %5s  %#v | %12s | %s\n",
 				xcolor.GreenFont(fmt.Sprintf("[%s:%s]", cfg.Application.Server.Name, cfg.Application.Server.Version)),
