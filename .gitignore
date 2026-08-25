@@ -31,6 +31,9 @@ Thumbs.db
 .codex
 docs/superpowers/
 
+# Local Git worktrees
+.worktrees/
+
 # Go build artifacts
 *.exe
 *.dll
