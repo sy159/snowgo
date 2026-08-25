@@ -1,0 +1,89 @@
+openapi: 3.1.0
+info:
+  title: 默认模块
+  description: ''
+  version: 1.0.0
+tags:
+  - name: 监控(存活、就绪)
+paths:
+  /readyz:
+    get:
+      summary: 就绪检查
+      deprecated: false
+      description: ''
+      tags:
+        - 监控(存活、就绪)
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                required:
+                  - status
+              example:
+                status: ready
+          headers: {}
+      security: []
+  /healthz:
+    get:
+      summary: 健康检查
+      deprecated: false
+      description: ''
+      tags:
+        - 监控(存活、就绪)
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                required:
+                  - status
+          headers: {}
+      security: []
+webhooks: {}
+components:
+  schemas: {}
+  responses: {}
+  securitySchemes: {}
+servers:
+  - url: http://127.0.0.1:8000
+    description: 开发环境
+security: []

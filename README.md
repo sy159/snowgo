@@ -107,6 +107,7 @@ snowgo
 │   ├── monitor/              # Prometheus + Grafana 监控部署
 │   └── rabbitmq/             # RabbitMQ 部署示例
 ├── docs/
+│   ├── api/                  # OpenAPI 文件
 │   └── sql/                  # 数据库初始化 SQL
 ├── internal/
 │   ├── api/                  # HTTP Handler（admin/account、admin/system 模块）
@@ -456,6 +457,11 @@ make gen do=add / make gen do=update   # 生成 Model + Query
 ### 接口文档
 
 - [Apifox 接口文档](https://apifox.com/apidoc/shared-becb3022-d340-491c-bdd7-1f4d4b84620f)
+- 本地 OpenAPI 文件：
+  - [`docs/api/admin.openapi.yaml`](./docs/api/admin.openapi.yaml)：后台管理接口，开发环境基址为 `http://127.0.0.1:8000/api/admin`
+  - [`docs/api/runtime.openapi.yaml`](./docs/api/runtime.openapi.yaml)：存活与就绪探针，开发环境基址为 `http://127.0.0.1:8000`
+
+Apifox 是接口设计与环境配置的唯一源头。本地 OpenAPI 文件用于随代码版本化接口契约；接口路径、请求/响应结构、鉴权或错误码变更时，应从对应 Apifox 目录重新导出并与代码一同提交。
 
 ### 前端项目
 

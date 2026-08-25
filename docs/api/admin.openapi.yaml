@@ -1,0 +1,3420 @@
+openapi: 3.1.0
+info:
+  title: 默认模块
+  description: ''
+  version: 1.0.0
+tags:
+  - name: 后台管理
+  - name: 后台管理/账号管理
+  - name: 后台管理/账号管理/用户管理
+  - name: 后台管理/账号管理/角色管理
+  - name: 后台管理/账号管理/菜单管理
+  - name: 后台管理/系统管理
+  - name: 后台管理/系统管理/日志
+  - name: 后台管理/系统管理/字典管理
+  - name: admin
+paths:
+  /account/user:
+    post:
+      summary: 创建用户
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/用户管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  maxLength: 64
+                  description: 用户名
+                password:
+                  type: string
+                  description: 密码
+                tel:
+                  type: string
+                  description: 用户电话(唯一)
+                nickname:
+                  type: string
+                  description: 昵称
+                email:
+                  type: string
+                  description: 邮箱
+                remark:
+                  type: string
+                  description: 备注
+                role_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: 角色ids，不设置为[]
+              required:
+                - username
+                - password
+                - tel
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  id: 11
+                msg: success
+          headers: {}
+      security: []
+    get:
+      summary: 用户列表
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/用户管理
+        - admin
+      parameters:
+        - name: ids
+          in: query
+          description: 用户id数组
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: username
+          in: query
+          description: 用户名
+          required: false
+          schema:
+            type: string
+        - name: tel
+          in: query
+          description: 电话
+          required: false
+          schema:
+            type: string
+        - name: nickname
+          in: query
+          description: 昵称
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: 用户状态：1 活跃, 2 禁用登录
+          required: false
+          schema:
+            type: number
+        - name: offset
+          in: query
+          description: 起始数据位置(0开始)
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          description: 获取数据量
+          required: false
+          schema:
+            type: integer
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      list:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            username:
+                              type: string
+                            tel:
+                              type: string
+                            nickname:
+                              type: string
+                            email:
+                              type: string
+                            remark:
+                              type: string
+                            status:
+                              type: integer
+                            created_by:
+                              type: integer
+                            updated_by:
+                              type: integer
+                            created_at:
+                              type: string
+                            updated_at:
+                              type: string
+                          required:
+                            - id
+                            - username
+                            - tel
+                            - nickname
+                            - email
+                            - remark
+                            - status
+                            - created_by
+                            - updated_by
+                            - created_at
+                            - updated_at
+                      total:
+                        type: integer
+                    required:
+                      - list
+                      - total
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  list:
+                    - id: 1
+                      username: admin
+                      tel: '18712345678'
+                      nickname: 如何好听
+                      email: ''
+                      remark: 管理员
+                      status: 1
+                      created_by: 0
+                      updated_by: 0
+                      created_at: '2026-05-04 21:45:06.281'
+                      updated_at: '2026-05-04 21:45:06.281'
+                    - id: 2
+                      username: test
+                      tel: '18700000001'
+                      nickname: 只读测试用户
+                      email: ''
+                      remark: 只读测试用户
+                      status: 1
+                      created_by: 0
+                      updated_by: 0
+                      created_at: '2026-05-04 21:45:06.281'
+                      updated_at: '2026-05-04 21:45:06.281'
+                  total: 2
+                msg: success
+                timestamp: 1777945523986
+          headers: {}
+      security: []
+    put:
+      summary: 更新用户
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/用户管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: ID 编号
+                username:
+                  type: string
+                  maxLength: 64
+                  description: 用户名
+                tel:
+                  type: string
+                  description: 用户电话(唯一)
+                nickname:
+                  type: string
+                  description: 昵称
+                email:
+                  type: string
+                  description: 邮箱
+                remark:
+                  type: string
+                  description: 备注
+                role_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: 角色id，不设置为0
+              required:
+                - username
+                - tel
+                - id
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  id: 11
+                msg: success
+          headers: {}
+      security: []
+  /account/user/{id}:
+    get:
+      summary: 用户详情
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/用户管理
+        - admin
+      parameters:
+        - name: id
+          in: path
+          description: 用户id
+          required: true
+          example: 1
+          schema:
+            type: integer
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      username:
+                        type: string
+                      tel:
+                        type: string
+                      nickname:
+                        type: string
+                      status:
+                        type: string
+                      created_at:
+                        type: string
+                      updated_at:
+                        type: string
+                      role_list:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            code:
+                              type: string
+                    required:
+                      - id
+                      - username
+                      - tel
+                      - nickname
+                      - status
+                      - created_at
+                      - updated_at
+                      - role_list
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  id: 1
+                  username: admin
+                  tel: '18712345678'
+                  nickname: 如何好听
+                  status: Active
+                  created_at: '2025-05-18 18:40:11.136'
+                  updated_at: '2025-05-18 18:40:11.136'
+                  role_list:
+                    - id: 1
+                      name: 管理员
+                      code: admin
+                msg: success
+          headers: {}
+      security: []
+    delete:
+      summary: 删除用户
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/用户管理
+        - admin
+      parameters:
+        - name: id
+          in: path
+          description: 用户id
+          required: true
+          example: 3
+          schema:
+            type: integer
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  id: 16
+                msg: success
+          headers: {}
+      security: []
+  /account/user/pwd:
+    post:
+      summary: 修改用户密码
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/用户管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: ID 编号
+                password:
+                  type: string
+              required:
+                - id
+                - password
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  id: 15
+                msg: success
+          headers: {}
+      security: []
+  /account/user/permission:
+    get:
+      summary: 用户权限信息
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/用户管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      username:
+                        type: string
+                      tel:
+                        type: string
+                      nickname:
+                        type: string
+                      status:
+                        type: integer
+                      role_list:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            code:
+                              type: string
+                      menu_list:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            parent_id:
+                              type: integer
+                            menu_type:
+                              type: string
+                            name:
+                              type: string
+                            path:
+                              type: string
+                            icon:
+                              type: string
+                            perms:
+                              type: string
+                            sort_order:
+                              type: integer
+                            created_at:
+                              type: string
+                            updated_at:
+                              type: string
+                            children:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  id:
+                                    type: integer
+                                  parent_id:
+                                    type: integer
+                                  menu_type:
+                                    type: string
+                                  name:
+                                    type: string
+                                  path:
+                                    type: string
+                                  icon:
+                                    type: string
+                                  perms:
+                                    type: string
+                                  sort_order:
+                                    type: integer
+                                  created_at:
+                                    type: string
+                                  updated_at:
+                                    type: string
+                                required:
+                                  - id
+                                  - parent_id
+                                  - menu_type
+                                  - name
+                                  - path
+                                  - icon
+                                  - perms
+                                  - sort_order
+                                  - created_at
+                                  - updated_at
+                          required:
+                            - id
+                            - parent_id
+                            - menu_type
+                            - name
+                            - path
+                            - icon
+                            - perms
+                            - sort_order
+                            - created_at
+                            - updated_at
+                            - children
+                      permission_list:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            perms:
+                              type: string
+                          required:
+                            - id
+                            - name
+                            - perms
+                      created_at:
+                        type: string
+                      updated_at:
+                        type: string
+                    required:
+                      - id
+                      - username
+                      - tel
+                      - nickname
+                      - status
+                      - role_list
+                      - menu_list
+                      - permission_list
+                      - created_at
+                      - updated_at
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  id: 1
+                  username: admin
+                  tel: '18712345678'
+                  nickname: 如何好听
+                  status: 1
+                  role_list:
+                    - id: 1
+                      name: 管理员
+                      code: admin
+                  menu_list:
+                    - id: 1
+                      parent_id: 0
+                      menu_type: Dir
+                      name: 账号管理
+                      path: ''
+                      icon: ''
+                      perms: ''
+                      sort_order: 0
+                      created_at: '2025-05-07T13:42:52.546213+08:00'
+                      updated_at: '2025-05-07T13:42:52.546213+08:00'
+                      children:
+                        - id: 2
+                          parent_id: 1
+                          menu_type: Menu
+                          name: 用户管理
+                          path: /account/user
+                          icon: fa fa-user-o
+                          perms: ''
+                          sort_order: 0
+                          created_at: '2025-05-07T13:42:52.546517+08:00'
+                          updated_at: '2025-05-07T13:42:52.546517+08:00'
+                        - id: 9
+                          parent_id: 1
+                          menu_type: Menu
+                          name: 角色管理
+                          path: /account/role
+                          icon: fa fa-user-secret
+                          perms: ''
+                          sort_order: 0
+                          created_at: '2025-05-07T13:42:52.547259+08:00'
+                          updated_at: '2025-05-07T13:42:52.547259+08:00'
+                        - id: 15
+                          parent_id: 1
+                          menu_type: Menu
+                          name: 菜单管理
+                          path: /account/menu
+                          icon: fa fa-th-list
+                          perms: ''
+                          sort_order: 0
+                          created_at: '2025-05-07T13:42:52.547772+08:00'
+                          updated_at: '2025-05-07T13:42:52.547772+08:00'
+                    - id: 20
+                      parent_id: 0
+                      menu_type: Dir
+                      name: 系统管理
+                      path: ''
+                      icon: ''
+                      perms: ''
+                      sort_order: 0
+                      created_at: '2025-05-07T13:42:52.548221+08:00'
+                      updated_at: '2025-05-07T13:42:52.548221+08:00'
+                      children:
+                        - id: 21
+                          parent_id: 20
+                          menu_type: Menu
+                          name: 操作日志管理
+                          path: /system/operation-log
+                          icon: fa fa-pencil-square-o
+                          perms: ''
+                          sort_order: 0
+                          created_at: '2025-05-07T13:42:52.548315+08:00'
+                          updated_at: '2025-05-07T13:42:52.548315+08:00'
+                  permission_list:
+                    - id: 3
+                      name: 用户列表
+                      perms: account:user:list
+                    - id: 4
+                      name: 用户详情
+                      perms: account:user:detail
+                    - id: 5
+                      name: 添加用户
+                      perms: account:user:create
+                    - id: 6
+                      name: 更新用户
+                      perms: account:user:update
+                    - id: 7
+                      name: 删除用户
+                      perms: account:user:delete
+                    - id: 8
+                      name: 重置密码
+                      perms: account:user:reset_pwd
+                    - id: 10
+                      name: 角色列表
+                      perms: account:role:list
+                    - id: 11
+                      name: 角色详情
+                      perms: account:role:detail
+                    - id: 12
+                      name: 添加角色
+                      perms: account:role:create
+                    - id: 13
+                      name: 更新角色
+                      perms: account:role:update
+                    - id: 14
+                      name: 删除角色
+                      perms: account:role:delete
+                    - id: 16
+                      name: 菜单列表
+                      perms: account:menu:list
+                    - id: 17
+                      name: 添加菜单
+                      perms: account:menu:create
+                    - id: 18
+                      name: 更新菜单
+                      perms: account:menu:update
+                    - id: 19
+                      name: 删除菜单
+                      perms: account:menu:delete
+                    - id: 22
+                      name: 操作日志列表
+                      perms: system:operation-log:list
+                  created_at: '2025-12-22T10:30:25.802668+08:00'
+                  updated_at: '2025-12-22T10:30:25.802668+08:00'
+                msg: success
+                timestamp: 1766370931366
+          headers: {}
+      security: []
+  /account/role:
+    post:
+      summary: 创建角色
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/角色管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: 名称
+                  maxLength: 128
+                code:
+                  type: string
+                  maxLength: 64
+                  description: 角色code(唯一标识)
+                description:
+                  type: string
+                  description: 角色描述
+                menu_ids:
+                  type: array
+                  items:
+                    type: integer
+                    description: 菜单id
+                  description: 菜单id列表
+              required:
+                - name
+                - code
+                - menu_ids
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  id: 1
+                msg: success
+          headers: {}
+      security: []
+    get:
+      summary: 角色列表
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/角色管理
+        - admin
+      parameters:
+        - name: ids
+          in: query
+          description: 角色id列表
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: name
+          in: query
+          description: 名称
+          required: false
+          schema:
+            type: string
+        - name: code
+          in: query
+          description: 角色code
+          required: false
+          schema:
+            type: string
+        - name: offset
+          in: query
+          description: 起始数据位置(0开始)
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          description: 获取数据量
+          required: false
+          schema:
+            type: integer
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      list:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            code:
+                              type: string
+                            description:
+                              type: string
+                            created_at:
+                              type: string
+                            updated_at:
+                              type: string
+                      total:
+                        type: integer
+                    required:
+                      - list
+                      - total
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  list:
+                    - id: 1
+                      name: 管理员
+                      code: admin
+                      description: 平台管理员角色
+                      created_at: '2025-12-22 10:30:25.817'
+                      updated_at: '2025-12-22 10:30:25.817'
+                  total: 1
+                msg: success
+                timestamp: 1766396636949
+          headers: {}
+      security: []
+    put:
+      summary: 更新角色
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/角色管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: ID 编号
+                name:
+                  type: string
+                  description: 名称
+                  maxLength: 128
+                code:
+                  type: string
+                  maxLength: 64
+                  description: 角色code(唯一标识)
+                description:
+                  type: string
+                  description: 角色描述
+                menu_ids:
+                  type: array
+                  items:
+                    type: integer
+                    description: 菜单id
+                  description: 菜单id列表
+              required:
+                - name
+                - code
+                - menu_ids
+                - id
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  id: 1
+                msg: success
+          headers: {}
+      security: []
+  /account/role/{id}:
+    get:
+      summary: 角色详情
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/角色管理
+        - admin
+      parameters:
+        - name: id
+          in: path
+          description: 角色id
+          required: true
+          example: 1
+          schema:
+            type: integer
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      code:
+                        type: string
+                      description:
+                        type: string
+                      menu_ids:
+                        type: array
+                        items:
+                          type: integer
+                      created_at:
+                        type: string
+                      updated_at:
+                        type: string
+                    required:
+                      - id
+                      - name
+                      - code
+                      - description
+                      - menu_ids
+                      - created_at
+                      - updated_at
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  id: 1
+                  name: 管理员
+                  code: admin
+                  description: ''
+                  menu_ids:
+                    - 1
+                    - 2
+                    - 3
+                    - 4
+                    - 5
+                    - 6
+                    - 7
+                  created_at: '2025-04-22T10:22:10.878947+08:00'
+                  updated_at: '2025-04-22T10:22:10.878947+08:00'
+                msg: success
+          headers: {}
+      security: []
+    delete:
+      summary: 删除角色
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/角色管理
+        - admin
+      parameters:
+        - name: id
+          in: path
+          description: 角色id
+          required: true
+          example: 10
+          schema:
+            type: integer
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  id: 2
+                msg: success
+          headers: {}
+      security: []
+  /account/menu:
+    post:
+      summary: 创建菜单
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/菜单管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                parent_id:
+                  type: integer
+                  description: 父级菜单id
+                  default: 0
+                  examples:
+                    - 0
+                menu_type:
+                  type: string
+                  enum:
+                    - Dir
+                    - Menu
+                    - Btn
+                  description: 菜单类型
+                name:
+                  type: string
+                  description: 菜单名
+                path:
+                  type: string
+                  description: 菜单路径
+                icon:
+                  type: string
+                  description: 菜单图标
+                perms:
+                  type: string
+                  description: 接口权限标识(用于按钮接口权限标识)
+                sort_order:
+                  type: integer
+                  description: 菜单排序(越小越靠前)
+                  default: 1
+                  minimum: 1
+              required:
+                - parent_id
+                - menu_type
+                - name
+                - sort_order
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  id: 1
+                msg: success
+          headers: {}
+      security: []
+    get:
+      summary: 菜单信息
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/菜单管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        parent_id:
+                          type: integer
+                        menu_type:
+                          type: string
+                        name:
+                          type: string
+                        path:
+                          type: string
+                        icon:
+                          type: string
+                        perms:
+                          type: string
+                        sort_order:
+                          type: integer
+                        created_at:
+                          type: string
+                        updated_at:
+                          type: string
+                        children:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: integer
+                              parent_id:
+                                type: integer
+                              menu_type:
+                                type: string
+                              name:
+                                type: string
+                              path:
+                                type: string
+                              icon:
+                                type: string
+                              perms:
+                                type: string
+                              sort_order:
+                                type: integer
+                              created_at:
+                                type: string
+                              updated_at:
+                                type: string
+                              children:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: integer
+                                    parent_id:
+                                      type: integer
+                                    menu_type:
+                                      type: string
+                                    name:
+                                      type: string
+                                    path:
+                                      type: string
+                                    icon:
+                                      type: string
+                                    perms:
+                                      type: string
+                                    sort_order:
+                                      type: integer
+                                    created_at:
+                                      type: string
+                                    updated_at:
+                                      type: string
+                                    children:
+                                      type: array
+                                      items:
+                                        type: string
+                                  required:
+                                    - id
+                                    - parent_id
+                                    - menu_type
+                                    - name
+                                    - path
+                                    - icon
+                                    - perms
+                                    - sort_order
+                                    - created_at
+                                    - updated_at
+                                    - children
+                            required:
+                              - id
+                              - parent_id
+                              - menu_type
+                              - name
+                              - path
+                              - icon
+                              - perms
+                              - sort_order
+                              - created_at
+                              - updated_at
+                              - children
+                      required:
+                        - id
+                        - parent_id
+                        - menu_type
+                        - name
+                        - path
+                        - icon
+                        - perms
+                        - sort_order
+                        - created_at
+                        - updated_at
+                        - children
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  - id: 1
+                    parent_id: 0
+                    menu_type: Dir
+                    name: 账号管理
+                    path: ''
+                    icon: ''
+                    perms: ''
+                    sort_order: 1
+                    created_at: '2025-12-25T20:13:49.091176+08:00'
+                    updated_at: '2025-12-25T20:13:49.091176+08:00'
+                    children:
+                      - id: 2
+                        parent_id: 1
+                        menu_type: Menu
+                        name: 用户管理
+                        path: /account/user
+                        icon: fa fa-user-o
+                        perms: ''
+                        sort_order: 1
+                        created_at: '2025-12-25T20:13:49.09389+08:00'
+                        updated_at: '2025-12-25T20:13:49.09389+08:00'
+                        children:
+                          - id: 3
+                            parent_id: 2
+                            menu_type: Btn
+                            name: 用户列表
+                            path: ''
+                            icon: ''
+                            perms: account:user:list
+                            sort_order: 1
+                            created_at: '2025-12-25T20:13:49.094311+08:00'
+                            updated_at: '2025-12-25T20:13:49.094311+08:00'
+                            children: []
+                          - id: 4
+                            parent_id: 2
+                            menu_type: Btn
+                            name: 用户详情
+                            path: ''
+                            icon: ''
+                            perms: account:user:detail
+                            sort_order: 2
+                            created_at: '2025-12-25T20:13:49.094706+08:00'
+                            updated_at: '2025-12-25T20:13:49.094706+08:00'
+                            children: []
+                          - id: 5
+                            parent_id: 2
+                            menu_type: Btn
+                            name: 添加用户
+                            path: ''
+                            icon: ''
+                            perms: account:user:create
+                            sort_order: 3
+                            created_at: '2025-12-25T20:13:49.095049+08:00'
+                            updated_at: '2025-12-25T20:13:49.095049+08:00'
+                            children: []
+                          - id: 6
+                            parent_id: 2
+                            menu_type: Btn
+                            name: 更新用户
+                            path: ''
+                            icon: ''
+                            perms: account:user:update
+                            sort_order: 4
+                            created_at: '2025-12-25T20:13:49.095822+08:00'
+                            updated_at: '2025-12-25T20:13:49.095822+08:00'
+                            children: []
+                          - id: 7
+                            parent_id: 2
+                            menu_type: Btn
+                            name: 删除用户
+                            path: ''
+                            icon: ''
+                            perms: account:user:delete
+                            sort_order: 5
+                            created_at: '2025-12-25T20:13:49.096219+08:00'
+                            updated_at: '2025-12-25T20:13:49.096219+08:00'
+                            children: []
+                          - id: 8
+                            parent_id: 2
+                            menu_type: Btn
+                            name: 重置密码
+                            path: ''
+                            icon: ''
+                            perms: account:user:reset_pwd
+                            sort_order: 6
+                            created_at: '2025-12-25T20:13:49.09665+08:00'
+                            updated_at: '2025-12-25T20:13:49.09665+08:00'
+                            children: []
+                      - id: 9
+                        parent_id: 1
+                        menu_type: Menu
+                        name: 角色管理
+                        path: /account/role
+                        icon: fa fa-user-secret
+                        perms: ''
+                        sort_order: 2
+                        created_at: '2025-12-25T20:13:49.097089+08:00'
+                        updated_at: '2025-12-25T20:13:49.097089+08:00'
+                        children:
+                          - id: 10
+                            parent_id: 9
+                            menu_type: Btn
+                            name: 角色列表
+                            path: ''
+                            icon: ''
+                            perms: account:role:list
+                            sort_order: 1
+                            created_at: '2025-12-25T20:13:49.097474+08:00'
+                            updated_at: '2025-12-25T20:13:49.097474+08:00'
+                            children: []
+                          - id: 11
+                            parent_id: 9
+                            menu_type: Btn
+                            name: 角色详情
+                            path: ''
+                            icon: ''
+                            perms: account:role:detail
+                            sort_order: 2
+                            created_at: '2025-12-25T20:13:49.098361+08:00'
+                            updated_at: '2025-12-25T20:13:49.098361+08:00'
+                            children: []
+                          - id: 12
+                            parent_id: 9
+                            menu_type: Btn
+                            name: 添加角色
+                            path: ''
+                            icon: ''
+                            perms: account:role:create
+                            sort_order: 3
+                            created_at: '2025-12-25T20:13:49.098723+08:00'
+                            updated_at: '2025-12-25T20:13:49.098723+08:00'
+                            children: []
+                          - id: 13
+                            parent_id: 9
+                            menu_type: Btn
+                            name: 更新角色
+                            path: ''
+                            icon: ''
+                            perms: account:role:update
+                            sort_order: 4
+                            created_at: '2025-12-25T20:13:49.099091+08:00'
+                            updated_at: '2025-12-25T20:13:49.099091+08:00'
+                            children: []
+                          - id: 14
+                            parent_id: 9
+                            menu_type: Btn
+                            name: 删除角色
+                            path: ''
+                            icon: ''
+                            perms: account:role:delete
+                            sort_order: 5
+                            created_at: '2025-12-25T20:13:49.099447+08:00'
+                            updated_at: '2025-12-25T20:13:49.099447+08:00'
+                            children: []
+                      - id: 15
+                        parent_id: 1
+                        menu_type: Menu
+                        name: 菜单管理
+                        path: /account/menu
+                        icon: fa fa-th-list
+                        perms: ''
+                        sort_order: 3
+                        created_at: '2025-12-25T20:13:49.099805+08:00'
+                        updated_at: '2025-12-25T20:13:49.099805+08:00'
+                        children:
+                          - id: 16
+                            parent_id: 15
+                            menu_type: Btn
+                            name: 菜单列表
+                            path: ''
+                            icon: ''
+                            perms: account:menu:list
+                            sort_order: 1
+                            created_at: '2025-12-25T20:13:49.10017+08:00'
+                            updated_at: '2025-12-25T20:13:49.10017+08:00'
+                            children: []
+                          - id: 17
+                            parent_id: 15
+                            menu_type: Btn
+                            name: 添加菜单
+                            path: ''
+                            icon: ''
+                            perms: account:menu:create
+                            sort_order: 2
+                            created_at: '2025-12-25T20:13:49.100529+08:00'
+                            updated_at: '2025-12-25T20:13:49.100529+08:00'
+                            children: []
+                          - id: 18
+                            parent_id: 15
+                            menu_type: Btn
+                            name: 更新菜单
+                            path: ''
+                            icon: ''
+                            perms: account:menu:update
+                            sort_order: 3
+                            created_at: '2025-12-25T20:13:49.100913+08:00'
+                            updated_at: '2025-12-25T20:13:49.100913+08:00'
+                            children: []
+                          - id: 19
+                            parent_id: 15
+                            menu_type: Btn
+                            name: 删除菜单
+                            path: ''
+                            icon: ''
+                            perms: account:menu:delete
+                            sort_order: 4
+                            created_at: '2025-12-25T20:13:49.101222+08:00'
+                            updated_at: '2025-12-25T20:13:49.101222+08:00'
+                            children: []
+                  - id: 20
+                    parent_id: 0
+                    menu_type: Dir
+                    name: 系统管理
+                    path: ''
+                    icon: ''
+                    perms: ''
+                    sort_order: 2
+                    created_at: '2025-12-25T20:13:49.101565+08:00'
+                    updated_at: '2025-12-25T20:13:49.101565+08:00'
+                    children:
+                      - id: 21
+                        parent_id: 20
+                        menu_type: Menu
+                        name: 操作日志管理
+                        path: /system/operation-log
+                        icon: fa fa-pencil-square-o
+                        perms: ''
+                        sort_order: 1
+                        created_at: '2025-12-25T20:13:49.101972+08:00'
+                        updated_at: '2025-12-25T20:13:49.101972+08:00'
+                        children:
+                          - id: 22
+                            parent_id: 21
+                            menu_type: Btn
+                            name: 操作日志列表
+                            path: ''
+                            icon: ''
+                            perms: system:operation-log:list
+                            sort_order: 1
+                            created_at: '2025-12-25T20:13:49.102413+08:00'
+                            updated_at: '2025-12-25T20:13:49.102413+08:00'
+                            children: []
+                      - id: 23
+                        parent_id: 20
+                        menu_type: Menu
+                        name: 字典管理
+                        path: /system/dict
+                        icon: fa fa-bookmark-o
+                        perms: ''
+                        sort_order: 2
+                        created_at: '2025-12-25T20:13:49.10333+08:00'
+                        updated_at: '2025-12-25T20:13:49.10333+08:00'
+                        children:
+                          - id: 24
+                            parent_id: 23
+                            menu_type: Btn
+                            name: 字典列表
+                            path: ''
+                            icon: ''
+                            perms: system:dict:list
+                            sort_order: 1
+                            created_at: '2025-12-25T20:13:49.103713+08:00'
+                            updated_at: '2025-12-25T20:13:49.103713+08:00'
+                            children: []
+                          - id: 25
+                            parent_id: 23
+                            menu_type: Btn
+                            name: 添加字典
+                            path: ''
+                            icon: ''
+                            perms: system:dict:create
+                            sort_order: 2
+                            created_at: '2025-12-25T20:13:49.104102+08:00'
+                            updated_at: '2025-12-25T20:13:49.104102+08:00'
+                            children: []
+                          - id: 27
+                            parent_id: 23
+                            menu_type: Btn
+                            name: 删除字典
+                            path: ''
+                            icon: ''
+                            perms: system:dict:delete
+                            sort_order: 3
+                            created_at: '2025-12-25T20:13:49.104943+08:00'
+                            updated_at: '2025-12-25T20:13:49.104943+08:00'
+                            children: []
+                          - id: 26
+                            parent_id: 23
+                            menu_type: Btn
+                            name: 更新字典
+                            path: ''
+                            icon: ''
+                            perms: system:dict:update
+                            sort_order: 3
+                            created_at: '2025-12-25T20:13:49.104583+08:00'
+                            updated_at: '2025-12-25T20:13:49.104583+08:00'
+                            children: []
+                msg: success
+                timestamp: 1777897690169
+          headers: {}
+      security: []
+    put:
+      summary: 更新菜单
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/菜单管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: ID 编号
+                parent_id:
+                  type: integer
+                  description: 父级菜单id
+                  default: 0
+                  examples:
+                    - 0
+                menu_type:
+                  type: string
+                  enum:
+                    - Dir
+                    - Menu
+                    - Btn
+                  description: 菜单类型
+                name:
+                  type: string
+                  description: 菜单名
+                path:
+                  type: string
+                  description: 菜单路径
+                icon:
+                  type: string
+                  description: 菜单图标
+                perms:
+                  type: string
+                  description: 接口权限标识(用于按钮接口权限标识)
+                order_num:
+                  type: integer
+                  description: 菜单排序(越小越靠前)
+                  default: 1
+                  minimum: 1
+              required:
+                - parent_id
+                - menu_type
+                - name
+                - order_num
+                - id
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  id: 1
+                msg: success
+          headers: {}
+      security: []
+  /account/menu/{id}:
+    delete:
+      summary: 删除菜单
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理/菜单管理
+        - admin
+      parameters:
+        - name: id
+          in: path
+          description: 菜单id
+          required: true
+          example: 29
+          schema:
+            type: integer
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  id: 8
+                msg: success
+          headers: {}
+      security: []
+  /auth/login:
+    post:
+      summary: 用户登录
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  description: 用户名
+                password:
+                  type: string
+                  description: 密码
+              required:
+                - username
+                - password
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      access_expire_timestamp:
+                        type: integer
+                        description: 访问token过期时间戳
+                      access_token:
+                        type: string
+                      refresh_expire_timestamp:
+                        type: integer
+                        description: 刷新token过期时间戳
+                      refresh_token:
+                        type: string
+                    required:
+                      - access_expire_timestamp
+                      - access_token
+                      - refresh_expire_timestamp
+                      - refresh_token
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  access_expire_timestamp: 1763467461
+                  access_token: >-
+                    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJncmFudF90eXBlIjoiYWNjZXNzIiwidXNlcl9pZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImlzcyI6InRlc3Qtc25vdyIsInN1YiI6IjEiLCJleHAiOjE3NjM0Njc0NjEsImlhdCI6MTc2MzQ2Njg2MSwianRpIjoiNGMzZjNlODEtNTIwYi00NTcyLTg5ZDUtNzc2NWI5NWVjZjBkIn0.AQ6_2OHoWe0xn6RUg7LY9KauJIYMPgDkdCuetOMqaE4
+                  refresh_expire_timestamp: 1763474061
+                  refresh_token: >-
+                    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJncmFudF90eXBlIjoicmVmcmVzaCIsInVzZXJfaWQiOjEsInVzZXJuYW1lIjoiYWRtaW4iLCJpc3MiOiJ0ZXN0LXNub3ciLCJzdWIiOiIxIiwiZXhwIjoxNzYzNDc0MDYxLCJpYXQiOjE3NjM0NjY4NjEsImp0aSI6IjRlZWUwYjIwLTZkNDUtNGFlNC1iNDYxLWVmMjE5ZjI0NTdiNiJ9.eg9cDj-iG_AcqXFynvMwMx9aAhRq_Iwh97uQcOnvgS0
+                msg: success
+                timestamp: 1763466861222
+          headers: {}
+      security: []
+  /auth/refresh-token:
+    post:
+      summary: 刷新token
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+                  description: 刷新token
+              required:
+                - refresh_token
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      access_expire_timestamp:
+                        type: integer
+                        description: 访问token过期时间戳
+                      access_token:
+                        type: string
+                      refresh_expire_timestamp:
+                        type: integer
+                        description: 刷新token过期时间戳
+                      refresh_token:
+                        type: string
+                    required:
+                      - access_expire_timestamp
+                      - access_token
+                      - refresh_expire_timestamp
+                      - refresh_token
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  access_expire_timestamp: 1763467461
+                  access_token: >-
+                    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJncmFudF90eXBlIjoiYWNjZXNzIiwidXNlcl9pZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImlzcyI6InRlc3Qtc25vdyIsInN1YiI6IjEiLCJleHAiOjE3NjM0Njc0NjEsImlhdCI6MTc2MzQ2Njg2MSwianRpIjoiNGMzZjNlODEtNTIwYi00NTcyLTg5ZDUtNzc2NWI5NWVjZjBkIn0.AQ6_2OHoWe0xn6RUg7LY9KauJIYMPgDkdCuetOMqaE4
+                  refresh_expire_timestamp: 1763474061
+                  refresh_token: >-
+                    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJncmFudF90eXBlIjoicmVmcmVzaCIsInVzZXJfaWQiOjEsInVzZXJuYW1lIjoiYWRtaW4iLCJpc3MiOiJ0ZXN0LXNub3ciLCJzdWIiOiIxIiwiZXhwIjoxNzYzNDc0MDYxLCJpYXQiOjE3NjM0NjY4NjEsImp0aSI6IjRlZWUwYjIwLTZkNDUtNGFlNC1iNDYxLWVmMjE5ZjI0NTdiNiJ9.eg9cDj-iG_AcqXFynvMwMx9aAhRq_Iwh97uQcOnvgS0
+                msg: success
+                timestamp: 1763466861222
+          headers: {}
+      security: []
+  /auth/logout:
+    post:
+      summary: 退出登录
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/账号管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      user_id:
+                        type: integer
+                    required:
+                      - user_id
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  user_id: 1
+                msg: success
+                timestamp: 1763630339932
+          headers: {}
+      security: []
+  /system/log/operation:
+    get:
+      summary: 操作日志列表
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/系统管理/日志
+        - admin
+      parameters:
+        - name: operator_id
+          in: query
+          description: 操作id
+          required: false
+          schema:
+            type: integer
+        - name: operator_name
+          in: query
+          description: 操作名
+          required: false
+          schema:
+            type: string
+        - name: resource
+          in: query
+          description: 资源
+          required: false
+          schema:
+            type: string
+        - name: resource_id
+          in: query
+          description: 资源id
+          required: false
+          schema:
+            type: string
+        - name: action
+          in: query
+          description: 操作动作Create/Update/Delete
+          required: false
+          schema:
+            type: string
+        - name: start_time
+          in: query
+          description: 日志开始时间
+          required: false
+          schema:
+            type: string
+        - name: end_time
+          in: query
+          description: 日志结束时间
+          required: false
+          schema:
+            type: string
+        - name: offset
+          in: query
+          description: 起始数据位置(0开始)
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: limit
+          in: query
+          description: 获取数据量
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 0
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      list:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            operator_id:
+                              type: integer
+                            operator_name:
+                              type: string
+                            operator_type:
+                              type: string
+                            resource:
+                              type: string
+                            resource_id:
+                              type: integer
+                            action:
+                              type: string
+                            trace_id:
+                              type: string
+                            before_data:
+                              type: string
+                            after_data:
+                              type: string
+                            description:
+                              type: string
+                            ip:
+                              type: string
+                            created_at:
+                              type: string
+                      total:
+                        type: integer
+                    required:
+                      - list
+                      - total
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  list:
+                    - id: 7
+                      operator_id: 1
+                      operator_name: admin
+                      operator_type: User
+                      resource: Menu
+                      resource_id: 21
+                      action: Create
+                      trace_id: fe63f985-ad1a-4d63-a0c3-125eadb78cd9
+                      before_data: '""'
+                      after_data: >-
+                        {"id": 21, "icon": "", "name": "系统管理", "path": "",
+                        "perms": "", "menu_type": "Dir", "order_num": 2,
+                        "parent_id": 0, "created_at": null, "updated_at": null}
+                      description: 用户(1-admin)创建了菜单(21-系统管理)
+                      ip: 127.0.0.1
+                      created_at: '2025-04-28 21:54:36.565'
+                  total: 9
+                msg: success
+          headers: {}
+      security: []
+  /system/log/login:
+    get:
+      summary: 登录日志列表
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/系统管理/日志
+        - admin
+      parameters:
+        - name: user_id
+          in: query
+          description: 用户id
+          required: false
+          schema:
+            type: integer
+        - name: username
+          in: query
+          description: 用户名
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: 登录状态
+          required: false
+          schema:
+            type: boolean
+        - name: start_time
+          in: query
+          description: 日志开始时间
+          required: false
+          schema:
+            type: string
+        - name: end_time
+          in: query
+          description: 日志结束时间
+          required: false
+          schema:
+            type: string
+        - name: offset
+          in: query
+          description: 起始数据位置(0开始)
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: limit
+          in: query
+          description: 获取数据量
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 0
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      list:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            operator_id:
+                              type: integer
+                            operator_name:
+                              type: string
+                            operator_type:
+                              type: string
+                            resource:
+                              type: string
+                            resource_id:
+                              type: integer
+                            action:
+                              type: string
+                            trace_id:
+                              type: string
+                            before_data:
+                              type: string
+                            after_data:
+                              type: string
+                            description:
+                              type: string
+                            ip:
+                              type: string
+                            created_at:
+                              type: string
+                      total:
+                        type: integer
+                    required:
+                      - list
+                      - total
+                  msg:
+                    type: string
+                required:
+                  - code
+                  - data
+                  - msg
+              example:
+                code: 0
+                data:
+                  list:
+                    - id: 7
+                      operator_id: 1
+                      operator_name: admin
+                      operator_type: User
+                      resource: Menu
+                      resource_id: 21
+                      action: Create
+                      trace_id: fe63f985-ad1a-4d63-a0c3-125eadb78cd9
+                      before_data: '""'
+                      after_data: >-
+                        {"id": 21, "icon": "", "name": "系统管理", "path": "",
+                        "perms": "", "menu_type": "Dir", "order_num": 2,
+                        "parent_id": 0, "created_at": null, "updated_at": null}
+                      description: 用户(1-admin)创建了菜单(21-系统管理)
+                      ip: 127.0.0.1
+                      created_at: '2025-04-28 21:54:36.565'
+                  total: 9
+                msg: success
+          headers: {}
+      security: []
+  /system/dict:
+    get:
+      summary: 字典列表
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/系统管理/字典管理
+        - admin
+      parameters:
+        - name: name
+          in: query
+          description: 字典名称
+          required: false
+          schema:
+            type: string
+        - name: code
+          in: query
+          description: 字典编码
+          required: false
+          schema:
+            type: string
+        - name: start_time
+          in: query
+          description: '字典创建开始时间: yyyy-MM-dd HH:mm:ss'
+          required: false
+          schema:
+            type: string
+        - name: end_time
+          in: query
+          description: '字典创建结束时间: yyyy-MM-dd HH:mm:ss'
+          required: false
+          schema:
+            type: string
+        - name: offset
+          in: query
+          description: 起始数据位置(0开始)
+          required: true
+          example: 0
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          description: 获取数据量
+          required: true
+          example: 10
+          schema:
+            type: integer
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      list:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            code:
+                              type: string
+                            name:
+                              type: string
+                            description:
+                              type: string
+                            created_at:
+                              type: string
+                            updated_at:
+                              type: string
+                      total:
+                        type: integer
+                    required:
+                      - list
+                      - total
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  list:
+                    - id: 1
+                      code: status
+                      name: 状态
+                      description: ''
+                      created_at: '2025-12-23 17:53:53.506'
+                      updated_at: '2025-12-23 17:53:53.506'
+                  total: 1
+                msg: success
+                timestamp: 1766483768974
+          headers: {}
+      security: []
+    post:
+      summary: 创建字典
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/系统管理/字典管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: 字典编码
+                name:
+                  type: string
+                  description: 字典名称
+                description:
+                  type: string
+                  description: 描述
+              required:
+                - code
+                - name
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  id: 1
+                msg: success
+                timestamp: 1766497177672
+          headers: {}
+      security: []
+    put:
+      summary: 更新字典
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/系统管理/字典管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: ID 编号
+                code:
+                  type: string
+                  description: 字典编码
+                name:
+                  type: string
+                  description: 字典名称
+                status:
+                  type: string
+                  description: 状态
+                  enum:
+                    - Active
+                    - Disabled
+                description:
+                  type: string
+                  description: 描述
+              required:
+                - code
+                - name
+                - status
+                - id
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  id: 1
+                msg: success
+                timestamp: 1766497177672
+          headers: {}
+      security: []
+  /system/dict/{id}:
+    delete:
+      summary: 删除字典
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/系统管理/字典管理
+        - admin
+      parameters:
+        - name: id
+          in: path
+          description: 字典id
+          required: true
+          schema:
+            type: integer
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+            example:
+              id: 3
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  id: 3
+                msg: success
+                timestamp: 1766542343782
+          headers: {}
+      security: []
+  /system/dict/item/{code}:
+    get:
+      summary: 根据字典code获取item列表
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/系统管理/字典管理
+        - admin
+      parameters:
+        - name: code
+          in: path
+          description: 字典code
+          required: true
+          example: status
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        item_name:
+                          type: string
+                        item_code:
+                          type: string
+                        status:
+                          type: string
+                        sort_order:
+                          type: integer
+                        description:
+                          type: string
+                        created_at:
+                          type: string
+                        updated_at:
+                          type: string
+                      required:
+                        - id
+                        - item_name
+                        - item_code
+                        - status
+                        - sort_order
+                        - description
+                        - created_at
+                        - updated_at
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  - id: 1
+                    item_name: 启用
+                    item_code: Active
+                    status: Active
+                    sort_order: 1
+                    description: 状态启用
+                    created_at: '2025-12-24 11:04:43.718'
+                    updated_at: '2025-12-24 11:04:43.718'
+                  - id: 2
+                    item_name: 禁用
+                    item_code: Disabled
+                    status: Active
+                    sort_order: 2
+                    description: 状态禁用
+                    created_at: '2025-12-24 11:05:19.443'
+                    updated_at: '2025-12-24 11:05:19.443'
+                msg: success
+                timestamp: 1766545554197
+          headers: {}
+      security: []
+  /system/dict/item:
+    post:
+      summary: 创建字典item
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/系统管理/字典管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dict_id:
+                  type: integer
+                  description: 字典id
+                item_name:
+                  type: string
+                  description: 字典item名称
+                item_code:
+                  type: string
+                  description: 字典item编码
+                sort_order:
+                  type: integer
+                  description: 排序号
+                description:
+                  type: string
+                  description: 描述
+              required:
+                - dict_id
+                - item_name
+                - item_code
+                - sort_order
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  id: 1
+                msg: success
+                timestamp: 1766497177672
+          headers: {}
+      security: []
+    put:
+      summary: 更新字典item
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/系统管理/字典管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: item id
+                item_name:
+                  type: string
+                  description: 字典item名称
+                item_code:
+                  type: string
+                  description: 字典item编码
+                status:
+                  type: string
+                  enum:
+                    - Active
+                    - Disabled
+                  description: 状态：Active 启用，Disabled 禁用
+                sort_order:
+                  type: integer
+                  description: 排序号
+                description:
+                  type: string
+                  description: 描述
+              required:
+                - id
+                - item_name
+                - item_code
+                - sort_order
+                - status
+            examples: {}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  id: 1
+                msg: success
+                timestamp: 1766497177672
+          headers: {}
+      security: []
+  /system/dict/item/{id}:
+    delete:
+      summary: 删除字典item
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/系统管理/字典管理
+        - admin
+      parameters:
+        - name: id
+          in: path
+          description: id
+          required: true
+          example: 3
+          schema:
+            type: integer
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+            example:
+              id: 3
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                    required:
+                      - id
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  id: 3
+                msg: success
+                timestamp: 1766542343782
+          headers: {}
+      security: []
+  /system/info:
+    get:
+      summary: 系统服务信息
+      deprecated: false
+      description: ''
+      tags:
+        - 后台管理/系统管理
+        - admin
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ''
+          example: application/json
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          description: ''
+          example: Bearer {{ token }}
+          schema:
+            type: string
+            default: Bearer {{ token }}
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      service_info:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          version:
+                            type: string
+                          env:
+                            type: string
+                          start_time:
+                            type: string
+                          uptime:
+                            type: string
+                          read_timeout:
+                            type: string
+                          write_timeout:
+                            type: string
+                        required:
+                          - name
+                          - version
+                          - env
+                          - start_time
+                          - uptime
+                          - read_timeout
+                          - write_timeout
+                      go_runtime:
+                        type: object
+                        properties:
+                          go_version:
+                            type: string
+                          goroutines:
+                            type: integer
+                          mem_alloc_mb:
+                            type: integer
+                          mem_total_mb:
+                            type: integer
+                          mem_sys_mb:
+                            type: integer
+                          gc_count:
+                            type: integer
+                          num_cpu:
+                            type: integer
+                        required:
+                          - go_version
+                          - goroutines
+                          - mem_alloc_mb
+                          - mem_total_mb
+                          - mem_sys_mb
+                          - gc_count
+                          - num_cpu
+                      os_info:
+                        type: object
+                        properties:
+                          os:
+                            type: string
+                          arch:
+                            type: string
+                          hostname:
+                            type: string
+                          disk_total_gb:
+                            type: integer
+                          disk_used_gb:
+                            type: integer
+                          disk_free_gb:
+                            type: integer
+                        required:
+                          - os
+                          - arch
+                          - hostname
+                          - disk_total_gb
+                          - disk_used_gb
+                          - disk_free_gb
+                    required:
+                      - service_info
+                      - go_runtime
+                      - os_info
+                  msg:
+                    type: string
+                  timestamp:
+                    type: integer
+                required:
+                  - code
+                  - data
+                  - msg
+                  - timestamp
+              example:
+                code: 0
+                data:
+                  service_info:
+                    name: snowgo测试环境
+                    version: v1
+                    env: dev
+                    start_time: '2026-05-13 09:23:34.328'
+                    uptime: 4s
+                    read_timeout: 30s
+                    write_timeout: 30s
+                  go_runtime:
+                    go_version: go1.25.0
+                    goroutines: 8
+                    mem_alloc_mb: 1
+                    mem_total_mb: 2
+                    mem_sys_mb: 13
+                    gc_count: 1
+                    num_cpu: 10
+                  os_info:
+                    os: darwin
+                    arch: arm64
+                    hostname: BC-CY31VVNTH0
+                    disk_total_gb: 460
+                    disk_used_gb: 370
+                    disk_free_gb: 90
+                msg: success
+                timestamp: 1778635418522
+          headers: {}
+      security: []
+webhooks: {}
+components:
+  schemas: {}
+  responses: {}
+  securitySchemes: {}
+servers:
+  - url: http://127.0.0.1:8000/api/admin
+    description: 开发环境
+security: []
