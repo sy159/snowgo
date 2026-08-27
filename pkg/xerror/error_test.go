@@ -266,8 +266,8 @@ func TestNewCode_DifferentCategories(t *testing.T) {
 }
 
 func TestLimitExceededErrorRequests(t *testing.T) {
-	if xerror.LimitExceededErrorRequests.GetErrCode() != 20106 {
-		t.Fatalf("error code = %d, want 20106", xerror.LimitExceededErrorRequests.GetErrCode())
+	if xerror.LimitExceededErrorRequests.GetErrCode() != 20105 {
+		t.Fatalf("error code = %d, want 20105", xerror.LimitExceededErrorRequests.GetErrCode())
 	}
 	if xerror.LimitExceededErrorRequests.GetCategory() != xerror.CategorySystem {
 		t.Fatalf("category = %q, want %q", xerror.LimitExceededErrorRequests.GetCategory(), xerror.CategorySystem)
