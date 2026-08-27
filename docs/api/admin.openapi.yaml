@@ -3391,7 +3391,7 @@ paths:
                     read_timeout: 30s
                     write_timeout: 30s
                   go_runtime:
-                    go_version: go1.25.0
+                    go_version: go1.26.7
                     goroutines: 8
                     mem_alloc_mb: 1
                     mem_total_mb: 2

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Go Version**: 1.25+
+> **Go Version**: 1.26+ (toolchain: go1.26.7)
 > **Status**: Active — single source of truth for engineering decisions.
 
 ## Document Index
