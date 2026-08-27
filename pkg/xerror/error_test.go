@@ -264,3 +264,21 @@ func TestNewCode_DifferentCategories(t *testing.T) {
 		}
 	})
 }
+
+func TestLimitExceededErrorRequests(t *testing.T) {
+	if xerror.LimitExceededErrorRequests.GetErrCode() != 20106 {
+		t.Fatalf("error code = %d, want 20106", xerror.LimitExceededErrorRequests.GetErrCode())
+	}
+	if xerror.LimitExceededErrorRequests.GetCategory() != xerror.CategorySystem {
+		t.Fatalf("category = %q, want %q", xerror.LimitExceededErrorRequests.GetCategory(), xerror.CategorySystem)
+	}
+	if xerror.LimitExceededErrorRequests.GetErrMsg() != "limit不能超过200" {
+		t.Fatalf("message = %q, want %q", xerror.LimitExceededErrorRequests.GetErrMsg(), "limit不能超过200")
+	}
+}
+
+func TestLimitErrorRequestsMessage(t *testing.T) {
+	if xerror.LimitErrorRequests.GetErrMsg() != "limit必须大于等于0" {
+		t.Fatalf("message = %q, want %q", xerror.LimitErrorRequests.GetErrMsg(), "limit必须大于等于0")
+	}
+}

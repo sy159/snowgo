@@ -165,17 +165,9 @@ func GetUserList(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	if userListReq.Offset < 0 {
-		xresponse.FailByError(c, e.OffsetErrorRequests)
+	if code := xgin.NormalizePagination(userListReq.Offset, &userListReq.Limit); code != nil {
+		xresponse.FailByError(c, code)
 		return
-	}
-	if userListReq.Limit < 0 {
-		xresponse.FailByError(c, e.LimitErrorRequests)
-		return
-	} else if userListReq.Limit == 0 {
-		userListReq.Limit = constant.DefaultLimit
-	} else if userListReq.Limit > constant.MaxLimit {
-		userListReq.Limit = constant.MaxLimit
 	}
 	ctx := c.Request.Context()
 

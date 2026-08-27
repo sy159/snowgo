@@ -44,15 +44,9 @@ func GetDictList(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	if dictListReq.Offset < 0 {
-		xresponse.FailByError(c, e.OffsetErrorRequests)
+	if code := xgin.NormalizePagination(dictListReq.Offset, &dictListReq.Limit); code != nil {
+		xresponse.FailByError(c, code)
 		return
-	}
-	if dictListReq.Limit < 0 {
-		xresponse.FailByError(c, e.LimitErrorRequests)
-		return
-	} else if dictListReq.Limit == 0 {
-		dictListReq.Limit = constant.DefaultLimit
 	}
 	ctx := c.Request.Context()
 

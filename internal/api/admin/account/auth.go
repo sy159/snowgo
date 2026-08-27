@@ -147,6 +147,10 @@ func RefreshToken(c *gin.Context) {
 		xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenInvalid.GetErrMsg())
 		return
 	}
+	if !claims.IsRefreshToken() {
+		xresponse.Fail(c, e.HttpUnauthorized.GetErrCode(), e.TokenInvalid.GetErrMsg())
+		return
+	}
 
 	// 先删除旧 JTI，再生成新的token，宁愿用户重新登录，也不允许 refresh token 被并发重复使用，并且生成新token理论上不应该失败
 	// 删除旧 jti（防止重放）

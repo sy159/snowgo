@@ -107,15 +107,9 @@ func GetRoleList(c *gin.Context) {
 		xresponse.Fail(c, e.HttpBadRequest.GetErrCode(), err.Error())
 		return
 	}
-	if cond.Offset < 0 {
-		xresponse.FailByError(c, e.OffsetErrorRequests)
+	if code := xgin.NormalizePagination(cond.Offset, &cond.Limit); code != nil {
+		xresponse.FailByError(c, code)
 		return
-	}
-	if cond.Limit < 0 {
-		xresponse.FailByError(c, e.LimitErrorRequests)
-		return
-	} else if cond.Limit == 0 {
-		cond.Limit = constant.DefaultLimit
 	}
 	ctx := c.Request.Context()
 

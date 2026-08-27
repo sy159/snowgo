@@ -8,6 +8,7 @@ import (
 	"snowgo/internal/service/admin/system"
 	common "snowgo/pkg"
 	e "snowgo/pkg/xerror"
+	"snowgo/pkg/xgin"
 	"snowgo/pkg/xlogger"
 	"snowgo/pkg/xresponse"
 )
@@ -43,17 +44,9 @@ func GetOperationLogList(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	//xlogger.InfofCtx(ctx, "get operation log list: %+v", logListReq)
-	if logListReq.Offset < 0 {
-		xresponse.FailByError(c, e.OffsetErrorRequests)
+	if code := xgin.NormalizePagination(logListReq.Offset, &logListReq.Limit); code != nil {
+		xresponse.FailByError(c, code)
 		return
-	}
-	if logListReq.Limit < 0 {
-		xresponse.FailByError(c, e.LimitErrorRequests)
-		return
-	} else if logListReq.Limit == 0 {
-		logListReq.Limit = constant.DefaultLimit
-	} else if logListReq.Limit > constant.MaxLimit {
-		logListReq.Limit = constant.MaxLimit
 	}
 
 	container := di.GetSystemContainer(c)
@@ -117,17 +110,9 @@ func GetLoginLogList(c *gin.Context) {
 	}
 	ctx := c.Request.Context()
 
-	if logListReq.Offset < 0 {
-		xresponse.FailByError(c, e.OffsetErrorRequests)
+	if code := xgin.NormalizePagination(logListReq.Offset, &logListReq.Limit); code != nil {
+		xresponse.FailByError(c, code)
 		return
-	}
-	if logListReq.Limit < 0 {
-		xresponse.FailByError(c, e.LimitErrorRequests)
-		return
-	} else if logListReq.Limit == 0 {
-		logListReq.Limit = constant.DefaultLimit
-	} else if logListReq.Limit > constant.MaxLimit {
-		logListReq.Limit = constant.MaxLimit
 	}
 
 	container := di.GetSystemContainer(c)
