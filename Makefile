@@ -149,3 +149,7 @@ gen: ## Generate DAL code (usage: make gen do=init|add|update|query)
 .PHONY: gen-query
 gen-query: ## Generate Query code
 	@go run ./internal/dal/cmd/gen/main.go query
+
+.PHONY: new-module
+new-module: ## Generate a business module (domain defaults to admin, module defaults to demo)
+	@go run ./cmd/modulegen -module "$(or $(module),demo)" -domain "$(or $(domain),admin)"

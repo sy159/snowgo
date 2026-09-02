@@ -27,7 +27,8 @@
 10. No `panic()` in API/Service/DAO for business errors.
 11. `created_at` mandatory for all tables; soft delete (`is_deleted tinyint(1) DEFAULT 0` + `deleted_at DATETIME(6) DEFAULT NULL`) is optional, decide per business need. Use for tables requiring audit/compliance/user undo (e.g., orders). Skip for high-volume logs and junction tables.
 12. Run tests according to change scope before declaring complete: small, localized changes run affected package tests; broad/shared behavior changes run `go test ./...`. Always run `make lint`. Use coverage commands only when coverage is the explicit goal. Integration tests use `-tags=integration`; `make test-integration` covers pkg and Service integration tests and requires Redis/RabbitMQ plus `MYSQL_DSN` for Service tests.
-13. Core and complex code must have comments. Update README / AGENTS docs alongside code changes.
+13. Core and complex code must have comments. Update README / AGENTS docs alongside code changes; avoid duplicating the same workflow guidance across standalone documents.
+14. The module generator lives in `internal/modulegen` and is invoked with `make new-module [domain=<domain>] [module=<module>]`. Its output is a skeleton only: complete DAO access, API validation, authorization, business errors, and tests before shipping a generated module.
 
 ---
 
