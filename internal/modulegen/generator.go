@@ -111,7 +111,7 @@ func Generate(input Options) (*Result, error) {
 	updated := make(map[string][]byte, 3)
 	originals := make(map[string][]byte, 3)
 	diRelative := filepath.Join("internal", "di", "container.go")
-	diSource, err := os.ReadFile(filepath.Join(opts.Root, diRelative))
+	diSource, err := os.ReadFile(filepath.Join(opts.Root, diRelative)) // #nosec G304 -- root is the explicit local project directory and diRelative is generator-owned.
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", diRelative, err)
 	}
@@ -123,7 +123,7 @@ func Generate(input Options) (*Result, error) {
 
 	domainRouterRelative := filepath.Join("internal", "router", opts.Domain, "router.go")
 	domainRouterPath := filepath.Join(opts.Root, domainRouterRelative)
-	domainRouterSource, err := os.ReadFile(domainRouterPath)
+	domainRouterSource, err := os.ReadFile(domainRouterPath) // #nosec G304 -- root is the explicit local project directory and domain is validated as a package name.
 	if err == nil {
 		updated[domainRouterRelative], err = updateDomainRouter(domainRouterSource, data)
 		if err != nil {
@@ -140,7 +140,7 @@ func Generate(input Options) (*Result, error) {
 	}
 
 	rootRouterRelative := filepath.Join("internal", "router", "router.go")
-	rootRouterSource, err := os.ReadFile(filepath.Join(opts.Root, rootRouterRelative))
+	rootRouterSource, err := os.ReadFile(filepath.Join(opts.Root, rootRouterRelative)) // #nosec G304 -- root is the explicit local project directory and rootRouterRelative is generator-owned.
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", rootRouterRelative, err)
 	}
@@ -157,7 +157,7 @@ func Generate(input Options) (*Result, error) {
 	for _, relative := range sortedByteMapKeys(rendered) {
 		content := rendered[relative]
 		path := filepath.Join(opts.Root, relative)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil { // #nosec G301 -- generated Go source directories must be readable by build and deployment users.
 			cleanupCreatedFiles(opts.Root, created)
 			return nil, fmt.Errorf("create directory for %s: %w", relative, err)
 		}
@@ -204,7 +204,7 @@ func sortedByteMapKeys(values map[string][]byte) []string {
 }
 
 func writeNewFile(path string, content []byte) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644) // #nosec G304,G306 -- path is generator-owned; generated Go source files require standard 0644 permissions.
 	if err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func writeExistingFileAtomically(path string, content []byte) error {
 		return err
 	}
 	closed = true
-	return os.Rename(temporaryPath, path)
+	return os.Rename(temporaryPath, path) // #nosec G703 -- both paths are derived from the same explicit local project directory.
 }
 
 func cleanupCreatedFiles(root string, relativePaths []string) {
@@ -270,7 +270,7 @@ func rollbackUpdatedFiles(root string, relativePaths []string, originals map[str
 }
 
 func readModulePath(root string) (string, error) {
-	content, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	content, err := os.ReadFile(filepath.Join(root, "go.mod")) // #nosec G304 -- root is the explicit local project directory supplied to this CLI.
 	if err != nil {
 		return "", fmt.Errorf("read go.mod: %w", err)
 	}
