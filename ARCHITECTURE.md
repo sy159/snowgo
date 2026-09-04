@@ -9,10 +9,13 @@
 ## 1. Layered Architecture
 
 ```
-Router → API → Service → DAO → DAL (GORM Gen) → MySQL / Redis
+Router → API → Service → DAO → DAL (GORM Gen) → MySQL
+                       ├→ Cache → Redis
+                       ├→ MQ
+                       └→ External services
 ```
 
-- Each layer calls only the layer below. API → Service (never DAO). Service → DAO (never GORM Gen directly).
+- Keep business dependencies directed through the declared boundaries. API calls Service, never DAO; Service calls DAO for database access, never GORM Gen directly. Service may call approved infrastructure components and stable contracts.
 - `repo` (`dal/repo/repo.go`) provides `WriteQuery()` / `ReadQuery()` / `Query()` / `ChangeDB()`.
 - DI: `di.GetContainer(c)` or `di.GetSystemContainer(c)`. Option pattern, LIFO close.
 - Cross-package Service dependencies use stable contracts under `internal/service/admin/contract` for shared capabilities. Business packages depend on contracts, not concrete Services from other business packages.
@@ -29,7 +32,7 @@ Design principle: drive schema by query patterns, avoid over-engineering, choose
 |------|------|
 | Table name | System/admin tables use `sys_<entity>`; business tables use `<module>_<entity>` when a module prefix is needed |
 | Association table | `<entity_a>_<entity_b>` with the same prefix strategy, e.g. `sys_user_role` |
-| Foreign keys | None. Application-level integrity |
+| Foreign keys | None. Enforce application-level integrity with validation, transactions, unique constraints, and reconciliation or cleanup where needed |
 | created_at | Mandatory. TIMESTAMP/DATETIME with DEFAULT CURRENT_TIMESTAMP |
 | updated_at | Only for tables with UPDATE |
 | Primary key | BIGINT default. INT for small/config tables |
@@ -46,7 +49,7 @@ Non-mandatory. Decide per business need:
 - **USE**: audit/compliance, referential integrity, user undo (e.g., orders, payments)
 - **SKIP**: high-volume logs, junction tables, simple config tables
 
-Column: `is_deleted TINYINT(1) NOT NULL DEFAULT 0` + `deleted_at DATETIME(6) DEFAULT NULL`. Index only if querying both states. Use `UpdateSimple`.
+Column: `is_deleted TINYINT(1) NOT NULL DEFAULT 0` + `deleted_at DATETIME(6) DEFAULT NULL`. Do not index `is_deleted` alone by default; include it in a query-driven composite index only when EXPLAIN and selectivity justify it. Use `UpdateSimple`.
 
 ### 2.3 Index Design
 
@@ -58,7 +61,7 @@ Column: `is_deleted TINYINT(1) NOT NULL DEFAULT 0` + `deleted_at DATETIME(6) DEF
 | Covering | All SELECT columns included |
 | Association | Composite unique (a_id, b_id) |
 
-Left-prefix rule: `(a, b, c)` serves `(a)`, `(a, b)`, `(a, b, c)`. Range queries break the chain.
+Left-prefix rule: `(a, b, c)` serves predicates starting with `(a)`, `(a, b)`, or `(a, b, c)`. A range predicate usually prevents later columns from further narrowing the index scan; verify the actual plan with EXPLAIN.
 
 **Performance checklist**: avoid SELECT * on large tables; use EXPLAIN before committing complex queries; avoid implicit type conversion in WHERE; prefer covering indexes for hot paths; composite index for low-cardinality + high-cardinality columns; no leading wildcard LIKE in production queries.
 
@@ -72,17 +75,21 @@ Use `WriteQuery().Transaction()` for:
 
 - Multi-table writes.
 - Business mutations that must persist operation logs atomically.
-- Read-after-write logic that must be isolated from replica lag.
 
-Independent single-table writes may run without an explicit transaction when there is no cross-table or operation-log atomicity requirement, for example login logs. Prefer `repo.WriteQuery()` for non-transactional writes when the write node must be explicit; `repo.Query()` may rely on dbresolver auto-routing.
+Do not open a transaction solely because a read follows a write. Independent single-table writes may run without an explicit transaction when there is no cross-table or operation-log atomicity requirement, for example login logs. When read-after-write consistency only requires avoiding replica lag, use `repo.WriteQuery()` for the read; use a transaction only when atomicity or transactional consistency is actually required. `repo.Query()` may rely on dbresolver auto-routing.
 
 Never call business Service methods through `container.SomeService.Method()` inside a transaction. Service MUST NOT directly use GORM Gen query APIs.
 
 ```go
 err := db.WriteQuery().Transaction(func(tx *query.Query) error {
-    // Pass tx to DAO methods
-    obj, err := dao.CreateUser(ctx, tx, &model.SysUser{...})
-    // Operation log within same tx
+    // 在同一事务内传递 tx，保证多表写入和审计日志原子一致。
+    if _, err := dao.CreateUser(ctx, tx, &model.SysUser{...}); err != nil {
+        return fmt.Errorf("create user: %w", err)
+    }
+    // 审计日志必须复用该 tx，避免业务数据与审计记录不一致。
+    if err := logWriter.CreateOperationLog(ctx, tx, &contract.OperationLogInput{...}); err != nil {
+        return fmt.Errorf("create operation log: %w", err)
+    }
     return nil
 })
 ```
@@ -97,18 +104,18 @@ Read/write separation: `repo.WriteQuery()` forces write node, `repo.ReadQuery()`
 | Outside transaction | `repo.Query()` / `repo.WriteQuery()` | From the Service's repository |
 
 ```go
-// DAO: unified signature, q source determined by caller
+// DAO 使用统一签名，使调用方能够决定是否参与事务。
 func (u *UserDao) CreateUser(ctx context.Context, q *query.Query, user *model.SysUser) (*model.SysUser, error) {
     return q.SysUser.WithContext(ctx).Omit(userDefaultSkipColumns...).Create(user)
 }
 
-// Service: inside transaction → pass tx
+// 事务内传入 tx，确保后续写操作处于同一原子边界。
 err := s.db.WriteQuery().Transaction(func(tx *query.Query) error {
     userObj, err = s.userDao.CreateUser(ctx, tx, &model.SysUser{...})
-    return nil
+    return err
 })
 
-// Service: outside transaction → pass repo query explicitly
+// 非事务写入显式使用写库，避免路由语义不清晰。
 userObj, err := s.userDao.CreateUser(ctx, s.db.WriteQuery(), &model.SysUser{...})
 ```
 
@@ -124,7 +131,7 @@ Operation logs for audited business mutations are synchronous within the same tr
 
 ## 4. Caching Strategy
 
-Service layer only. Keys: `constant.CacheXXXPrefix + value`. Invalidation **after** DB commit — never inside transaction. Cache set is non-blocking; failure logged, never propagated.
+Service layer only. Keys: `constant.CacheXXXPrefix + value`. Invalidation happens **after** DB commit, never inside a transaction. Cache reads and fills are synchronous calls but may be best-effort when falling back to the database preserves correctness. Every ignored cache failure must be logged or measured; invalidation failures require enough context to diagnose the stale-key risk and a retry, versioning, short-TTL, or reconciliation strategy when stale data is business-critical. Existing silent `_ = cache...` calls are technical debt, not a pattern to copy.
 
 | Constant | Key Pattern | TTL | Scope |
 |----------|-------------|-----|-------|
@@ -136,7 +143,7 @@ Service layer only. Keys: `constant.CacheXXXPrefix + value`. Invalidation **afte
 
 Non-cache keys: `CacheLoginFailPrefix` (login failure, 3 min), `CacheRefreshJtiPrefix` (JWT refresh JTI).
 
-Pattern: Read-through (cache → miss → DB → fill non-blocking). Write-behind (tx → commit → invalidate).
+Pattern: cache-aside read (`cache → miss → DB → best-effort fill`) and post-commit invalidation (`DB transaction → commit → invalidate`).
 
 ---
 
@@ -144,7 +151,7 @@ Pattern: Read-through (cache → miss → DB → fill non-blocking). Write-behin
 
 Graceful degradation: cache down → query DB and log the cache error. DB down → return stale cache only for read paths that explicitly implement stale-cache semantics; otherwise return a controlled system error.
 
-External calls: `context.WithTimeout`. Retry transient errors only — max 3 times, exponential backoff. No retry on 4xx, validation errors, unique constraint violations.
+External calls must have a caller-bounded timeout. Retry only transient failures for idempotent or idempotency-protected operations, within the total deadline and component retry budget. Use exponential backoff with jitter and honor `Retry-After` when applicable. Do not retry validation, authentication, authorization, unique-constraint, or other permanent failures; 408 and 429 require an explicit policy. Default to at most three total attempts unless the component has a stricter documented policy.
 
 Idempotency: unique index for create-by-key, request_id in Redis for duplicate detection, WHERE status for transitions, distributed lock + unique tx number for financial.
 
@@ -158,18 +165,18 @@ Paginate all lists. Default limit: `constant.DefaultLimit` (10). Avoid N+1 (JOIN
 
 | Concern | Guideline |
 |---------|-----------|
-| Trees | Load all rows, build in memory |
+| Trees | For bounded admin trees, load the required rows and build in memory; paginate or redesign unbounded hierarchies |
 | Batch ops | Validate size limits, bulk insert/update |
-| Fuzzy search | ES/Meilisearch. No LIKE '%term%' on large tables |
+| Fuzzy search | Avoid leading-wildcard LIKE on large tables; evaluate a search engine only when query volume and search requirements justify it |
 | Export | Stream results |
 
-Performance targets should be defined per endpoint or module. Default review thresholds: P99 read < 200ms for hot cache-backed reads, P99 write < 500ms for common writes, slow SQL threshold 2s, cache hit rate > 90% for mature hot keys.
+Define latency, error-rate, throughput, and cache-hit objectives per endpoint or module from production telemetry. The slow-SQL threshold is configuration-driven. Example targets are not release commitments unless they are documented, measurable, and owned by the affected module.
 
 ---
 
 ## 7. Code Comments
 
-Core and complex code must have comments. Simple code needs none. The following must have comments:
+Core and complex code must have concise Chinese comments. Simple code needs none. Comments explain **why** an invariant, boundary, or decision exists; they must not narrate obvious code. The following must have comments:
 
 | What | Why |
 |------|-----|
@@ -179,4 +186,4 @@ Core and complex code must have comments. Simple code needs none. The following 
 | Index rationale | Why this index (or not) |
 | Error handling branches | Why handled differently |
 
-Style: one line. WHY, not WHAT.
+Style: prefer one concise line. Write WHY, not WHAT.

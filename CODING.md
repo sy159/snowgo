@@ -18,7 +18,7 @@
 | Constants | CamelCase exported, camelCase unexported | CacheMenuTree, defaultLimit |
 | DTOs (API) | {Entity}Info, {Entity}List, {Entity}Param | UserInfo, UserList, UserParam |
 | DTOs (Service) | no json tags unless crossing boundaries | UserCondition |
-| Struct tags | json + form + binding | - |
+| API request tags | Add `json` or `form` for the accepted transport and `binding` for transport validation; do not add unused tags | `json:"username" binding:"required,max=64"` |
 
 ---
 
@@ -43,9 +43,9 @@ Configuration keys and environment variable names should be documented in `.env.
 
 | Layer | Rule |
 |-------|------|
-| API | Use `errors.As` to extract `e.BizError`, respond with `FailByError(c, bizErr.Code)`. Use `Fail` only for binding errors. Never `Fail(c, code, err.Error())` for service errors |
+| API | Use `errors.As` to extract `e.BizError`, respond with `FailByError(c, bizErr.Code)`. Use `Fail` only for transport/request validation or protocol-specific messages. Never `Fail(c, code, err.Error())` for Service errors |
 | Service | Define sentinels with `e.NewBizError(e.Code)`. Never `errors.New` for business errors. Use `fmt.Errorf("%w", err)` for infrastructure errors |
-| DAO | Return directly — raw GORM for DB. DAO validation should be minimal; business validation belongs in API/Service |
+| DAO | Return directly — raw GORM for DB. DAO validation should be minimal; business validation belongs in Service |
 | Global | Never `panic()` in API/Service/DAO. Only `xlogger.Panic` for fatal init |
 
 ### BizError Pattern
@@ -68,7 +68,7 @@ if errors.As(err, &bizErr) {
     return
 }
 xlogger.ErrorfCtx(ctx, "...: %v", err)
-xresponse.FailByError(c, e.FallbackCode)
+xresponse.FailByError(c, e.HttpInternalServerError)
 ```
 
 To add a new business error:
@@ -79,38 +79,33 @@ To add a new business error:
 
 Prefer returning an existing sentinel with `errors.Is` compatibility when callers need branching. Use `WrapBizError` when the underlying cause is useful for logs but should not be exposed to clients.
 
+Never silently ignore an error or turn an unexpected error into a successful result. An explicitly best-effort operation must document why failure is acceptable and log or emit a metric for the failure. Do not log an error and continue when doing so would violate correctness or consistency.
+
 ### Error Code Scheme
 
 5-digit integers via `xerror.NewCode(category, code, msg)`. Duplicate codes panic at init.
 
 | Range | Meaning |
 |-------|---------|
-| 0-504 | HTTP status codes |
+| 0 and selected 2xx-5xx values | Success and protocol-shaped application codes |
 | 1xxxx | Business errors |
 | 2xxxx | System/infra errors |
 
 Structure: `[level][module][specific]` — first digit = level, digits 2-3 = module, digits 4-5 = specific.
 
-### HTTP Status Mapping
+### Response Code Semantics
 
-| Status | Trigger |
-|--------|---------|
-| 400 | Validation / bad input |
-| 401 | Auth failure |
-| 403 | Permission denied |
-| 404 | Not found |
-| 429 | Rate limit |
-| 500 | Server error |
+`xresponse.Json` currently returns HTTP 200 for JSON envelopes and places the application code in the response `code` field. Values such as 400, 401, 403, 404, and 500 are therefore protocol-shaped application codes, not transport status codes. Rate limiting currently uses system codes 20101 and 20102. Do not change this contract or assume HTTP status equals application code without an explicit compatibility decision and API tests.
 
 ---
 
 ## 4. Logging
 
-- Business code uses `xlogger.InfofCtx` / `xlogger.ErrorfCtx` (injects trace_id).
+- Business code uses the context-aware logger APIs, all of which inject `trace_id`: prefer `xlogger.InfoCtx` / `xlogger.ErrorCtx` for structured fields and use `xlogger.InfofCtx` / `xlogger.ErrorfCtx` when formatted logging is clearer.
 - Avoid `fmt.Printf` / `log.Println` in business code. CLI tools, startup banners, package-level fallback loggers, and non-production console access logs may use standard output when intentional.
 - `Warn`: reserved for access logs via `xlogger.Access()`.
 - `Info`: business events. `Error`: anomalies. `Debug`: disabled in production.
-- Sensitive fields auto-masked: password, token, secret, access_token, refresh_token, phone, id_card, email.
+- Never rely on automatic masking as the only control. Business logs must not include credentials, tokens, secrets, or PII. The access logger masks only its configured JSON paths; when a new sensitive field can enter request or response logs, update the masking configuration and tests.
 
 ---
 
@@ -124,8 +119,9 @@ Structure: `[level][module][specific]` — first digit = level, digits 2-3 = mod
 
 ## 6. Input Validation
 
-- API layer is the gate. Validate before reaching Service.
-- Gin binding tags: `binding:"required,max=64"`. Add explicit validation for business rules.
+- API validates transport-level input before reaching Service: binding, required fields, format, length, enums, and basic request limits.
+- Service validates business rules and state-dependent preconditions, such as resource existence, allowed status transitions, inventory, and operation eligibility.
+- Gin binding tags: `binding:"required,max=64"`. Add explicit validation for request-level constraints.
 - Common tags: `required`, `max=N`, `min=N`, `email`, `oneof=A B`.
 
 ---
@@ -141,6 +137,8 @@ Structure: `[level][module][specific]` — first digit = level, digits 2-3 = mod
 ## 8. Service Dependencies
 
 Use package boundaries to decide whether a Service dependency needs an interface.
+
+Before introducing a dependency, error, logging, transaction, cache, response, authorization, or configuration pattern, search the repository for the established implementation and reuse it unless it is insufficient for the requirement.
 
 | Scenario | Rule | Example |
 |----------|------|---------|

@@ -313,6 +313,9 @@ make gen do=init        # 生成所有表的 Model
 make gen do=add         # 交互式添加指定表的 Model
 make gen do=update      # 更新已有表的 Model
 make gen do=query       # 重新生成 Query API
+make new-module                                 # 生成默认 admin/demo 示例模块
+make new-module module=order                    # 在 admin domain 生成 order 模块
+make new-module domain=business module=order    # 在 business domain 生成 order 模块
 make mysql-init         # 初始化数据库数据
 make mq-init            # 声明 RabbitMQ 拓扑
 
@@ -388,18 +391,22 @@ GET /readyz    # Readiness probe（服务是否就绪）
     ↓
 make gen do=add / make gen do=update   # 生成 Model + Query
     ↓
+make new-module module=order           # 生成 DAO/Service/API/Router，并自动注册 DI 与路由
+    ↓
 实现 DAO 层（统一 `*query.Query` 参数，事务内传 `tx`，事务外传 `repo.Query()` / `repo.WriteQuery()`）
     ↓
 实现 Service 层（业务逻辑、缓存、操作日志）
     ↓
 实现 API 层（参数绑定、校验、响应转换）
     ↓
-注册路由 + 鉴权/权限配置（internal/router/*_router.go；登录态接口使用 JWTAuth，敏感管理接口额外使用 PermissionAuth）
+完善路由鉴权/权限配置（生成的详情示例已有 JWTAuth，敏感管理接口额外使用 PermissionAuth）
     ↓
-更新 DI 容器（internal/di/container.go）
+按实际依赖扩展生成的模块 Container（internal/di/container.go）
 ```
 
 > ⚠️ **警告**：`internal/dal/model/` 与 `internal/dal/query/` 为机器生成代码，**禁止手动编辑**。后续 `make gen` 会覆盖所有手动修改。
+
+模块生成器入口为 `cmd/modulegen`，默认使用 `domain=admin`、`module=demo`。它会生成 DAO/Service/API/Router 骨架、一个不访问数据库的 `GetXXXInfo` 示例，以及独立的模块 Container，并按现有分组自动注册 DI 和 Router；自定义 domain 的 Container 会增加域前缀以避免重名。目标文件、DI 或 Router 已存在同名注册时会在预检阶段报错并终止，新文件不会覆盖或删除已有内容。详情示例继承 domain 的 JWT 保护；正式业务仍需按实际场景补齐 `PermissionAuth`、业务错误码、真实查询逻辑和测试。
 
 ---
 
