@@ -204,7 +204,7 @@ func sortedByteMapKeys(values map[string][]byte) []string {
 }
 
 func writeNewFile(path string, content []byte) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644) // #nosec G304,G306 -- path is generator-owned; generated Go source files require standard 0644 permissions.
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644) // #nosec G302,G304 -- path is generator-owned; generated Go source files require standard 0644 permissions.
 	if err != nil {
 		return err
 	}
