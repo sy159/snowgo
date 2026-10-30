@@ -130,13 +130,13 @@ func (u *UserDao) GetRoleListByUserId(ctx context.Context, userId int32) ([]*mod
 }
 
 // GetRoleIdsByUserId 只返回 roleId，如果没找到记录则返回 0
-func (u *UserDao) GetRoleIdsByUserId(ctx context.Context, userId int32) ([]int32, error) {
+func (u *UserDao) GetRoleIdsByUserId(ctx context.Context, q *query.Query, userId int32) ([]int32, error) {
 	var roleIds []int32
 	if userId <= 0 {
 		return roleIds, errors.New("用户 id 不合法")
 	}
 
-	m := u.repo.Query().SysUserRole
+	m := q.SysUserRole
 	err := m.WithContext(ctx).Select(m.RoleID).Where(m.UserID.Eq(userId)).Scan(&roleIds)
 	if err != nil {
 		return roleIds, err
@@ -186,16 +186,27 @@ func (u *UserDao) CountRoleByIds(ctx context.Context, q *query.Query, roleIds []
 }
 
 // GetUserById 查询用户by id
-func (u *UserDao) GetUserById(ctx context.Context, userId int32) (*model.SysUser, error) {
+func (u *UserDao) GetUserById(ctx context.Context, q *query.Query, userId int32) (*model.SysUser, error) {
 	if userId <= 0 {
 		return nil, errors.New("用户id不存在")
 	}
-	m := u.repo.Query().SysUser
+	m := q.SysUser
 	user, err := m.WithContext(ctx).Where(m.ID.Eq(userId)).First()
 	if err != nil {
 		return nil, err
 	}
 	return user, nil
+}
+
+// GetMenuIdsByRoleIds 批量读取角色的授权范围，复用调用方事务。
+func (u *UserDao) GetMenuIdsByRoleIds(ctx context.Context, q *query.Query, roleIds []int32) ([]int32, error) {
+	if len(roleIds) == 0 {
+		return nil, nil
+	}
+	m := q.SysRoleMenu
+	var ids []int32
+	err := m.WithContext(ctx).Where(m.RoleID.In(roleIds...)).Distinct(m.MenuID).Pluck(m.MenuID, &ids)
+	return ids, err
 }
 
 // GetUserByUsername 查询用户by name

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -37,11 +38,12 @@ type UserRepo interface {
 	DeleteUserRole(ctx context.Context, q *query.Query, userId int32) error
 	DeleteById(ctx context.Context, q *query.Query, userId int32) error
 	GetRoleListByUserId(ctx context.Context, userId int32) ([]*model.SysRole, error)
-	GetRoleIdsByUserId(ctx context.Context, userId int32) ([]int32, error)
+	GetRoleIdsByUserId(ctx context.Context, q *query.Query, userId int32) ([]int32, error)
+	GetMenuIdsByRoleIds(ctx context.Context, q *query.Query, roleIds []int32) ([]int32, error)
 	IsNameTelDuplicate(ctx context.Context, username, tel string, userId int32) (bool, error)
 	IsExistByRoleId(ctx context.Context, roleId int32) (bool, error)
 	CountRoleByIds(ctx context.Context, q *query.Query, roleId []int32) (int64, error)
-	GetUserById(ctx context.Context, userId int32) (*model.SysUser, error)
+	GetUserById(ctx context.Context, q *query.Query, userId int32) (*model.SysUser, error)
 	GetUserByUsername(ctx context.Context, q *query.Query, username string) (*model.SysUser, error)
 	GetUserList(ctx context.Context, condition *account.UserListCondition) ([]*model.SysUser, int64, error)
 	ResetPwdById(ctx context.Context, q *query.Query, userId int32, password string) error
@@ -134,11 +136,13 @@ type UserListCondition struct {
 }
 
 var (
-	ErrUserNameTelExist = e.NewBizError(e.UserNameTelExistError)
-	ErrUserNotFound     = e.NewBizError(e.UserNotFound)
-	ErrAuth             = e.NewBizError(e.AuthError)
-	ErrRoleNotExist     = e.NewBizError(e.UserRoleNotExist)
-	ErrDeleteSelf       = e.NewBizError(e.UserDeleteSelfError)
+	ErrUserNameTelExist      = e.NewBizError(e.UserNameTelExistError)
+	ErrUserNotFound          = e.NewBizError(e.UserNotFound)
+	ErrAuth                  = e.NewBizError(e.AuthError)
+	ErrRoleNotExist          = e.NewBizError(e.UserRoleNotExist)
+	ErrDeleteSelf            = e.NewBizError(e.UserDeleteSelfError)
+	ErrUserRoleNotAuthorized = e.NewBizError(e.HttpForbidden)
+	ErrRefreshUserInvalid    = e.NewBizError(e.HttpUnauthorized)
 )
 
 var (
@@ -176,6 +180,51 @@ func validatePassword(pw string) *e.BizError {
 	}
 	if typeCount < 2 {
 		return e.NewBizError(e.PwdComplexityError)
+	}
+	return nil
+}
+
+func (u *UserService) validateRoleAssignment(ctx context.Context, tx *query.Query, operatorID, targetID int32, roleIDs []int32) error {
+	// 授权范围必须在写入前从同一事务读取，不能依赖可能尚未失效的权限缓存。
+	operatorRoles, err := u.userDao.GetRoleIdsByUserId(ctx, tx, operatorID)
+	if err != nil {
+		return fmt.Errorf("查询操作者角色失败: %w", err)
+	}
+	if slices.Contains(operatorRoles, constant.SuperAdminRoleId) {
+		return nil
+	}
+	if targetID > 0 {
+		targetRoles, err := u.userDao.GetRoleIdsByUserId(ctx, tx, targetID)
+		if err != nil {
+			return fmt.Errorf("查询目标用户角色失败: %w", err)
+		}
+		// 空角色列表也会清空原有绑定，必须先保护已有的超级管理员账号。
+		if slices.Contains(targetRoles, constant.SuperAdminRoleId) {
+			return ErrUserRoleNotAuthorized
+		}
+	}
+	if slices.Contains(roleIDs, constant.SuperAdminRoleId) {
+		return ErrUserRoleNotAuthorized
+	}
+	if len(roleIDs) == 0 {
+		return nil
+	}
+	operatorMenus, err := u.userDao.GetMenuIdsByRoleIds(ctx, tx, operatorRoles)
+	if err != nil {
+		return fmt.Errorf("查询操作者菜单权限失败: %w", err)
+	}
+	assignedMenus, err := u.userDao.GetMenuIdsByRoleIds(ctx, tx, roleIDs)
+	if err != nil {
+		return fmt.Errorf("查询待分配角色菜单权限失败: %w", err)
+	}
+	allowed := make(map[int32]struct{}, len(operatorMenus))
+	for _, id := range operatorMenus {
+		allowed[id] = struct{}{}
+	}
+	for _, id := range assignedMenus {
+		if _, ok := allowed[id]; !ok {
+			return ErrUserRoleNotAuthorized
+		}
 	}
 	return nil
 }
@@ -221,6 +270,10 @@ func (u *UserService) CreateUser(ctx context.Context, userParam *UserParam) (int
 			if roleLen != int64(len(userParam.RoleIds)) {
 				return ErrRoleNotExist
 			}
+		}
+
+		if err := u.validateRoleAssignment(ctx, tx, userContext.UserId, 0, userParam.RoleIds); err != nil {
+			return err
 		}
 
 		// 创建用户
@@ -301,7 +354,7 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 		return 0, ErrUserNotFound
 	}
 	// 获取用户信息
-	oldUser, err := u.userDao.GetUserById(ctx, userParam.ID)
+	oldUser, err := u.userDao.GetUserById(ctx, u.db.Query(), userParam.ID)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "获取用户(%d)信息异常: %v", userParam.ID, err)
 		return 0, fmt.Errorf("用户信息查询失败: %w", err)
@@ -328,6 +381,10 @@ func (u *UserService) UpdateUser(ctx context.Context, userParam *UserParam) (int
 			if roleLen != int64(len(userParam.RoleIds)) {
 				return ErrRoleNotExist
 			}
+		}
+
+		if err := u.validateRoleAssignment(ctx, tx, userContext.UserId, userParam.ID, userParam.RoleIds); err != nil {
+			return err
 		}
 
 		// 更新用户（指针字段仅在非空时传入）
@@ -423,7 +480,7 @@ func (u *UserService) GetUserById(ctx context.Context, userId int32) (*UserInfo,
 	if userId <= 0 {
 		return nil, ErrUserNotFound
 	}
-	user, err := u.userDao.GetUserById(ctx, userId)
+	user, err := u.userDao.GetUserById(ctx, u.db.Query(), userId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUserNotFound
@@ -511,7 +568,7 @@ func (u *UserService) DeleteById(ctx context.Context, userId int32) error {
 		return ErrDeleteSelf
 	}
 	// 查询被删除用户信息，用于操作日志记录
-	oldUser, err := u.userDao.GetUserById(ctx, userId)
+	oldUser, err := u.userDao.GetUserById(ctx, u.db.Query(), userId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrUserNotFound
@@ -584,7 +641,7 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 		return err
 	}
 	// 获取用户信息
-	user, err := u.userDao.GetUserById(ctx, userId)
+	user, err := u.userDao.GetUserById(ctx, u.db.Query(), userId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrUserNotFound
@@ -632,6 +689,25 @@ func (u *UserService) ResetPwdById(ctx context.Context, userId int32, password s
 		return err
 	}
 	xlogger.InfofCtx(ctx, "用户(%d-%s)重置用户(%d)密码成功", userContext.UserId, userContext.Username, userId)
+	return nil
+}
+
+// ValidateRefreshUser 保留 access token 自然过期，仅在续期时校验账号当前状态。
+func (u *UserService) ValidateRefreshUser(ctx context.Context, userID int32) error {
+	if userID <= 0 {
+		return ErrRefreshUserInvalid
+	}
+	// 读取主库，避免复制延迟让已禁用或已删除的账号继续续期。
+	user, err := u.userDao.GetUserById(ctx, u.db.WriteQuery(), userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrRefreshUserInvalid
+		}
+		return fmt.Errorf("查询刷新令牌用户失败: %w", err)
+	}
+	if user.Status == nil || *user.Status != constant.UserStatusActive {
+		return ErrRefreshUserInvalid
+	}
 	return nil
 }
 
@@ -690,7 +766,7 @@ func (u *UserService) GetRoleIdsByUserId(ctx context.Context, userId int32) ([]i
 	}
 
 	//  缓存未命中或解析失败：查库拿 RoleId
-	roleIds, err := u.userDao.GetRoleIdsByUserId(ctx, userId)
+	roleIds, err := u.userDao.GetRoleIdsByUserId(ctx, u.db.Query(), userId)
 	if err != nil {
 		xlogger.ErrorfCtx(ctx, "查询用户角色id失败 uid=%d: %v", userId, err)
 		return roleIds, fmt.Errorf("查询用户角色id失败: %w", err)

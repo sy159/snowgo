@@ -56,7 +56,7 @@ func (f *fakeUserRepo) GetRoleListByUserId(context.Context, int32) ([]*model.Sys
 	panic("not implemented")
 }
 
-func (f *fakeUserRepo) GetRoleIdsByUserId(context.Context, int32) ([]int32, error) {
+func (f *fakeUserRepo) GetRoleIdsByUserId(context.Context, *query.Query, int32) ([]int32, error) {
 	f.getRoleIDsCalls++
 	return f.roleIds, f.roleIdsErr
 }
@@ -73,7 +73,11 @@ func (f *fakeUserRepo) CountRoleByIds(context.Context, *query.Query, []int32) (i
 	panic("not implemented")
 }
 
-func (f *fakeUserRepo) GetUserById(context.Context, int32) (*model.SysUser, error) {
+func (f *fakeUserRepo) GetUserById(context.Context, *query.Query, int32) (*model.SysUser, error) {
+	panic("not implemented")
+}
+
+func (f *fakeUserRepo) GetMenuIdsByRoleIds(context.Context, *query.Query, []int32) ([]int32, error) {
 	panic("not implemented")
 }
 

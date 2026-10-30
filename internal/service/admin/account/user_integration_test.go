@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"gorm.io/gorm"
+
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
 	daoAccount "snowgo/internal/dao/admin/account"
@@ -16,10 +18,124 @@ import (
 	"snowgo/pkg/xcryption"
 )
 
+func insertIntegrationUserAdmin(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	role := insertIntegrationRole(t, db, "it_super_admin", "超级管理员")
+	admin := insertIntegrationUser(t, db, "admin", "18000000000", role.ID)
+	if role.ID != constant.SuperAdminRoleId || admin.ID != 1 {
+		t.Fatal("expected clean fixture with super role and operator ID 1")
+	}
+}
+
+func TestUserRoleAssignmentIntegration(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		update      bool
+		self        bool
+		protected   bool
+		grantSuper  bool
+		grantExcess bool
+		allowed     bool
+	}{
+		{name: "create cannot grant super", grantSuper: true},
+		{name: "create cannot grant excess", grantExcess: true},
+		{name: "update cannot grant excess", update: true, grantExcess: true},
+		{name: "self escalation denied", update: true, self: true, grantSuper: true},
+		{name: "cannot remove super role", update: true, protected: true},
+		{name: "create subset permitted", allowed: true},
+		{name: "update subset permitted", update: true, allowed: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			deps := setupIntegrationDeps(t)
+			db := deps.repo.DB()
+			cleanupIntegrationTables(t, db)
+			super := insertIntegrationRole(t, db, "it_super", "超级管理员")
+			operatorRole := insertIntegrationRole(t, db, "it_operator", "操作员")
+			excess := insertIntegrationRole(t, db, "it_excess", "高权限角色")
+			subset := insertIntegrationRole(t, db, "it_subset", "低权限角色")
+			operator := insertIntegrationUser(t, db, "admin", "18000000000", operatorRole.ID)
+			owned := insertIntegrationMenu(t, db, 0, constant.MenuTypeBtn, "已有权限")
+			other := insertIntegrationMenu(t, db, 0, constant.MenuTypeBtn, "额外权限")
+			insertIntegrationRoleMenu(t, db, operatorRole.ID, owned.ID)
+			insertIntegrationRoleMenu(t, db, subset.ID, owned.ID)
+			insertIntegrationRoleMenu(t, db, excess.ID, other.ID)
+			p := &UserParam{Username: "subject", Password: "abc123", Tel: "18100000000", RoleIds: []int32{subset.ID}}
+			if tc.grantSuper {
+				p.RoleIds = []int32{super.ID}
+			}
+			if tc.grantExcess {
+				p.RoleIds = []int32{excess.ID}
+			}
+			if tc.update {
+				targetRole := subset.ID
+				if tc.protected {
+					targetRole = super.ID
+					p.RoleIds = nil
+				}
+				target := operator
+				if !tc.self {
+					target = insertIntegrationUser(t, db, "target", "18200000000", targetRole)
+				}
+				p.ID = target.ID
+			}
+			s := newIntegrationUserService(deps)
+			var id int32
+			var err error
+			if tc.update {
+				id, err = s.UpdateUser(testUserCtx(), p)
+			} else {
+				id, err = s.CreateUser(testUserCtx(), p)
+			}
+			if !tc.allowed {
+				if !errors.Is(err, ErrUserRoleNotAuthorized) {
+					t.Fatalf("expected forbidden, got %v", err)
+				}
+				if countRows(t, db, model.TableNameSysUser, "username = ?", "subject") != 0 || countRows(t, db, model.TableNameSysOperationLog, "") != 0 {
+					t.Fatal("rejected assignment persisted business changes or audit")
+				}
+				if tc.protected && countRows(t, db, model.TableNameSysUserRole, "user_id = ? AND role_id = ?", p.ID, super.ID) != 1 {
+					t.Fatal("super role was removed")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if countRows(t, db, model.TableNameSysUserRole, "user_id = ? AND role_id = ?", id, subset.ID) != 1 || countRows(t, db, model.TableNameSysOperationLog, "resource_id = ?", id) != 1 {
+				t.Fatal("authorized role assignment or audit missing")
+			}
+		})
+	}
+}
+
+func TestValidateRefreshUserIntegration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+	db := deps.repo.DB()
+	cleanupIntegrationTables(t, db)
+	user := insertIntegrationUser(t, db, "refresh_user", "18100000000")
+	s := newIntegrationUserService(deps)
+	if err := s.ValidateRefreshUser(testUserCtx(), user.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(user).Update("status", constant.UserStatusDisabled).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ValidateRefreshUser(testUserCtx(), user.ID); !errors.Is(err, ErrRefreshUserInvalid) {
+		t.Fatalf("expected disabled account rejected, got %v", err)
+	}
+	if err := db.Delete(user).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ValidateRefreshUser(testUserCtx(), user.ID); !errors.Is(err, ErrRefreshUserInvalid) {
+		t.Fatalf("expected deleted account rejected, got %v", err)
+	}
+}
+
 func TestUserServiceCreateUserIntegration(t *testing.T) {
 	deps := setupIntegrationDeps(t)
 	db := deps.repo.DB()
 	cleanupIntegrationTables(t, db)
+	insertIntegrationUserAdmin(t, db)
 
 	role := insertIntegrationRole(t, db, "it_user_role", "用户角色")
 	service := newIntegrationUserService(deps)
@@ -62,6 +178,7 @@ func TestUserServiceCreateUserRollbackIntegration(t *testing.T) {
 	deps := setupIntegrationDeps(t)
 	db := deps.repo.DB()
 	cleanupIntegrationTables(t, db)
+	insertIntegrationUserAdmin(t, db)
 
 	role := insertIntegrationRole(t, db, "it_user_create_rollback_role", "用户创建回滚角色")
 	operationLogService := systemService.NewOperationLogService(deps.repo, failingOperationLogRepo{})
@@ -91,6 +208,7 @@ func TestUserServiceUpdateUserIntegration(t *testing.T) {
 	deps := setupIntegrationDeps(t)
 	db := deps.repo.DB()
 	cleanupIntegrationTables(t, db)
+	insertIntegrationUserAdmin(t, db)
 
 	oldRole := insertIntegrationRole(t, db, "it_old_role", "旧角色")
 	newRole := insertIntegrationRole(t, db, "it_new_role", "新角色")
@@ -143,6 +261,7 @@ func TestUserServiceUpdateUserRollbackIntegration(t *testing.T) {
 	deps := setupIntegrationDeps(t)
 	db := deps.repo.DB()
 	cleanupIntegrationTables(t, db)
+	insertIntegrationUserAdmin(t, db)
 
 	oldRole := insertIntegrationRole(t, db, "it_old_role", "旧角色")
 	newRole := insertIntegrationRole(t, db, "it_new_role", "新角色")

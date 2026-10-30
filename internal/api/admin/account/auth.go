@@ -152,6 +152,18 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
+	// 仅在续期时检查账号状态；校验失败不能消费旧 JTI 或签发新令牌。
+	if err := container.UserService.ValidateRefreshUser(ctx, claims.UserId); err != nil {
+		var bizErr *e.BizError
+		if errors.As(err, &bizErr) {
+			xresponse.FailByError(c, bizErr.Code)
+			return
+		}
+		xlogger.ErrorfCtx(ctx, "validate refresh user failed: user_id=%d err=%v", claims.UserId, err)
+		xresponse.FailByError(c, e.HttpInternalServerError)
+		return
+	}
+
 	// 先删除旧 JTI，再生成新的token，宁愿用户重新登录，也不允许 refresh token 被并发重复使用，并且生成新token理论上不应该失败
 	// 删除旧 jti（防止重放）
 	jtiKey := constant.CacheRefreshJtiPrefix + claims.ID

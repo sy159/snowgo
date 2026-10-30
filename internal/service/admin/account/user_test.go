@@ -1,14 +1,21 @@
 package account
 
 import (
+	"context"
+	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"testing"
 
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
 	"snowgo/internal/constant"
 	"snowgo/internal/dal/model"
+	"snowgo/internal/dal/query"
 	"snowgo/internal/dal/repo"
+	"snowgo/internal/service/admin/contract"
+	"snowgo/pkg/xauth"
 	"snowgo/pkg/xcryption"
 	e "snowgo/pkg/xerror"
 )
@@ -174,7 +181,7 @@ func TestUserServiceGetRoleIdsByUserId(t *testing.T) {
 		cache := newFakeCache()
 		cache.values[cacheKey] = "[1,2]"
 		repo := &fakeUserRepo{roleIds: []int32{3}}
-		service := &UserService{userDao: repo, cache: cache}
+		service := &UserService{db: userSecurityDB(t), userDao: repo, cache: cache}
 
 		got, err := service.GetRoleIdsByUserId(testUserCtx(), 2)
 		if err != nil {
@@ -191,7 +198,7 @@ func TestUserServiceGetRoleIdsByUserId(t *testing.T) {
 	t.Run("cache miss reads dao and writes cache", func(t *testing.T) {
 		cache := newFakeCache()
 		repo := &fakeUserRepo{roleIds: []int32{3, 4}}
-		service := &UserService{userDao: repo, cache: cache}
+		service := &UserService{db: userSecurityDB(t), userDao: repo, cache: cache}
 
 		got, err := service.GetRoleIdsByUserId(testUserCtx(), 2)
 		if err != nil {
@@ -209,7 +216,7 @@ func TestUserServiceGetRoleIdsByUserId(t *testing.T) {
 		cache := newFakeCache()
 		cache.values[cacheKey] = "not-json"
 		repo := &fakeUserRepo{roleIds: []int32{5}}
-		service := &UserService{userDao: repo, cache: cache}
+		service := &UserService{db: userSecurityDB(t), userDao: repo, cache: cache}
 
 		got, err := service.GetRoleIdsByUserId(testUserCtx(), 2)
 		if err != nil {
@@ -222,6 +229,7 @@ func TestUserServiceGetRoleIdsByUserId(t *testing.T) {
 
 	t.Run("dao error", func(t *testing.T) {
 		service := &UserService{
+			db:      &repo.Repository{},
 			userDao: &fakeUserRepo{roleIdsErr: errTestDAO},
 			cache:   newFakeCache(),
 		}
@@ -243,4 +251,208 @@ func equalInt32s(a, b []int32) bool {
 		}
 	}
 	return true
+}
+
+// 只模拟事务连接；业务读写由 fake DAO 承接，意外 SQL 会使测试失败。
+type userTestDriver struct{}
+type userTestConn struct{}
+type userTestTx struct{}
+
+func (userTestDriver) Open(string) (driver.Conn, error)  { return userTestConn{}, nil }
+func (userTestConn) Prepare(string) (driver.Stmt, error) { return nil, errors.New("unexpected SQL") }
+func (userTestConn) Close() error                        { return nil }
+func (userTestConn) Begin() (driver.Tx, error)           { return userTestTx{}, nil }
+func (userTestTx) Commit() error                         { return nil }
+func (userTestTx) Rollback() error                       { return nil }
+
+func init() { sql.Register("user-security-test", userTestDriver{}) }
+
+func userSecurityDB(t *testing.T) *repo.Repository {
+	t.Helper()
+	db, err := sql.Open("user-security-test", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	gdb, err := gorm.Open(mysql.New(mysql.Config{Conn: db, SkipInitializeWithVersion: true}), &gorm.Config{DisableAutomaticPing: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return repo.NewRepository(gdb, nil)
+}
+
+type assignmentRepo struct {
+	UserRepo
+	roles    map[int32][]int32
+	menus    map[int32][]int32
+	rolesErr error
+	menusErr error
+	writes   int
+	q        *query.Query
+}
+
+func (r *assignmentRepo) IsNameTelDuplicate(context.Context, string, string, int32) (bool, error) {
+	return false, nil
+}
+func (r *assignmentRepo) CountRoleByIds(_ context.Context, q *query.Query, ids []int32) (int64, error) {
+	r.q = q
+	return int64(len(ids)), nil
+}
+func (r *assignmentRepo) GetRoleIdsByUserId(_ context.Context, q *query.Query, id int32) ([]int32, error) {
+	if q == nil || (r.q != nil && q != r.q) {
+		return nil, errors.New("role lookup escaped transaction")
+	}
+	r.q = q
+	return r.roles[id], r.rolesErr
+}
+func (r *assignmentRepo) GetMenuIdsByRoleIds(_ context.Context, q *query.Query, ids []int32) ([]int32, error) {
+	if q != r.q && r.q != nil {
+		return nil, errors.New("authorization query escaped transaction")
+	}
+	var menus []int32
+	for _, id := range ids {
+		menus = append(menus, r.menus[id]...)
+	}
+	return menus, r.menusErr
+}
+func (r *assignmentRepo) GetUserById(_ context.Context, _ *query.Query, id int32) (*model.SysUser, error) {
+	return &model.SysUser{ID: id}, nil
+}
+func (r *assignmentRepo) CreateUser(_ context.Context, _ *query.Query, user *model.SysUser) (*model.SysUser, error) {
+	r.writes++
+	user.ID = 10
+	return user, nil
+}
+func (r *assignmentRepo) UpdateUser(_ context.Context, _ *query.Query, user *model.SysUser) (*model.SysUser, error) {
+	r.writes++
+	return user, nil
+}
+func (r *assignmentRepo) CreateUserRoleInBatches(context.Context, *query.Query, []*model.SysUserRole) error {
+	r.writes++
+	return nil
+}
+func (r *assignmentRepo) DeleteUserRole(context.Context, *query.Query, int32) error {
+	r.writes++
+	return nil
+}
+
+type assignmentLog struct{ calls int }
+
+func (l *assignmentLog) CreateOperationLog(context.Context, *query.Query, *contract.OperationLogInput) error {
+	l.calls++
+	return nil
+}
+
+func TestUserRoleAssignment(t *testing.T) {
+	for _, update := range []bool{false, true} {
+		name := "create"
+		if update {
+			name = "update"
+		}
+		t.Run(name, func(t *testing.T) {
+			for _, tc := range []struct {
+				name          string
+				operatorRoles []int32
+				targetRoles   []int32
+				assigned      []int32
+				rolesErr      error
+				menusErr      error
+				wantErr       error
+				forbidden     bool
+			}{
+				{name: "cannot grant super admin", operatorRoles: []int32{2}, assigned: []int32{1}, forbidden: true},
+				{name: "cannot grant greater permissions", operatorRoles: []int32{2}, assigned: []int32{3}, forbidden: true},
+				{name: "can grant permission subset", operatorRoles: []int32{2}, assigned: []int32{4}},
+				{name: "super admin can grant any role", operatorRoles: []int32{1}, assigned: []int32{3}},
+				{name: "super admin can grant super role", operatorRoles: []int32{1}, assigned: []int32{1}},
+				{name: "no assigned roles", operatorRoles: []int32{2}},
+				{name: "cannot grant without permissions", assigned: []int32{4}, forbidden: true},
+				{name: "role lookup failure", assigned: []int32{4}, rolesErr: errTestDAO, wantErr: errTestDAO},
+				{name: "menu lookup failure", operatorRoles: []int32{2}, assigned: []int32{4}, menusErr: errTestDAO, wantErr: errTestDAO},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					r := &assignmentRepo{roles: map[int32][]int32{2: tc.operatorRoles, 9: tc.targetRoles}, menus: map[int32][]int32{2: {10, 20}, 3: {10, 30}, 4: {10}}, rolesErr: tc.rolesErr, menusErr: tc.menusErr}
+					log := &assignmentLog{}
+					s := NewUserService(userSecurityDB(t), r, newFakeCache(), nil, log)
+					ctx := context.WithValue(testUserCtx(), xauth.XUserId, int32(2))
+					p := &UserParam{ID: 9, Username: "target", Password: "abc123", Tel: "18100000000", RoleIds: tc.assigned}
+					var err error
+					if update {
+						_, err = s.UpdateUser(ctx, p)
+					} else {
+						_, err = s.CreateUser(ctx, p)
+					}
+					if tc.forbidden {
+						var biz *e.BizError
+						if !errors.As(err, &biz) || biz.Code != e.HttpForbidden {
+							t.Fatalf("expected forbidden, got %v", err)
+						}
+					} else if tc.wantErr != nil {
+						if !errors.Is(err, tc.wantErr) {
+							t.Fatalf("expected %v, got %v", tc.wantErr, err)
+						}
+					} else if err != nil {
+						t.Fatal(err)
+					}
+					if tc.forbidden || tc.wantErr != nil {
+						if r.writes != 0 || log.calls != 0 {
+							t.Fatal("rejected assignment wrote business data or audit")
+						}
+					} else if r.writes == 0 || log.calls != 1 {
+						t.Fatal("authorized write/audit did not execute")
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestUserRoleAssignmentSelfEscalation(t *testing.T) {
+	r := &assignmentRepo{roles: map[int32][]int32{2: {2}}}
+	log := &assignmentLog{}
+	s := NewUserService(userSecurityDB(t), r, newFakeCache(), nil, log)
+	ctx := context.WithValue(testUserCtx(), xauth.XUserId, int32(2))
+	_, err := s.UpdateUser(ctx, &UserParam{ID: 2, Username: "operator", Tel: "18100000000", RoleIds: []int32{constant.SuperAdminRoleId}})
+	if !errors.Is(err, ErrUserRoleNotAuthorized) || r.writes != 0 || log.calls != 0 {
+		t.Fatalf("expected self escalation denied without writes, got %v", err)
+	}
+}
+
+type refreshStateRepo struct {
+	UserRepo
+	q   *query.Query
+	ctx context.Context
+}
+
+func (r *refreshStateRepo) GetUserById(ctx context.Context, q *query.Query, id int32) (*model.SysUser, error) {
+	r.q, r.ctx = q, ctx
+	status := constant.UserStatusActive
+	return &model.SysUser{ID: id, Status: &status}, nil
+}
+
+func TestValidateRefreshUserUsesPrimary(t *testing.T) {
+	db := userSecurityDB(t)
+	r := &refreshStateRepo{}
+	s := NewUserService(db, r, nil, nil, nil)
+	ctx := testUserCtx()
+	if err := s.ValidateRefreshUser(ctx, 5); err != nil {
+		t.Fatal(err)
+	}
+	if r.q != db.WriteQuery() || r.ctx != ctx {
+		t.Fatal("refresh validation did not use primary query and caller context")
+	}
+}
+
+func TestUserRoleAssignmentProtectsSuperAdmin(t *testing.T) {
+	for _, roles := range [][]int32{nil, {4}} {
+		r := &assignmentRepo{roles: map[int32][]int32{2: {2}, 9: {constant.SuperAdminRoleId}}, menus: map[int32][]int32{2: {10}, 4: {10}}}
+		log := &assignmentLog{}
+		s := NewUserService(userSecurityDB(t), r, newFakeCache(), nil, log)
+		ctx := context.WithValue(testUserCtx(), xauth.XUserId, int32(2))
+		_, err := s.UpdateUser(ctx, &UserParam{ID: 9, Username: "admin", Tel: "18100000000", RoleIds: roles})
+		var biz *e.BizError
+		if !errors.As(err, &biz) || biz.Code != e.HttpForbidden || r.writes != 0 || log.calls != 0 {
+			t.Fatalf("expected protected admin with no writes, got %v", err)
+		}
+	}
 }
